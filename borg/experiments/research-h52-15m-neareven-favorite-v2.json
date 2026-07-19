@@ -1,0 +1,73 @@
+{
+  "experiment_id": "research-h52-15m-neareven-favorite-v2",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-18T19:05:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "short_window_terminal_favorite_calibration",
+  "supersedes": "research-h52-hourly-neareven-favorite-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "research-h52-v2",
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "v1_disposition": {
+    "defect": "The up/down event classifier typed Polymarket's 5m, 15m and 1h series identically as direction_1h. Consequences: (a) v1 placed 36/40 forward orders on direction_5m markets — the known fee-negative cell — via duplicate mislabeled in-memory records; (b) the v1 discovery cohort labeled '1h' was actually 90% fifteen-minute markets (36/40) with window_start stored 45 minutes early.",
+    "v1_rows": "All rows under experiment research-h52-hourly-neareven-favorite-v1 and strategy H52_hourly_neareven_favorite_v1 are excluded from every H52 read forever.",
+    "fixes": "Classifier now types by slug (research-universe.js directionMarketType); 5m slugs are excluded from this discovery path entirely; borg_markets rows relabeled direction_15m with corrected window_start/timeframe/resolution_source; klines re-anchored on exact 1m candles."
+  },
+  "hypothesis": "In fifteen-minute up/down markets during the final 60-300 seconds, the favorite token quoted 0.50-0.60 at the executable ask is systematically underpriced, because quoting attention concentrates on the 5-minute series and the 15-minute books go stale near resolution.",
+  "discovery_evidence": {
+    "method": "Retrospective borg_book_snaps calibration, one snapshot per resolved market (first with tte 60-300s), favorite = higher best ask, executable ask entry, crypto taker fee 0.07*p*(1-p) per share.",
+    "window": "2026-07-17 01:14Z through 2026-07-18 (the entire snapshot dataset — two days; this is NOT a robustness split)",
+    "product_split": {"direction_15m": {"markets": 36, "wins": 24, "pnl_per_share_1x": 0.1013, "avg_ask": 0.5481}, "direction_1h_true": {"markets": 4, "wins": 4, "note": "unusable n"}},
+    "negative_control": "Identical cell on direction_5m: n=1,720, win rate 0.528, -0.033/share at 1x.",
+    "independent_verification": "report-h52-verifier-2026-07-18.md — key findings incorporated: entries cluster (34 distinct timestamps; correlated same-minute cross-asset pairs); clustered p approximately 0.039-0.059 against the book-implied favorite probability 0.542; under a >=52-hypothesis search this is consistent with pure selection. tte sub-window structure is non-monotone (zigzag) — the earlier 'later entry is stronger' claim is retracted. Displacement-robustness claims are struck (btc_ref column was broken; reference candles were poisoned at analysis time). Band-edge decay is smooth (0.194 at 0.50-0.55 falling to 0.012 at 0.60-0.70), stale-book/fee/tick/coverage attacks failed, delayed-fill simulation at +5/10/30s holds approximately +0.14.",
+    "known_weaknesses": [
+      "Two capture days = the entire dataset; no across-regime evidence exists.",
+      "Post-selection band and window; clustered significance is marginal and consistent with search artifacts.",
+      "sol subgroup negative in-sample (-0.021 over ask 0.50-0.70) — treated as noise, not excluded.",
+      "Median displayed touch depth ~$130 per entry; capacity is tiny.",
+      "About 17% of v1 forward orders were marked unfilled by the execution model — displayed asks are not always takeable."
+    ]
+  },
+  "frozen_mechanics": {
+    "market_types": ["direction_15m"],
+    "assets": ["btc", "eth", "sol", "xrp"],
+    "entry_window_tte_sec": [60, 300],
+    "favorite_definition": "side with the strictly higher best ask; equal asks skip",
+    "favorite_ask_band": [0.50, 0.60],
+    "fair_favorite_probability_frozen": 0.667,
+    "execution": "single taker buy of the favorite at the displayed ask, latency_1s execution model, 20% displayed-touch participation, TARGET_STAKE_USD stake, once per market, hold to terminal resolution; strategy-level market_type guard in addition to engine dispatch",
+    "no_exit_logic": true,
+    "thresholds_may_not_change_during_eval": true
+  },
+  "registered_prediction": "If the mechanism is real, forward mean net P&L per entered market is positive at 2x costs. If the discovery was selection, the arm converges to approximately -1x fees per market (about -$0.20 per $10 stake).",
+  "strategy_bindings": [
+    {
+      "strategy": "H52_15m_neareven_favorite_v2",
+      "family": "short_window_terminal_favorite_calibration",
+      "arm": "baseline",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "cluster_by": ["Polymarket market/window", "UTC day", "entry timestamp minute (cross-asset co-entries are one cluster)"],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "multiple_testing": "Correct across the full H1-H52 research family and every discarded variant.",
+    "early_kill": "If mean net_pnl_2x per entered market is at or below zero at 100 independent direction_15m markets, stop the arm and record the negative result.",
+    "watch_items": ["sol subgroup", "win rate vs book-implied 0.542", "unfilled-order asymmetry (winners running away)", "depth-constrained fills"],
+    "overlap_rule": "Markets also entered by any other 15m/1h arm must be reported jointly; do not sum overlapping arms as independent profit.",
+    "promotion": "No live path. Passing the mechanical read only triggers a separate implementation and risk review.",
+    "null_outcome": "Measured edge may be approximately zero; no parameter or inverse signal may be selected from the discovery cohort."
+  }
+}

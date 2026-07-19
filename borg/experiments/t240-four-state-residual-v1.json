@@ -1,0 +1,63 @@
+{
+  "experiment_id": "t240-four-state-residual-v1",
+  "manifest_format": "borg-experiment-v1",
+  "strategy_version": "v1-frozen",
+  "created_at": "2026-07-16",
+  "frozen_at": "2026-07-16T13:00:00.000Z",
+  "status": "frozen",
+  "phase": "eval",
+  "paper_only": true,
+  "live_order_path": false,
+  "family": "t240_four_state_residual",
+  "primary_metric": "net_pnl_2x",
+  "discovery_evidence": {
+    "generated_at": "2026-07-16T12:45:49.078Z",
+    "discovery_trades_excluded": 64,
+    "discovery_pnl_2x_usd": 1.47,
+    "first_half_pnl_2x_usd": 4.04,
+    "second_half_pnl_2x_usd": -2.57,
+    "clustered_mean_ci95_usd": [-2.1292, 2.2187],
+    "interpretation": "Exploratory result is unstable and consistent with zero edge. Every observation before this manifest is excluded."
+  },
+  "model": {
+    "target_tte_sec": 240,
+    "target_window_sec": [237.5, 240.5],
+    "cex_momentum_lookback_sec": 60,
+    "minimum_history_sec": 55,
+    "state_definition": ["CEX_UP__MARKET_UP", "CEX_UP__MARKET_DOWN", "CEX_DOWN__MARKET_UP", "CEX_DOWN__MARKET_DOWN"],
+    "features": ["intercept", "market_mid_log_odds", "state_1", "state_2", "state_3"],
+    "coefficients": [-0.282899, 1.188078, -0.182171, 0.153905, 0.489076],
+    "assets": ["btc", "eth", "sol", "bnb", "doge", "xrp", "hype"],
+    "asset_selection": "none; asset is a pre-registered reporting stratum only"
+  },
+  "execution": {
+    "benchmark": "displayed executable ask",
+    "fee_stress_multiplier": 2,
+    "edge_buffer_per_share_usd": 0.01,
+    "stake_cap_usd": 10,
+    "touch_depth_participation": 0.2,
+    "minimum_notional_usd": 1,
+    "execution_model": "latency_1s",
+    "atomic": false
+  },
+  "evaluation": {
+    "independent_markets": 300,
+    "days": 14,
+    "required_quality_coverage": 0.9,
+    "required_market_clustered_lower_ci": 0,
+    "required_first_half_pnl_2x": 0,
+    "required_second_half_pnl_2x": 0,
+    "multiple_testing": "Holm family-wise correction across the registered promotion-report family",
+    "asset_report": true,
+    "no_live_promotion": "Passing permits a separately reviewed tiny canary only; it never authorizes live trading."
+  },
+  "strategy_bindings": [{
+    "strategy": "T240_four_state_residual_v1",
+    "family": "t240_four_state_residual",
+    "arm": "baseline",
+    "phase": "eval",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "net_pnl_2x"
+  }]
+}

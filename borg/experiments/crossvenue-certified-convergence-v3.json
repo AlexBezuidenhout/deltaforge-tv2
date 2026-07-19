@@ -1,0 +1,63 @@
+{
+  "experiment_id": "crossvenue-certified-convergence-v3",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-18T19:41:17.570Z",
+  "evidence_started_at": "2026-07-18T19:41:17.570Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "rule_aware_crossvenue_convergence",
+  "strategy_version": "crossvenue-certified-convergence-v3",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "selection_disclosure": "All pre-V3 matches, opportunities and basis samples are excluded. They paired independently latest venue books and manual approvals were not cryptographically bound to the reviewed rule text.",
+  "hypothesis": "When two content-hash-certified contracts have a proved payoff relation, a persistent executable probability dislocation can offer either a positive terminal minimum payout or a measurable post-fee convergence exit without requiring sub-millisecond colocation.",
+  "identity": {
+    "approval": "Exact Polymarket condition id and Kalshi ticker plus manual review bound to both current rule-document hashes.",
+    "rule_change": "Any venue rule change invalidates approval until a new manual review records the new hashes.",
+    "automatic_title_matching": "diagnostic discovery only; never economic evidence",
+    "legacy_reviews": "fail closed as REQUIRES_RULE_HASH_REVIEW"
+  },
+  "synchronization": {
+    "clock": "local monotonic receive order with source timestamps retained separately",
+    "holdback_ms": 250,
+    "maximum_receive_skew_ms": 250,
+    "maximum_state_age": "venue-specific freshness limits",
+    "pairing": "latest causal state from each venue at the decision cut; never search backward for an older aligned pair",
+    "unsynchronized_rows": "stored as grade-F diagnostics; cannot open an evidence episode"
+  },
+  "execution": {
+    "entry": "walk equal payout quantity through both executable ask books",
+    "early_exit": "walk both executable bid books and charge all four taker fees",
+    "terminal": "credit only the statewise minimum payout from the certified relation proof",
+    "fee_stress": "fees charged again plus one adverse tick on each leg",
+    "atomicity": false,
+    "jurisdiction": "paper observation only; the Dublin process must not trade Kalshi"
+  },
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "primary_metric": "net_executable_convergence_pnl_after_all_entry_and_exit_fees",
+    "secondary_metrics": [
+      "terminal_minimum_profit_after_two_times_cost",
+      "time_to_first_profitable_liquidation",
+      "displayed_capacity",
+      "orphan_leg_immediate_unwind_loss"
+    ],
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bound_above_zero": true,
+    "right_censor_unconverged_positions": true,
+    "null_outcome": "No certified active pairs or no post-fee convergence is an acceptable result."
+  },
+  "strategy_bindings": [{
+    "strategy": "crossvenue_certified_convergence_v3",
+    "family": "rule_aware_crossvenue_convergence",
+    "arm": "250ms_receive_skew",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "net_convergence_pnl_all_fees"
+  }]
+}

@@ -1,0 +1,145 @@
+{
+  "experiment_id": "allmarket-l2-maker-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-16T17:00:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "allmarket_event_driven_l2",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "allmarket-queue-v1",
+  "provisional": true,
+  "strategy_bindings": [
+    {
+      "strategy": "AM_passive_maker_v1",
+      "family": "passive_queue_markout",
+      "arm": "event_20_50ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_fill"
+    },
+    {
+      "strategy": "AM_reward_passive_maker_v1",
+      "family": "passive_queue_markout",
+      "arm": "event_20_50ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_fill_excluding_unattributed_rewards"
+    },
+    {
+      "strategy": "AM_L2_predictor_control_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_20ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    },
+    {
+      "strategy": "AM_L2_predictor_control_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_50ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    },
+    {
+      "strategy": "AM_L2_predictor_control_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_100ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    },
+    {
+      "strategy": "AM_L2_predictor_control_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_250ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    },
+    {
+      "strategy": "AM_L2_predictor_control_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_500ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    },
+    {
+      "strategy": "AM_L2_cost_confirmed_taker_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_20ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    },
+    {
+      "strategy": "AM_L2_cost_confirmed_taker_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_50ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    },
+    {
+      "strategy": "AM_L2_cost_confirmed_taker_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_100ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    },
+    {
+      "strategy": "AM_L2_cost_confirmed_taker_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_250ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    },
+    {
+      "strategy": "AM_L2_cost_confirmed_taker_v1",
+      "family": "pretrade_l2_markout",
+      "arm": "latency_500ms",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_trigger"
+    }
+  ],
+  "universe": {
+    "discovery": "entire current CLOB reward directory plus top-500 active Gamma markets",
+    "realtime_panel": "deterministic category round-robin ranked by reward density, required inventory and historical 5-second toxicity",
+    "maximum_markets": 10,
+    "catalyst_guard_hours": 6,
+    "category_fair_value_feeds": []
+  },
+  "predictor": {
+    "minimum_touch_imbalance": 0.6,
+    "minimum_microprice_displacement_ticks": 0.25,
+    "maximum_spread_ticks": 4,
+    "rationale": "mechanism defaults fixed before forward data; they are not selected from historical PnL"
+  },
+  "execution": {
+    "latency_profiles_ms": [20, 50, 100, 250, 500],
+    "maker": "post-only simulated bid with displayed queue plus one minimum qualifying order ahead; only public prints advance queue; partial fills supported",
+    "taker": "full-depth ask VWAP plus one pessimistic tick; no fill when displayed depth is insufficient",
+    "markouts_ms": [1000, 5000, 30000],
+    "exit": "full-size bid-depth VWAP required",
+    "fee": "Gamma per-market rate and exponent on every simulated taker leg",
+    "reward_and_rebate": "not credited until competitive share and pool allocation can be reconstructed"
+  },
+  "evaluation": {
+    "discovery_rows_are_evidence": false,
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "cluster_by": ["condition_id", "UTC day"],
+    "require_both_time_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "promotion_rule": "No live path. Freeze a new eval manifest only after positive market-clustered lower confidence bounds and no single category or market supplies most PnL.",
+    "multiple_testing": "Correct across four strategies, five latency profiles, three horizons, categories, and the existing BORG strategy family.",
+    "null_outcome": "The accepted conclusion may be that the measured edge is zero or negative."
+  }
+}

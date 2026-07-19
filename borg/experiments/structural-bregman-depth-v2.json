@@ -1,0 +1,83 @@
+{
+  "experiment_id": "structural-bregman-depth-v2",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-18T18:25:48.389Z",
+  "evidence_started_at": "2026-07-18T18:25:48.389Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "same_venue_logical_coherence",
+  "supersedes": "structural-sports-ordered-v1",
+  "strategy_version": "structural-bregman-depth-v2",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "change": {
+    "reason": "The V1 semantic parser allowed incidental '$1 if Yes' settlement prose to override explicit date and percentage semantics. All 69,184 apparently economic historical nested-threshold evaluations came from three invalid relation pairs and are excluded.",
+    "invalid_pairs_excluded": 3,
+    "invalid_positive_evaluations_excluded": 69184,
+    "candidate_ids_versioned": true,
+    "prior_rows_reused": false
+  },
+  "coherence_model": {
+    "state_space": "payoff-proof terminal states only",
+    "mutually_exclusive_divergence": "normalized simplex KL",
+    "overlapping_event_divergence": "weighted Bernoulli KL over marginal coordinates",
+    "projection": "pairwise Frank-Wolfe with exact one-dimensional line search",
+    "linear_minimization_oracle": "enumerated certified terminal states; components above 12 predicates require a future SAT/MILP oracle and fail closed",
+    "interpretation": "Bregman residual ranks incoherence; it is not executable PnL. Trade quantities are determined independently from asks, fees and depth."
+  },
+  "certification": {
+    "accepted": [
+      "single-condition binary complements",
+      "explicit negRisk complete mutually-exclusive event sets",
+      "same-scope ordered crypto price thresholds",
+      "typed disjoint crypto price ranges",
+      "same-scope sports total and spread ladders with matching normalized rules"
+    ],
+    "fail_closed": [
+      "dates and deadlines",
+      "vote and victory margins",
+      "percentages",
+      "generic payout prose",
+      "mixed resolver rules",
+      "unknown fee schedule",
+      "unknown venue minimum",
+      "unproved state graph"
+    ]
+  },
+  "execution": {
+    "latency_profiles_ms": [20, 50, 100, 250, 500],
+    "target_budget_usd": 10,
+    "book_model": "walk every displayed ask level for every leg",
+    "fees": "current per-market Gamma fee schedule stressed at 2x; unknown schedules fail closed",
+    "minimum_size": "maximum published minimum across legs",
+    "quantity_search": "all depth breakpoints plus budget boundary",
+    "objective": "maximum statewise guaranteed dollar profit",
+    "orphan_stress": "immediate executable bid-depth unwind for each possible filled leg",
+    "atomicity": "false on Polymarket multi-order bundles; economic candidates remain unqualified"
+  },
+  "evaluation": {
+    "minimum_independent_events": 300,
+    "minimum_calendar_days": 14,
+    "primary_metric": "statewise_guaranteed_profit_after_2x_fees_and_depth",
+    "require_both_chronological_halves_positive": true,
+    "require_event_and_day_clustered_lower_bounds_above_zero": true,
+    "report_false_relation_rate": true,
+    "report_displayed_capacity": true,
+    "report_orphan_cvar": true,
+    "multiple_testing": "Holm correction across relation type, latency profile and inspected capacity band",
+    "promotion": "Passing permits a separate reviewed paper multi-leg state-machine study only.",
+    "null_outcome": "No executable structural bundle is an accepted and presently expected result."
+  },
+  "strategy_bindings": [{
+    "strategy": "structural_bregman_depth_v2",
+    "family": "same_venue_logical_coherence",
+    "arm": "baseline",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "guaranteed_profit_2x_depth"
+  }]
+}

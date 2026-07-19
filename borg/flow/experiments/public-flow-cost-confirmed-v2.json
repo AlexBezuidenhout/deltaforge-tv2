@@ -1,0 +1,42 @@
+{
+  "manifest_format": "flow-experiment-v1",
+  "experiment_id": "public-flow-cost-confirmed-v2",
+  "status": "FROZEN_FORWARD_PILOT",
+  "strategy_version": "public-flow-cost-confirmed-v2",
+  "frozen_at_utc": "2026-07-16T14:34:03.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "discovery_rows_excluded": true,
+  "discovery_control": {
+    "strategy_version": "public-flow-scalp-v1",
+    "independent_sweeps_at_review": 2183,
+    "finding": "All continuation and fade latency cells had negative net 5-second markout; blind fade was structurally worse. These rows cannot count as V2 evidence."
+  },
+  "arms": [
+    "cost_confirmed_continuation_v2",
+    "absorption_reversal_v2"
+  ],
+  "latency_profiles_ms": [100, 250, 500],
+  "primary_metric": "net_pnl_5s_exact_roundtrip_fees",
+  "mechanism": {
+    "trigger": "completed public sweep that walked beyond the displayed opposing touch",
+    "decision": "at the scheduled availability timestamp using only the latest causal book state",
+    "followthrough": "target executable bid improves by at least one token tick",
+    "queue_confirmation": "target top bid size is at least top ask size",
+    "cost_hurdle": "observed sweep displacement per share covers current spread plus exact entry and exit taker fees",
+    "sizing": "min($10 / arrival ask, 20% of displayed arrival ask size)",
+    "exit": "executable full-size bid markout at 1s, 2s, 5s and 10s"
+  },
+  "minimum_read": {
+    "independent_sweeps_per_arm_and_latency": 300,
+    "calendar_days": 30,
+    "both_chronological_halves_positive": true,
+    "market_and_day_clustered_lower_confidence_bound_above_zero": true,
+    "multiple_testing_correction": true,
+    "minimum_non_f_quality_pct": 90
+  },
+  "selection_disclosure": "V2 was designed after V1 failed. V1 rows and any pre-deployment replay are discovery only and excluded from V2 evidence.",
+  "zero_edge_disclosure": "The valid expected outcome is that public completed flow contains no post-cost scalp edge.",
+  "no_optional_stopping": true,
+  "provisional": true
+}

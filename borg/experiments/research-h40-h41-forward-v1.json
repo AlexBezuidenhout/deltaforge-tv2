@@ -1,0 +1,55 @@
+{
+  "experiment_id": "research-h40-h41-forward-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-17T14:55:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "prospective_directional_residuals",
+  "supersedes": "research-v5-h32-h51-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "unchanged-research-v5-code-forward-only",
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "hypothesis": "The pre-existing H40 path-entropy and H41 cross-asset residual mechanisms may retain positive executable returns on fresh markets after the discovery cohort is excluded and costs are doubled.",
+  "frozen_mechanics": {
+    "strategy_code_changed": false,
+    "thresholds_changed": false,
+    "asset_selection_changed": false,
+    "sizing_changed": false,
+    "reason": "The prior point estimates were positive but unstable across chronological halves and too small for selection-safe inference. A new identity is required before collecting confirmatory evidence."
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "H40_directional_entropy_breakout",
+      "family": "path_entropy",
+      "arm": "baseline",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "H41_crossasset_dispersion_reversion",
+      "family": "cross_sectional_reversion",
+      "arm": "baseline",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "cluster_by": ["Polymarket market/window", "UTC day"],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_clustered_lower_confidence_bound_above_zero": true,
+    "multiple_testing": "Correct across every H1-H51 strategy and discarded variant, not merely H40 and H41.",
+    "promotion": "No live path. Passing the mechanical read only triggers a separate implementation and risk review.",
+    "null_outcome": "Measured edge may be approximately zero; inverse signals are not created from losing discovery rows."
+  }
+}

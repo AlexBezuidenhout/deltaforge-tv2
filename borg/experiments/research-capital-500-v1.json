@@ -1,0 +1,21 @@
+{
+  "manifest_format": "borg-research-capital-v1",
+  "manifest_id": "research-capital-500-v1",
+  "capital_version": "500usd-v1",
+  "frozen_at_utc": "2026-07-15T16:52:09.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "starting_bankroll_usd": 500,
+  "risk_per_trade_pct": 0.02,
+  "target_notional_usd": 10,
+  "max_gross_exposure_pct": 0.06,
+  "max_gross_exposure_usd": 30,
+  "depth_policy": {
+    "capacity_strategies_max_touch_participation": 0.20,
+    "displayed_or_surviving_depth_may_reduce_size": true,
+    "paper_non_fills_are_preserved": true
+  },
+  "cohort_rule": "Only orders stamped research_capital_version=500usd-v1 belong to the current $500 cohort. Legacy rows are retained and never pooled into current dashboard totals.",
+  "sizing_rationale": "Two percent is a capital-preservation assumption, not an alpha threshold. No signal or edge threshold changed with this manifest.",
+  "provisional": true
+}

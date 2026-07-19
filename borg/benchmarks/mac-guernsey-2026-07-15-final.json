@@ -1,0 +1,163 @@
+{
+  "format": "borg-infra-benchmark-v1",
+  "measured_at": "2026-07-15T16:01:41.272Z",
+  "location": "mac-guernsey",
+  "host": "MacBook-Air-2.local",
+  "platform": "darwin 25.3.0 arm64",
+  "duration_ms": 10000,
+  "database": {
+    "host": "ep-lucky-lab-at6bma3y-pooler.c-9.us-east-1.aws.neon.tech",
+    "rtt": {
+      "n": 20,
+      "min_ms": 111.542,
+      "p50_ms": 137.727,
+      "p95_ms": 225.718,
+      "max_ms": 1025.325
+    }
+  },
+  "clock_calibration": {
+    "binance": {
+      "local_minus_source_ms": {
+        "n": 10,
+        "min_ms": -69,
+        "p50_ms": -27,
+        "p95_ms": -23.5,
+        "max_ms": -22.5
+      },
+      "midpoint_uncertainty_ms": {
+        "n": 10,
+        "min_ms": 124.003,
+        "p50_ms": 125.947,
+        "p95_ms": 162.457,
+        "max_ms": 202.242
+      },
+      "quantization_ms": 1,
+      "reliable": true,
+      "correction_ms": -27
+    },
+    "polymarket": {
+      "local_minus_source_ms": {
+        "n": 10,
+        "min_ms": -22.5,
+        "p50_ms": 161.5,
+        "p95_ms": 850.5,
+        "max_ms": 929
+      },
+      "midpoint_uncertainty_ms": {
+        "n": 10,
+        "min_ms": 20.865,
+        "p50_ms": 22.823,
+        "p95_ms": 61.143,
+        "max_ms": 74.918
+      },
+      "quantization_ms": 1000,
+      "reliable": false,
+      "correction_ms": 0
+    }
+  },
+  "public_http_rtt": {
+    "polymarket_clob_time": {
+      "n": 10,
+      "min_ms": 43.242,
+      "p50_ms": 45.418,
+      "p95_ms": 48.803,
+      "max_ms": 130.221
+    },
+    "binance_time": {
+      "n": 10,
+      "min_ms": 247.462,
+      "p50_ms": 251.279,
+      "p95_ms": 274.387,
+      "max_ms": 276.07
+    }
+  },
+  "websocket": {
+    "binance_aggTrade": {
+      "connect_ms": 2655.484375,
+      "freshness_corrected": {
+        "n": 65,
+        "min_ms": 133,
+        "p50_ms": 136,
+        "p95_ms": 169,
+        "max_ms": 221
+      },
+      "freshness_raw": {
+        "n": 65,
+        "min_ms": 106,
+        "p50_ms": 109,
+        "p95_ms": 142,
+        "max_ms": 194
+      },
+      "source_clock_correction_ms": -27,
+      "source_clock_uncertainty_ms": 125.947,
+      "interarrival": {
+        "n": 64,
+        "min_ms": 0,
+        "p50_ms": 36,
+        "p95_ms": 346,
+        "max_ms": 853
+      },
+      "error": null
+    },
+    "polymarket_chainlink_rtds": {
+      "connect_ms": 260.353333,
+      "freshness_corrected": {
+        "n": 70,
+        "min_ms": 864,
+        "p50_ms": 1380,
+        "p95_ms": 1865,
+        "max_ms": 1981
+      },
+      "freshness_raw": {
+        "n": 70,
+        "min_ms": 864,
+        "p50_ms": 1380,
+        "p95_ms": 1865,
+        "max_ms": 1981
+      },
+      "source_clock_correction_ms": 0,
+      "source_clock_uncertainty_ms": 500,
+      "interarrival": {
+        "n": 70,
+        "min_ms": 0,
+        "p50_ms": 36,
+        "p95_ms": 758,
+        "max_ms": 1262
+      },
+      "error": null
+    },
+    "polymarket_clob": {
+      "connect_ms": 135.55483300000014,
+      "freshness_corrected": {
+        "n": 164,
+        "min_ms": 0,
+        "p50_ms": 0,
+        "p95_ms": 57,
+        "max_ms": 160
+      },
+      "freshness_raw": {
+        "n": 164,
+        "min_ms": -7,
+        "p50_ms": -2,
+        "p95_ms": 57,
+        "max_ms": 160
+      },
+      "source_clock_correction_ms": 0,
+      "source_clock_uncertainty_ms": 500,
+      "interarrival": {
+        "n": 163,
+        "min_ms": 0,
+        "p50_ms": 23,
+        "p95_ms": 214,
+        "max_ms": 616
+      },
+      "error": null
+    }
+  },
+  "order_acknowledgement": {
+    "status": "NOT_MEASURED",
+    "reason": "Read-only benchmark: no signed/live order was authorized. HTTP RTT is a routing proxy, not order acknowledgement."
+  },
+  "suggested_order_latency_ms": 100,
+  "interpretation": "Compare identical reports from Mac, Dublin and us-east. A VPS claim is invalid unless feed freshness and CLOB RTT improve without a remote database bottleneck."
+}

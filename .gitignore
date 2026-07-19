@@ -1,0 +1,35 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+**/.DS_Store
+*.log
+*.pem
+*.key
+coverage/
+.nyc_output/
+~$*
+.claude/settings.local.json
+
+# Local AI/tool state is never part of a collaborator checkout.
+.agents/
+.codex/
+.claude/
+.mcp.json
+.termato.json
+.termato-build-cache.json
+
+# Credentials and runtime/research data stay outside Git.
+*Friend-Access*.json
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+*.wal
+*.parquet
+research_log/*.csv
+
+# live executor runtime state — operator-local gates, never versioned
+borg/live/VERDICT_CONFIRMED
+borg/live/KILL

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run DeltaForge acceptance checks every ten minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

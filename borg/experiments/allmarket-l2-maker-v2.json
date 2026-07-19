@@ -1,0 +1,41 @@
+{
+  "experiment_id": "allmarket-l2-maker-v2",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-16T17:15:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "allmarket_event_driven_l2",
+  "supersedes": "allmarket-l2-maker-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "allmarket-queue-v1",
+  "provisional": true,
+  "change": {
+    "reason": "The discovery universe now paginates active Gamma event windows instead of stopping at the top 500, and fee-enabled markets with missing schedule metadata use a conservative 0.07 fallback rather than zero fees.",
+    "mechanics_changed": true,
+    "thresholds_changed": false,
+    "prior_rows_reused": false
+  },
+  "universe": {
+    "discovery": "entire current CLOB reward directory plus every paginated active Gamma binary market",
+    "maximum_gamma_pages_per_endpoint": 20,
+    "maximum_end_date_windows": 10,
+    "gamma_offset_cap": 2000,
+    "realtime_panel": "deterministic category round-robin ranked by reward density, required inventory and historical 5-second toxicity",
+    "maximum_markets": 10,
+    "catalyst_guard_hours": 6,
+    "catalyst_guard_hours_without_category_fair_feed": 24,
+    "category_fair_value_feeds": []
+  },
+  "evaluation": {
+    "prior_v1_rows_are_evidence": false,
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "cluster_by": ["condition_id", "UTC day"],
+    "require_both_time_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "null_outcome": "The accepted conclusion may be that the measured edge is zero or negative."
+  }
+}

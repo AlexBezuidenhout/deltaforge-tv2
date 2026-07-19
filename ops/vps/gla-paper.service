@@ -1,0 +1,32 @@
+[Unit]
+Description=G late-arbitrage dry-run mirror (paper only)
+Wants=network-online.target
+After=network-online.target deltaforge-tv2.service borg-collector.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/gla-paper.env
+Environment=NODE_ENV=production
+Environment=LIVE_TRADING_ENABLED=0
+ExecStart=/usr/local/bin/node borg/live/executor.js
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

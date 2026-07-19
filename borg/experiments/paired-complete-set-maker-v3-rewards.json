@@ -1,0 +1,113 @@
+{
+  "experiment_id": "paired-complete-set-maker-v3-rewards",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-17T14:50:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "paired_complete_set_maker",
+  "supersedes": "paired-complete-set-maker-v2",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "paired-maker-reward-aware-v3",
+  "provisional": true,
+  "change": {
+    "reason": "Public activity for the reference wallet shows persistent two-sided inventory turnover, complete-set merges and material maker rebates. V2 tested spread capture but selected zero-reward markets and quoted below reward minimums, so it could not test that mechanism.",
+    "mechanics_changed": true,
+    "thresholds_tuned_from_pnl": false,
+    "prior_rows_reused": false
+  },
+  "hypothesis": "Reward-eligible two-sided passive quotes may offset queue delay and orphan toxicity sufficiently to make a small complete-set maker profitable, particularly before scheduled sports or esports catalysts.",
+  "mechanism": {
+    "complete_set_payoff_usd_per_share": 1,
+    "minimum_pair_edge": 0.01,
+    "initial_orders": "equal-share post-only BUY quotes at both displayed best bids",
+    "initial_quote_lifetime_seconds": 900,
+    "maker_fill_model": "public prints consume displayed queue plus one venue-minimum order before simulated fills",
+    "cancel_ack_ms": 50,
+    "repair": "cancel both initial quotes after first fill and quote only the complement while preserving the one-cent complete-set edge",
+    "orphan_exit": "walk full displayed bid depth, worsen by one tick and charge taker fees; if no executable exit exists, retain the orphan and score it at the public resolution winner",
+    "liquidity_reward_model": "quadratic distance score using public L2; require both initial quotes, venue minimum size and venue maximum spread; competitor identity is unavailable, so min of aggregate side scores is used as a conservative competitor upper bound",
+    "liquidity_rewards_realized_or_claimed": false,
+    "maker_rebates_credited": false,
+    "reason_rewards_are_separate": "public L2 cannot reconstruct maker identities, minute sampling, account eligibility or the wallet's actual normalized score"
+  },
+  "capital": {
+    "target_pair_cost_usd_before_reward_minimum": 25,
+    "maximum_reserved_pair_cost_usd_per_arm": 250,
+    "maximum_simultaneous_markets_per_arm": 1,
+    "arms_are_independent_500usd_counterfactuals": true,
+    "never_sum_arm_pnl": true
+  },
+  "universe": {
+    "categories": ["sports", "esports"],
+    "active_reward_configuration_required": true,
+    "known_game_start_required": true,
+    "selection": "deterministic reward-density, near-term, volume and liquidity rank; never historical strategy PnL",
+    "maximum_realtime_markets": 6,
+    "minimum_time_to_end_seconds": 600,
+    "maximum_preferred_time_to_end_days": 14
+  },
+  "arms": {
+    "reward_pregame_repair_60s": {
+      "market_phase": "before game_start_time",
+      "repair_timeout_seconds": 60
+    },
+    "reward_pregame_repair_300s": {
+      "market_phase": "before game_start_time",
+      "repair_timeout_seconds": 300
+    },
+    "reward_live_repair_60s_control": {
+      "market_phase": "at or after game_start_time",
+      "repair_timeout_seconds": 60,
+      "role": "catalyst-toxicity control"
+    }
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "PMM_wallet_mechanism_v3_reward_aware",
+      "family": "paired_complete_set_maker",
+      "arm": "reward_pregame_repair_60s",
+      "phase": "pilot",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "closed_cycle_total_pnl_ex_modeled_rewards_2x_cost"
+    },
+    {
+      "strategy": "PMM_wallet_mechanism_v3_reward_aware",
+      "family": "paired_complete_set_maker",
+      "arm": "reward_pregame_repair_300s",
+      "phase": "pilot",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "closed_cycle_total_pnl_ex_modeled_rewards_2x_cost"
+    },
+    {
+      "strategy": "PMM_wallet_mechanism_v3_reward_aware",
+      "family": "paired_complete_set_maker",
+      "arm": "reward_live_repair_60s_control",
+      "phase": "pilot",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "closed_cycle_total_pnl_ex_modeled_rewards_2x_cost"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "cluster_by": ["condition_id", "UTC day"],
+    "require_both_time_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "modeled_rewards_cannot_support_promotion_until_reconciled_to_account_level_rewards": true,
+    "multiple_testing_correction": "Holm across all paired-maker arms and previously attempted variants",
+    "null_outcome": "The accepted conclusion may be that the reference wallet's scale, category knowledge, rebate share or inventory tolerance cannot be reproduced with $500."
+  },
+  "dispositions": [
+    {
+      "strategy": "PMM_wallet_mechanism_v2",
+      "status": "SUPERSEDED",
+      "reason": "V2 remains valid evidence for spread-only paired making, but it selected zero-reward markets and cannot evaluate the reward-aware mechanism."
+    }
+  ]
+}

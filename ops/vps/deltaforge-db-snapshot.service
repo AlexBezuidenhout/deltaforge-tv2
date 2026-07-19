@@ -1,0 +1,16 @@
+[Unit]
+Description=Snapshot DeltaForge local PostgreSQL for off-host archive
+Requires=postgresql.service
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=deltaforge
+Group=deltaforge
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=DELTAFORGE_DB_SNAPSHOT_DIR=/var/lib/deltaforge/db-snapshots
+ExecStart=/opt/deltaforge/tv2/current/ops/vps/local-db-snapshot.sh
+UMask=0077
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true

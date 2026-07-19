@@ -1,0 +1,207 @@
+{
+  "format": "borg-latency-replay-v1",
+  "created_at": "2026-07-15T16:04:44.050Z",
+  "strategy": "ALL_TAKER_STRATEGIES",
+  "database_snapshot_as_of": "2026-07-15T16:04:44.018Z",
+  "caveat": "Counterfactual quote-survival replay, not a causal alpha estimate. F-grade rows are excluded, never assumed filled.",
+  "profiles": [
+    {
+      "profile": "100ms",
+      "order_latency_ms": 100,
+      "intended_signals": 4068,
+      "independent_markets": 2562,
+      "utc_days": 5,
+      "replayable": 476,
+      "fill_rate_on_replayable": 1,
+      "pnl_1x": -32.364143230215355,
+      "pnl_2x": -84.17570819143107,
+      "quality_grades": {
+        "A": 0,
+        "B": 476,
+        "C": 0,
+        "F": 3592
+      },
+      "market_clustered": {
+        "clusters": 129,
+        "mean_pnl_per_signal": -0.06799189754246959,
+        "ci95": [
+          -0.830093434385716,
+          0.6481269596370718
+        ]
+      },
+      "day_clustered": {
+        "clusters": 1,
+        "mean_pnl_per_signal": -0.06799189754246923,
+        "ci95": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "profile": "250ms",
+      "order_latency_ms": 250,
+      "intended_signals": 4068,
+      "independent_markets": 2562,
+      "utc_days": 5,
+      "replayable": 476,
+      "fill_rate_on_replayable": 1,
+      "pnl_1x": -32.364143230215355,
+      "pnl_2x": -84.17570819143107,
+      "quality_grades": {
+        "A": 0,
+        "B": 476,
+        "C": 0,
+        "F": 3592
+      },
+      "market_clustered": {
+        "clusters": 129,
+        "mean_pnl_per_signal": -0.06799189754246959,
+        "ci95": [
+          -0.830093434385716,
+          0.6481269596370718
+        ]
+      },
+      "day_clustered": {
+        "clusters": 1,
+        "mean_pnl_per_signal": -0.06799189754246923,
+        "ci95": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "profile": "500ms",
+      "order_latency_ms": 500,
+      "intended_signals": 4068,
+      "independent_markets": 2562,
+      "utc_days": 5,
+      "replayable": 476,
+      "fill_rate_on_replayable": 1,
+      "pnl_1x": -32.364143230215355,
+      "pnl_2x": -84.17570819143107,
+      "quality_grades": {
+        "A": 0,
+        "B": 476,
+        "C": 0,
+        "F": 3592
+      },
+      "market_clustered": {
+        "clusters": 129,
+        "mean_pnl_per_signal": -0.06799189754246959,
+        "ci95": [
+          -0.830093434385716,
+          0.6481269596370718
+        ]
+      },
+      "day_clustered": {
+        "clusters": 1,
+        "mean_pnl_per_signal": -0.06799189754246923,
+        "ci95": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "profile": "1000ms",
+      "order_latency_ms": 1000,
+      "intended_signals": 4068,
+      "independent_markets": 2562,
+      "utc_days": 5,
+      "replayable": 476,
+      "fill_rate_on_replayable": 0.8046218487394958,
+      "pnl_1x": -103.55850923473342,
+      "pnl_2x": -144.04517188046705,
+      "quality_grades": {
+        "A": 0,
+        "B": 476,
+        "C": 0,
+        "F": 3592
+      },
+      "market_clustered": {
+        "clusters": 129,
+        "mean_pnl_per_signal": -0.21755989335028045,
+        "ci95": [
+          -0.8382740410985964,
+          0.38683473231172105
+        ]
+      },
+      "day_clustered": {
+        "clusters": 1,
+        "mean_pnl_per_signal": -0.2175598933502803,
+        "ci95": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "profile": "2000ms",
+      "order_latency_ms": 2000,
+      "intended_signals": 4068,
+      "independent_markets": 2562,
+      "utc_days": 5,
+      "replayable": 476,
+      "fill_rate_on_replayable": 0.6176470588235294,
+      "pnl_1x": -187.31326254812643,
+      "pnl_2x": -216.49199345525304,
+      "quality_grades": {
+        "A": 0,
+        "B": 476,
+        "C": 0,
+        "F": 3592
+      },
+      "market_clustered": {
+        "clusters": 129,
+        "mean_pnl_per_signal": -0.39351525745404725,
+        "ci95": [
+          -0.8807458568674634,
+          0.08978507548722489
+        ]
+      },
+      "day_clustered": {
+        "clusters": 1,
+        "mean_pnl_per_signal": -0.39351525745404714,
+        "ci95": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "profile": "measured-mac",
+      "order_latency_ms": 100,
+      "intended_signals": 4068,
+      "independent_markets": 2562,
+      "utc_days": 5,
+      "replayable": 476,
+      "fill_rate_on_replayable": 1,
+      "pnl_1x": -32.364143230215355,
+      "pnl_2x": -84.17570819143107,
+      "quality_grades": {
+        "A": 0,
+        "B": 476,
+        "C": 0,
+        "F": 3592
+      },
+      "market_clustered": {
+        "clusters": 129,
+        "mean_pnl_per_signal": -0.06799189754246959,
+        "ci95": [
+          -0.830093434385716,
+          0.6481269596370718
+        ]
+      },
+      "day_clustered": {
+        "clusters": 1,
+        "mean_pnl_per_signal": -0.06799189754246923,
+        "ci95": [
+          null,
+          null
+        ]
+      }
+    }
+  ]
+}

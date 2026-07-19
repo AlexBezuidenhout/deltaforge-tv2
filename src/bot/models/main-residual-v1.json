@@ -1,0 +1,35 @@
+{
+  "format": "main-residual-model-v1",
+  "experimentId": "main-model-challenger-v1",
+  "modelVersion": "main-residual-offset-logit-v1",
+  "status": "PROVISIONAL_FORWARD_ONLY",
+  "trainingStart": "2026-07-10T00:00:00.000Z",
+  "trainingEnd": "2026-07-15T22:26:55.888Z",
+  "evidenceStart": "2026-07-16T08:30:00.000Z",
+  "mechanism": "regularized correction to market log-odds; market probability remains the offset",
+  "noTradingPath": true,
+  "validation": {
+    "method": "chronological 70/30 split inside the training cohort; diagnostic only, never promotion evidence",
+    "developmentMarkets": 2518,
+    "validationMarkets": 1080,
+    "metrics": {
+      "marketBaseline": { "n": 1080, "brier": 0.23731304795370306, "logLoss": 0.6679224111995834 },
+      "legacyHeuristic": { "n": 1080, "brier": 0.21693152569444468, "logLoss": 0.6248498301123708 },
+      "residual": { "n": 1080, "brier": 0.2082654073261598, "logLoss": 0.6037798210722621 }
+    }
+  },
+  "featureNames": [
+    "heuristic_logit_residual",
+    "phi_logit_residual",
+    "phi_missing",
+    "time_fraction_centered",
+    "log_sigma_ratio"
+  ],
+  "means": [-0.006681560922529209, -0.09812842673574096, 0, -0.06867982212340189, -0.9880366647925221],
+  "scales": [0.3590813654902256, 2.788719380752217, 1, 0.28924074438832037, 0.5097182201233724],
+  "coefficients": [-0.12273082176423508, 0.6672768434504376, 0.4084156201756538, 0, 0.04834583600587436, -0.023558876939547318],
+  "slopePenalty": 16,
+  "interceptPenalty": 4,
+  "trainingMarkets": 3598,
+  "iterations": 5
+}

@@ -1,0 +1,108 @@
+{
+  "experiment_id": "paired-complete-set-maker-v2",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-17T08:46:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "paired_complete_set_maker",
+  "supersedes": "paired-complete-set-maker-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "paired-maker-queue-orphan-v2",
+  "provisional": true,
+  "change": {
+    "reason": "The v1 30-second quote lifetime repeatedly discarded queue priority while live selected books had roughly 100k-218k displayed shares ahead. Persistent passive making cannot be evaluated by rejoining the back of the queue every 30 seconds.",
+    "mechanics_changed": true,
+    "thresholds_changed": false,
+    "prior_rows_reused": false
+  },
+  "hypothesis": "Persistently joining both complementary best bids may capture the complete-set spread if queue-realistic fills complete often enough that orphan liquidation losses do not consume the locked spread.",
+  "mechanism": {
+    "complete_set_payoff_usd_per_share": 1,
+    "initial_orders": "equal-share post-only BUY quotes at both displayed best bids",
+    "initial_quote_lifetime_seconds": 900,
+    "end_boundary": "initial quote expiry is shortened to one minute before the stated market end",
+    "maker_fill_model": "public prints must consume displayed queue plus one venue-minimum order before our shares fill",
+    "cancel_ack_ms": 50,
+    "repair": "after any fill, cancel both initial quotes; quote only the complementary token without spending the arm's minimum locked edge",
+    "orphan_exit": "walk actual bid depth, worsen VWAP by one current market tick, and charge the configured taker fee",
+    "merge_accounting": "net equal complementary shares at exactly $1; report locked PnL separately from orphan PnL",
+    "maker_rebates_credited": false,
+    "liquidity_rewards_credited": false
+  },
+  "capital": {
+    "target_pair_cost_usd": 10,
+    "maximum_simultaneous_markets_per_arm": 3,
+    "maximum_reserved_pair_cost_usd_per_arm": 30,
+    "arms_are_independent_counterfactuals": true
+  },
+  "universe": {
+    "categories": ["sports", "esports"],
+    "selection": "deterministic near-term liquidity and volume rank; never historical strategy PnL",
+    "maximum_realtime_markets": 3,
+    "minimum_time_to_end_seconds": 600,
+    "maximum_preferred_time_to_end_days": 14
+  },
+  "arms": {
+    "one_cent_repair_60s": {
+      "minimum_pair_edge": 0.01,
+      "repair_timeout_seconds": 60
+    },
+    "one_cent_repair_300s": {
+      "minimum_pair_edge": 0.01,
+      "repair_timeout_seconds": 300
+    },
+    "two_cent_control_300s": {
+      "minimum_pair_edge": 0.02,
+      "repair_timeout_seconds": 300
+    }
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "PMM_wallet_mechanism_v2",
+      "family": "paired_complete_set_maker",
+      "arm": "one_cent_repair_60s",
+      "phase": "pilot",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "closed_cycle_total_pnl_ex_rewards"
+    },
+    {
+      "strategy": "PMM_wallet_mechanism_v2",
+      "family": "paired_complete_set_maker",
+      "arm": "one_cent_repair_300s",
+      "phase": "pilot",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "closed_cycle_total_pnl_ex_rewards"
+    },
+    {
+      "strategy": "PMM_wallet_mechanism_v2",
+      "family": "paired_complete_set_maker",
+      "arm": "two_cent_control_300s",
+      "phase": "pilot",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "closed_cycle_total_pnl_ex_rewards"
+    }
+  ],
+  "dispositions": [
+    {
+      "strategy": "PMM_wallet_mechanism_v1",
+      "status": "SUPERSEDED",
+      "reason": "The 30-second initial quote lifetime resets queue priority and cannot test persistent passive making. Its rows remain immutable but are not evidence for v2."
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "cluster_by": ["condition_id", "UTC day"],
+    "report_each_arm_separately": true,
+    "require_both_time_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "exclude_interrupted_or_open_orphan_cycles_from_realized_pnl_but_report_their_count_and_mark": true,
+    "null_outcome": "The accepted conclusion may be that queue delay and orphan toxicity make the measured edge zero or negative."
+  }
+}

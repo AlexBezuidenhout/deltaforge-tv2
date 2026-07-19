@@ -1,0 +1,11 @@
+[Unit]
+Description=Compact DeltaForge sealed events every six hours
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=6h
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

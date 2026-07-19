@@ -1,0 +1,30 @@
+tv2.107.174.203.197.sslip.io {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Referrer-Policy "no-referrer"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:3004 {
+		flush_interval -1
+	}
+}
+
+df2.107.174.203.197.sslip.io {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Referrer-Policy "no-referrer"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	basic_auth {
+		friend-viewer __DF2_BCRYPT_HASH__
+	}
+	@write_method not method GET HEAD OPTIONS
+	respond @write_method "Read-only collaborator access" 403
+	reverse_proxy 127.0.0.1:3005 {
+		flush_interval -1
+	}
+}

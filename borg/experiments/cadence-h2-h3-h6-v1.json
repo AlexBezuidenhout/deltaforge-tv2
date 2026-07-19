@@ -1,0 +1,66 @@
+{
+  "manifest_format": "borg-experiment-v1",
+  "experiment_id": "cadence-h2-h3-h6-v1",
+  "status": "PILOT_FORWARD_ONLY",
+  "frozen_at_utc": "2026-07-15T00:00:00.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "hypothesis": "Event-time observation may preserve a transient CEX-to-CLOB or CLOB-to-model discrepancy that a one-second sampler misses. Faster observation has value only if quote-survival-adjusted, post-fee PnL improves under identical order latency.",
+  "strategies": {
+    "H2_cex_impulse_lag": {
+      "tte_sec": [60, 240],
+      "min_return_10s_bps": 4,
+      "min_edge_after_2x_fee": 0.03,
+      "ask_band": [0.25, 0.8]
+    },
+    "H3_flow_confirmed": {
+      "tte_sec": [75, 225],
+      "min_return_10s_bps": 1.5,
+      "min_flow_imbalance": 0.35,
+      "min_depth_imbalance": 0.15,
+      "min_edge_after_2x_fee": 0.02,
+      "ask_band": [0.3, 0.8]
+    },
+    "H6_phi_overreaction": {
+      "tte_sec": [60, 180],
+      "min_probability_divergence": 0.12,
+      "min_retrace_10s_bps": 1,
+      "min_edge_after_2x_fee": 0.03,
+      "ask_band": [0.2, 0.75]
+    }
+  },
+  "arms": {
+    "sampled": {
+      "information_cadence": "1000ms timer",
+      "order_latency_ms": 250
+    },
+    "event": {
+      "information_cadence": "Binance or Polymarket event, coalesced at most 25ms per asset",
+      "order_latency_ms": 250
+    }
+  },
+  "assignment": {
+    "unit": "independent Polymarket market_id",
+    "method": "FNV-1a(strategy_name + ':' + market_id) modulo 2",
+    "allocation": "exactly one arm per market",
+    "stratification": "reported by asset and UTC day; no post-hoc reassignment"
+  },
+  "minimum_read": {
+    "independent_signaled_markets_per_strategy_arm": 300,
+    "minimum_calendar_days": 14,
+    "no_optional_stopping": true
+  },
+  "primary_metrics": [
+    "post-fee PnL per intended signal at 1x current fee model",
+    "quote-survival fill rate",
+    "event-minus-sampled arm difference with market/day clustered interval"
+  ],
+  "secondary_metrics": [
+    "2x fee-stress PnL",
+    "adverse selection at 5s and 30s",
+    "resolver-divergence conditional PnL",
+    "data-quality and execution-fidelity grade distribution"
+  ],
+  "decision_rule": "No promotion or parameter change from this cohort before the minimum read. A faster arm is useful only if its clustered post-fee interval and quote-survival evidence improve; a null or negative result means the apparent latency edge is not deployable.",
+  "provisional": true
+}

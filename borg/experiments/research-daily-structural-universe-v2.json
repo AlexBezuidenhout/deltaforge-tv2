@@ -1,0 +1,48 @@
+{
+  "experiment_id": "research-daily-structural-universe-v2",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-18T10:31:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "daily_structural_capture",
+  "supersedes": "research-v4-h22-h31-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "daily-universe-v2-capture-only",
+  "provisional": true,
+  "historical_rows_reused": false,
+  "hypothesis": "A wider deterministic daily crypto panel can make ordered-threshold, disjoint-range, resolver-close and boundary-migration mechanisms observable without selecting markets from realized PnL.",
+  "universe": {
+    "assets": ["btc", "eth", "sol", "xrp"],
+    "asset_selection": "all configured assets every UTC day",
+    "event_selection": "nearest future end time per asset and market family",
+    "discovery_lookahead_days": 7,
+    "threshold_contracts_per_asset_event": 5,
+    "range_contracts_per_asset_event": 4,
+    "ranking": "absolute strike/range distance from the asset's fresh resolver spot; deterministic strike tie-break",
+    "missing_spot_policy": "select none; never guess moneyness",
+    "purpose": "capture coverage only; counts are socket-budget choices, not trading thresholds selected from PnL"
+  },
+  "strategy_bindings": [
+    { "strategy": "H26_nested_threshold_bundle", "family": "structural_bundle", "phase": "pilot", "min_independent_markets": 300, "min_days": 14, "primary_metric": "net_pnl_2x_clustered_by_market_day" },
+    { "strategy": "H27_disjoint_bucket_bundle", "family": "structural_bundle", "phase": "pilot", "min_independent_markets": 300, "min_days": 14, "primary_metric": "net_pnl_2x_clustered_by_market_day" },
+    { "strategy": "H28_threshold_resolver_close", "family": "daily_resolver_close", "phase": "pilot", "min_independent_markets": 300, "min_days": 14, "primary_metric": "net_pnl_2x_clustered_by_market_day" },
+    { "strategy": "H29_range_resolver_close", "family": "daily_resolver_close", "phase": "pilot", "min_independent_markets": 300, "min_days": 14, "primary_metric": "net_pnl_2x_clustered_by_market_day" },
+    { "strategy": "H30_threshold_ladder_residual", "family": "daily_ladder_residual", "phase": "pilot", "min_independent_markets": 300, "min_days": 14, "primary_metric": "net_pnl_2x_clustered_by_market_day" },
+    { "strategy": "H45_threshold_distance_velocity", "family": "threshold_velocity", "phase": "pilot", "min_independent_markets": 300, "min_days": 14, "primary_metric": "net_pnl_2x_clustered_by_market_day" },
+    { "strategy": "H46_range_boundary_migration", "family": "range_boundary_migration", "phase": "pilot", "min_independent_markets": 300, "min_days": 14, "primary_metric": "net_pnl_2x_clustered_by_market_day" }
+  ],
+  "evaluation": {
+    "pilot_rows_are_evidence": false,
+    "freeze_required_before_eval": true,
+    "minimum_independent_market_events": 300,
+    "minimum_calendar_days": 14,
+    "cluster_by": ["Polymarket event/window", "UTC day"],
+    "cost_views": ["1x", "2x"],
+    "bundle_requirements": ["deterministic payoff proof", "complete-group PnL", "displayed depth", "partial and non-fills", "orphan-leg stress"],
+    "promotion_rule": "No live path. A later unchanged evaluation identity is required, with positive market- and day-clustered lower bounds after 2x costs.",
+    "null_outcome": "Zero qualifying events is a valid opportunity-rate result, not zero-PnL evidence."
+  }
+}

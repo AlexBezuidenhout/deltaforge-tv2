@@ -1,0 +1,58 @@
+{
+  "experiment_id": "public-flow-scalp-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-16T00:00:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "public_taker_flow_markout",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "target_stake_usd": 10,
+  "max_touch_participation": 0.2,
+  "strategy_version": "public-flow-scalp-v1",
+  "strategy_bindings": [
+    {
+      "strategy": "public_flow_continuation",
+      "family": "post_sweep_continuation",
+      "arm": "continuation",
+      "phase": "pilot",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_independent_sweep"
+    },
+    {
+      "strategy": "public_flow_fade_control",
+      "family": "post_sweep_continuation",
+      "arm": "fade_control",
+      "phase": "pilot",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "mean_net_pnl_5s_per_independent_sweep"
+    }
+  ],
+  "trigger": {
+    "observable_event": "completed market-channel last_trade_price only",
+    "minimum_notional_usd": 10,
+    "displayed_consumption_rule": "reported aggressor size >= pre-event opposing top size and trade price touches or crosses that level",
+    "pending_order_visibility": false
+  },
+  "execution": {
+    "latency_profiles_ms": [25, 100, 250, 500, 1000, 2000],
+    "entry": "decision-time ask limit; fill only if arrival touch survives; size capped by displayed ask",
+    "exit_horizons_ms": [1000, 2000, 5000, 10000],
+    "exit": "full-size top-bid capacity required",
+    "fee": "per-token CLOB /fee-rate coefficient applied to both taker legs",
+    "fidelity": "L3 public event-time touch; no order acknowledgement"
+  },
+  "evaluation": {
+    "pilot_rows_are_evidence": false,
+    "minimum_independent_market_events": 300,
+    "minimum_calendar_days": 30,
+    "cluster_unit": "trigger transaction and UTC day",
+    "primary_horizon_ms": 5000,
+    "promotion_rule": "No live path. Freeze a new eval manifest only if the continuation arm beats the fade control and has a positive clustered lower confidence bound after exact round-trip fees under measured latency.",
+    "multiple_testing": "Correct across both arms, all latency profiles, four horizons, and the existing BORG hypothesis family."
+  }
+}

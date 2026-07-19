@@ -1,0 +1,30 @@
+{
+  "manifest_format": "borg-experiment-v1",
+  "experiment_id": "cadence-h2-h3-h6-v2-500usd",
+  "supersedes": "cadence-h2-h3-h6-v1",
+  "status": "PILOT_FORWARD_ONLY",
+  "frozen_at_utc": "2026-07-15T16:52:09.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "research_capital_version": "500usd-v1",
+  "starting_bankroll_usd": 500,
+  "risk_per_trade_pct": 0.02,
+  "target_notional_usd": 10,
+  "economic_thresholds": "Identical to cadence-h2-h3-h6-v1; only the pre-registered research-capital cohort changes.",
+  "arms": {
+    "sampled": { "information_cadence": "1000ms timer", "order_latency_ms": 250 },
+    "event": { "information_cadence": "source event, coalesced at most 25ms per asset", "order_latency_ms": 250 }
+  },
+  "assignment": {
+    "unit": "independent Polymarket market_id",
+    "method": "FNV-1a(strategy_name + ':' + market_id) modulo 2",
+    "allocation": "exactly one arm per market"
+  },
+  "minimum_read": {
+    "independent_signaled_markets_per_strategy_arm": 300,
+    "minimum_calendar_days": 14,
+    "no_optional_stopping": true
+  },
+  "decision_rule": "Do not pool v1 sizing rows. Compare arms only inside 500usd-v1 using quote-survival-adjusted post-fee PnL clustered by market and UTC day.",
+  "provisional": true
+}

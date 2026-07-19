@@ -1,0 +1,42 @@
+[Unit]
+Description=BORG Pyth resolver boundary transfer observer (paper only)
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=NODE_ENV=production
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_WAL_MIN_FREE_GB=20
+Environment=BORG_COLLECTION_EPOCH_ID=dublin-local-pg-2026-07-16-v1
+Environment=BORG_COLLECTION_EPOCH_START=2026-07-16T13:28:05.289Z
+Environment=BORG_COLLECTION_LOCATION=dublin-ie
+Environment=BORG_CODE_VERSION=pyth-resolver-boundary-transfer-v1
+Environment=PYTH_MAX_MARKETS=24
+Environment=PYTH_CLOB_SHARDS=2
+Environment=PYTH_UNIVERSE_REFRESH_MS=300000
+Environment=PYTH_TICK_DB_SAMPLE_MS=1000
+Environment=PYTH_BOOK_MAX_AGE_MS=500
+Environment=PYTH_SOURCE_MAX_AGE_MS=2000
+Environment=PYTH_TARGET_BUDGET_USD=10
+Environment=PYTH_SETTLEMENT_COST_USD=0.10
+ExecStart=/usr/local/bin/node borg/pyth/collector.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=45
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

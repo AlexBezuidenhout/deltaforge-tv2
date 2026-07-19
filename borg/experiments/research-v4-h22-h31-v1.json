@@ -1,0 +1,43 @@
+{
+  "experiment_id": "research-v4-h22-h31-v1",
+  "created_at": "2026-07-15",
+  "phase": "pilot",
+  "paper_only": true,
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "max_total_stake_usd": 10,
+  "max_touch_participation": 0.2,
+  "execution_model": "latency_1s_quote_survival",
+  "fee_stress_for_entry": "2x crypto taker curve: 2 * 0.07 * p * (1-p) per share",
+  "minimum_residual_edge": 0.02,
+  "population": {
+    "hourly_assets": ["btc", "eth", "sol", "xrp"],
+    "hourly_contracts": "current contract; next contract discovered and warmed 30 seconds before open",
+    "daily_assets": ["btc", "eth", "sol", "xrp"],
+    "daily_rotation": "one asset per UTC day, deterministic round-robin",
+    "daily_contracts": "three nearest thresholds and two nearest disjoint buckets"
+  },
+  "hypotheses": [
+    { "id": "H22", "strategy": "H22_hourly_resolver_dislocation", "root": ["R1"], "tier": "V", "market_types": ["direction_1h"] },
+    { "id": "H23", "strategy": "H23_hourly_crossvenue_confirmation", "root": ["R1", "R4"], "tier": "V", "market_types": ["direction_1h"] },
+    { "id": "H24", "strategy": "H24_hourly_flow_breakout", "root": ["R2"], "tier": "V", "market_types": ["direction_1h"] },
+    { "id": "H25", "strategy": "H25_horizon_vol_surface", "root": ["R4"], "tier": "H/V", "market_types": ["direction_5m", "direction_1h"] },
+    { "id": "H26", "strategy": "H26_nested_threshold_bundle", "root": ["R5"], "tier": "P/V", "market_types": ["threshold_daily"] },
+    { "id": "H27", "strategy": "H27_disjoint_bucket_bundle", "root": ["R5"], "tier": "P/V", "market_types": ["range_daily"] },
+    { "id": "H28", "strategy": "H28_threshold_resolver_close", "root": ["R1"], "tier": "H", "market_types": ["threshold_daily"] },
+    { "id": "H29", "strategy": "H29_range_resolver_close", "root": ["R1"], "tier": "H", "market_types": ["range_daily"] },
+    { "id": "H30", "strategy": "H30_threshold_ladder_residual", "root": ["R1", "R5"], "tier": "V", "market_types": ["threshold_daily"] },
+    { "id": "H31", "strategy": "H31_hourly_crossasset_residual", "root": ["R2", "R4"], "tier": "V", "market_types": ["direction_1h"] }
+  ],
+  "evaluation": {
+    "pilot_rows_are_evidence": false,
+    "freeze_required_before_eval": true,
+    "minimum_independent_market_events": 300,
+    "minimum_calendar_days": 14,
+    "cluster_unit": "Polymarket event/window and UTC day",
+    "cost_views": ["1x", "2x"],
+    "bundle_requirements": ["complete-group PnL positive", "orphan-fill rate reported", "non-atomic leg loss included"],
+    "promotion_rule": "No live path. After a new freeze, require positive clustered confidence interval after 2x costs and no dependence on one asset/day/regime.",
+    "multiple_testing": "Correct across H1-H31 and all discarded variants. Pilot exploration does not reset family-wise error."
+  }
+}

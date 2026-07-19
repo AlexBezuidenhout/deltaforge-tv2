@@ -1,0 +1,68 @@
+{
+  "experiment_id": "structural-certified-payoff-graph-v3",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-18T19:34:09.387Z",
+  "evidence_started_at": "2026-07-18T19:34:09.387Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "certified_payoff_graph",
+  "supersedes": "structural-bregman-depth-v2",
+  "strategy_version": "structural-certified-payoff-graph-v3",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "selection_disclosure": "V2 established that executable economics cannot be inferred from title algebra alone. V3 was specified after that audit. Every V1/V2 observation is excluded from V3 evidence, including all previously positive parser errors.",
+  "hypothesis": "Content-addressed venue rules plus a finite-state payoff proof can identify rare same-venue bundles whose minimum terminal payout exceeds synchronized executable asks after two times current fees, subject to displayed capacity and explicit non-atomic orphan risk.",
+  "certification": {
+    "rule_document": "Exact event and market settlement metadata is persisted once under a SHA-256 content hash.",
+    "candidate_identity": "Universe version, legs, payoff proof and rule-certification hash; any rule change creates a new candidate.",
+    "accepted": [
+      "single-condition binary complements",
+      "non-augmented explicit negRisk complete event sets",
+      "same-resolution-scope ordered price thresholds",
+      "same-resolution-scope typed disjoint ranges",
+      "same-scope sports total and spread ladders with identical normalized rule templates"
+    ],
+    "fail_closed": [
+      "augmented negRisk sets",
+      "negRisk Other placeholders",
+      "partial event sets",
+      "mixed resolver or expiry scope",
+      "dates, margins and percentages presented as price ladders",
+      "unknown rules, fee schedules, venue minimums or payoff states"
+    ],
+    "state_oracle": "Enumerated certified terminal states; exactly-one sets use the closed-form state list. Unsupported general components above 12 predicates require a future SAT/MILP oracle and fail closed."
+  },
+  "execution": {
+    "latency_profiles_ms": [20, 50, 100, 250, 500],
+    "target_budget_usd": 10,
+    "book_model": "walk every displayed ask level for every leg",
+    "fees": "current per-market fee metadata stressed at 2x; unknown schedules fail closed",
+    "minimum_size": "maximum published venue minimum across legs",
+    "atomicity": false,
+    "promotion_rule": "No multi-leg bundle is labelled qualified until a separate execution study demonstrates bounded orphan risk."
+  },
+  "evaluation": {
+    "minimum_independent_events": 300,
+    "minimum_calendar_days": 14,
+    "primary_metric": "statewise_guaranteed_profit_after_2x_fees_depth_and_rule_certification",
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bound_above_zero": true,
+    "report_rule_recertification_rate": true,
+    "report_false_relation_rate": true,
+    "report_capacity_and_orphan_loss": true,
+    "multiple_testing": "Holm correction across relation class, latency profile and inspected capacity band",
+    "null_outcome": "No executable certified bundle is an acceptable result."
+  },
+  "strategy_bindings": [{
+    "strategy": "structural_certified_payoff_graph_v3",
+    "family": "certified_payoff_graph",
+    "arm": "baseline",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "guaranteed_profit_2x_depth_certified_rules"
+  }]
+}

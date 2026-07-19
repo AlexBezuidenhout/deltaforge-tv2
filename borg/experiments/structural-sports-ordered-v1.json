@@ -1,0 +1,53 @@
+{
+  "experiment_id": "structural-sports-ordered-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-18T10:33:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "same_venue_structural_payoffs",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "hypothesis": "Same-venue complete sets and ordered sports totals/spreads may occasionally offer positive executable minimum-payout bundles after doubled fees, displayed-depth limits and non-atomic orphan stress.",
+  "universe": {
+    "gamma_panels": ["broad near-expiry", "broad volume", "Sports tag 1 near-expiry", "Sports tag 1 volume"],
+    "sports_tag_id": 1,
+    "sports_pages_per_ranking": 5,
+    "catalog_cap": 20000,
+    "realtime_candidate_cap": 24,
+    "realtime_token_cap": 96,
+    "selection": "deterministic round-robin by structure family, then nearest end time, fewest legs and candidate hash",
+    "pnl_used_for_selection": false
+  },
+  "certified_relations": {
+    "binary_complement": "the two outcome tokens of one binary condition",
+    "complete_mutually_exclusive_set": "Gamma negRisk event only when every active market is a literal YES/NO predicate",
+    "sports_total_ladder": "same event, statistic/period scope and normalized rule template; Over(high) implies Over(low)",
+    "sports_spread_ladder": "same event, participant, statistic/period scope and normalized rule template; covering a lower handicap implies covering a higher handicap",
+    "crypto_nested_threshold": "typed currency/crypto-price predicates with matching direction",
+    "disjoint_ranges": "typed price ranges with non-overlapping bounds",
+    "fail_closed": ["dates", "percentages", "mixed periods", "ambiguous participants", "missing rule text", "non-binary markets"]
+  },
+  "execution": {
+    "latency_profiles_ms": [20, 50, 100, 250, 500],
+    "entry": "walk every executable ask leg",
+    "fee_view": "2x venue fee schedule",
+    "minimum_displayed_profit_usd": 0.05,
+    "target_notional_usd": 10,
+    "atomic": false,
+    "qualified_policy": "A positive economic candidate remains unqualified while multi-leg submission is non-atomic."
+  },
+  "evaluation": {
+    "minimum_independent_events": 300,
+    "minimum_calendar_days": 14,
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_event_and_day_clustered_lower_bounds_above_zero": true,
+    "report_displayed_capacity": true,
+    "report_orphan_stress": true,
+    "promotion": "No live path. Passing permits a separate reviewed paper execution study only.",
+    "null_outcome": "No executable bundle or approximately zero edge is an accepted result."
+  }
+}

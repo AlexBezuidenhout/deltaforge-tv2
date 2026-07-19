@@ -1,0 +1,50 @@
+{
+  "manifest_format": "flow-experiment-v1",
+  "experiment_id": "flow-late-absorption-boundary-v3",
+  "status": "FROZEN_FORWARD_EVALUATION",
+  "strategy_version": "flow-late-absorption-boundary-v3",
+  "supersedes": "flow-late-absorption-boundary-v2",
+  "frozen_at_utc": "2026-07-18T16:43:31.757Z",
+  "evidence_started_at": "2026-07-18T16:43:31.757Z",
+  "paper_only": true,
+  "live_order_path": "separate_disabled_by_default_canary_not_counted_as_evidence",
+  "provisional": true,
+  "discovery_rows_excluded": true,
+  "prior_specification_disposition": "V2 captured causal delayed books but omitted the market-published minimum share size. V3 resets the forward sample and requires that venue rule at source confirmation and order arrival.",
+  "selection_disclosure": "The 0-10 second boundary band was selected after inspecting earlier Flow data. Every V1/V2 row, the 18-market 18/18 discovery result and every WAL replay are discovery only.",
+  "hypothesis": "A completed wrong-way public sweep that is absorbed and followed by one-tick executable improvement in the opposite token during the final ten seconds contains terminal resolver information beyond the executable ask and crypto taker fee.",
+  "frozen_mechanics": {
+    "source_signal": "public-flow-cost-confirmed-v3 absorption_reversal_v2 at 500ms information delay",
+    "market_scope": "crypto direction markets with an authoritative scheduled resolver boundary and terminal outcome",
+    "entry_window": "strictly 0 < seconds_to_resolution <= 10 at confirmation",
+    "independence": "first qualifying source signal per condition_id only; never stack one market",
+    "primary_order_transit_ms": 250,
+    "order_transit_controls_ms": [50, 100, 500],
+    "arrival_rule": "last causal CLOB book at or before intended arrival; reject stale, crossed, missing-capacity, connection-gap, post-boundary or non-marketable arrivals",
+    "fill": "FAK-style paper fill at arrival ask, min($10/ask, 20% displayed arrival ask size), at least $1 notional and at least the CLOB market's published minimum_order_size",
+    "exit": "hold to official terminal resolution; no post-boundary book exit is credited",
+    "costs": "exact entry taker fee; primary inference requires doubled entry-fee stress positive",
+    "live_canary": "separate event-driven executor; max $10, protected FAK worst price equal to the causal arrival ask, independent database and environment arming gates; live results never enter the paper forward cohort",
+    "post_selected_parameter": "The 10-second band remains PROVISIONAL and cannot use pre-freeze rows as evidence.",
+    "mechanism_argument": "Inside ten seconds, a completed wrong-way sweep followed by opposite-book improvement can reveal which side absorbed stale boundary flow. This is a resolver-state hypothesis, not a claim that discovery PnL is repeatable."
+  },
+  "minimum_read": {
+    "independent_markets": 300,
+    "calendar_days": 30,
+    "both_chronological_halves_positive": true,
+    "market_and_day_clustered_lower_confidence_bound_above_zero": true,
+    "multiple_testing_correction": "Holm correction across every Flow arm, information latency, order latency, horizon and inspected TTE bucket",
+    "minimum_data_quality_pct": 90,
+    "minimum_persisted_arrival_coverage_pct": 90,
+    "primary_metric": "terminal_net_pnl_2x_entry_fee_at_250ms_order_transit",
+    "capacity_metric": "realized dollars per independent market at displayed 20%-touch capacity"
+  },
+  "failure_conditions": [
+    "Either chronological half is non-positive at doubled entry fees",
+    "The market- or day-clustered 95% lower bound is not above zero",
+    "The 250ms cohort is negative or fewer than 90% of decisions have a persisted causal arrival book",
+    "Profit depends on an order below the venue minimum or arriving at/after the resolver boundary",
+    "Authenticated acknowledgement or fill slippage consumes the paper lower bound"
+  ],
+  "zero_edge_disclosure": "The discovery result may be selection noise or a paper-fill artifact. A zero or negative forward result is an expected and valid outcome."
+}

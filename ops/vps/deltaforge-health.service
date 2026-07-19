@@ -1,0 +1,22 @@
+[Unit]
+Description=DeltaForge research-platform acceptance check
+Wants=network-online.target
+Requires=postgresql.service
+After=network-online.target postgresql.service borg-collector.service
+
+[Service]
+Type=oneshot
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=NODE_ENV=production
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_ARCHIVE_DIR=/var/lib/deltaforge/archive/borg-raw
+Environment=BORG_WAL_MIN_FREE_GB=20
+Environment=BORG_OFFHOST_ARCHIVE_RECEIPT=/var/lib/deltaforge/offhost-archive.receipt
+ExecStart=/usr/local/bin/node scripts/runtime-audit.js
+ExecStart=/usr/local/bin/node scripts/research-platform-check.js --json
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

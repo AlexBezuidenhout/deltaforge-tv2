@@ -1,0 +1,40 @@
+{
+  "manifest_format": "borg-experiment-v1",
+  "experiment_id": "main-v4-warm-vol-temporal-consensus-v1",
+  "status": "FROZEN_FORWARD_EVAL",
+  "phase": "eval",
+  "family": "main_v4_warm_vol_temporal_consensus",
+  "strategy_version": "main-v4-warm-vol-temporal-consensus-v1",
+  "frozen_at_utc": "2026-07-16T14:58:00.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "research_capital_version": "500usd-v1",
+  "starting_bankroll_usd": 500,
+  "target_notional_usd": 10,
+  "primary_metric": "net_pnl_2x",
+  "strategy_bindings": [{
+    "strategy": "MAIN_V4_warm_vol_temporal_consensus",
+    "family": "warm_vol_temporal_source_envelope",
+    "phase": "eval",
+    "min_independent_markets": 500,
+    "min_days": 14,
+    "primary_metric": "net_pnl_2x"
+  }],
+  "hypothesis": "A source-confirmed five-minute dislocation is tradable only after the causal volatility profile is warm, all three transports agree over both 10 and 30 seconds, and a least-favourable probability computed with the largest EWMA/RMS/robust sigma clears executable stressed costs.",
+  "mechanism": {
+    "markets": "BTC, ETH, SOL and XRP five-minute direction binaries",
+    "warmup": "at least 60 completed one-second return observations; incomplete profiles abstain",
+    "temporal_confirmation": "Binance, Coinbase and Chainlink return signs all agree at both 10s and 30s",
+    "volatility_uncertainty": "use max(EWMA, ordinary RMS, MAD-robust) causal five-minute sigma",
+    "source_uncertainty": "YES uses the minimum source-conditioned fair; NO uses one minus the maximum",
+    "resolver_veto": "Binance-minus-Chainlink level divergence must have the consensus sign",
+    "execution": "real CLOB ask, event_order_250ms quote-survival model, <=20% displayed touch, $10 cap",
+    "economic_gate": "least-favourable probability clears executable ask, 2x crypto taker fees and one token tick",
+    "exit": "hold to terminal resolution"
+  },
+  "selection_disclosure": "V4 was created after code review found that V3 could act before its volatility profile was warm and could rely on a single ten-second horizon. V3 outcomes and every pre-deployment V4 replay are excluded; no numerical threshold was selected from V3 PnL.",
+  "decision_rule": "After at least 500 independent markets and 14 calendar days, require >=90% non-F data, positive 2x-cost PnL in both chronological halves, a multiple-testing-adjusted market-clustered lower confidence bound above zero, and non-negative 5s/30s adverse-selection markouts. Otherwise reject.",
+  "zero_edge_disclosure": "The valid expected result is that the conservative envelope finds few or no trades, or that remaining post-cost edge is approximately zero.",
+  "no_optional_stopping": true,
+  "provisional": true
+}

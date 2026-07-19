@@ -1,0 +1,42 @@
+{
+  "manifest_format": "borg-experiment-v1",
+  "experiment_id": "main-v2-resolver-quorum-v1",
+  "status": "FROZEN_FORWARD_EVAL",
+  "phase": "eval",
+  "family": "main_v2_resolver_quorum",
+  "strategy_version": "main-v2-resolver-quorum-v1",
+  "frozen_at_utc": "2026-07-16T08:53:00.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "research_capital_version": "500usd-v1",
+  "starting_bankroll_usd": 500,
+  "target_notional_usd": 10,
+  "primary_metric": "net_pnl_2x",
+  "strategy_bindings": [
+    {
+      "strategy": "MAIN_V2_resolver_quorum",
+      "family": "resolver_quorum_latency",
+      "phase": "eval",
+      "min_independent_markets": 500,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x"
+    }
+  ],
+  "hypothesis": "When Coinbase and the Chainlink resolver stream agree while direct Binance is the lagging outlier, an unadjusted Polymarket crypto binary may briefly lag the resolver-aware quorum after executable costs.",
+  "mechanism": {
+    "markets": "BTC, ETH, SOL and XRP five-minute direction binaries",
+    "information_cadence": "source event, causally timestamped",
+    "minimum_tte_seconds": 60,
+    "maximum_resolver_tick_age_ms": 3000,
+    "quorum": "Coinbase and Chainlink same sign, each >=2.5bp over 10s, within 2.5bp of each other",
+    "outlier": "quorum minus direct Binance has the quorum sign and magnitude >=2.5bp",
+    "execution": "real CLOB ask, event_order_250ms quote-survival model, <=20% displayed touch, $10 cap",
+    "economic_gate": "at least $0.02 probability edge per share after 2x crypto taker fees",
+    "exit": "hold to terminal resolution; no interim mark-price stop"
+  },
+  "selection_disclosure": "The mechanism was selected after reviewing H1-H51 pilot results. No H49 or legacy Main observation counts as evidence for this new strategy ID. Multiple-testing correction must include all prior hypotheses and discarded variants.",
+  "decision_rule": "After at least 500 independent markets and 14 calendar days, require >=90% non-F data quality, positive 2x-cost PnL in both chronological halves, a multiple-testing-adjusted market-clustered lower confidence bound above zero, and non-negative 5s/30s adverse selection. Otherwise reject or redesign under a new strategy ID.",
+  "zero_edge_disclosure": "A valid result is that the apparent pilot edge disappears and measured exploitable edge is approximately zero.",
+  "no_optional_stopping": true,
+  "provisional": true
+}

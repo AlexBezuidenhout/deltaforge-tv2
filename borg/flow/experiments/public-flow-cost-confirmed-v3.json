@@ -1,0 +1,43 @@
+{
+  "manifest_format": "flow-experiment-v1",
+  "experiment_id": "public-flow-cost-confirmed-v3",
+  "status": "FROZEN_FORWARD_PILOT",
+  "strategy_version": "public-flow-cost-confirmed-v3",
+  "supersedes": "public-flow-cost-confirmed-v2",
+  "frozen_at_utc": "2026-07-18T16:43:31.757Z",
+  "evidence_started_at": "2026-07-18T16:43:31.757Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "provisional": true,
+  "discovery_rows_excluded": true,
+  "correction": {
+    "reason": "The V2 depth model enforced a one-dollar notional floor but did not persist or enforce each CLOB market's published minimum_order_size. The active crypto books inspected at freeze published a five-share minimum. This is a venue-contract correction, not a performance-tuned threshold.",
+    "evidence_policy": "V1 and V2 remain immutable history and contribute zero V3 confirmation evidence."
+  },
+  "arms": [
+    "cost_confirmed_continuation_v2",
+    "absorption_reversal_v2"
+  ],
+  "latency_profiles_ms": [100, 250, 500],
+  "primary_metric": "net_pnl_5s_exact_roundtrip_fees",
+  "mechanism": {
+    "trigger": "completed public sweep that walked beyond the displayed opposing touch",
+    "decision": "at the scheduled availability timestamp using only the latest causal book state",
+    "followthrough": "target executable bid improves by at least one token tick",
+    "queue_confirmation": "target top bid size is at least top ask size",
+    "cost_hurdle": "observed sweep displacement per share covers current spread plus exact entry and exit taker fees",
+    "sizing": "min($10 / arrival ask, 20% of displayed arrival ask size), provided the resulting shares meet the market-published minimum_order_size",
+    "exit": "executable full-size bid markout at 1s, 2s, 5s and 10s"
+  },
+  "minimum_read": {
+    "independent_sweeps_per_arm_and_latency": 300,
+    "calendar_days": 30,
+    "both_chronological_halves_positive": true,
+    "market_and_day_clustered_lower_confidence_bound_above_zero": true,
+    "multiple_testing_correction": true,
+    "minimum_non_f_quality_pct": 90
+  },
+  "selection_disclosure": "V3 changes only execution feasibility after a venue-rule omission was found. It does not inherit V2 outcomes and it does not validate the post-selected final-ten-second boundary hypothesis.",
+  "zero_edge_disclosure": "The valid expected outcome is that public completed flow contains no post-cost scalp edge.",
+  "no_optional_stopping": true
+}

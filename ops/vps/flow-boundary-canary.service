@@ -1,0 +1,35 @@
+[Unit]
+Description=Final-10s Flow boundary canary (dry observer unless independently armed)
+Wants=network-online.target
+Requires=postgresql.service polymarket-flow.service
+After=network-online.target postgresql.service polymarket-flow.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=-/etc/deltaforge/flow-boundary-live.env
+Environment=NODE_ENV=production
+ExecStart=/usr/local/bin/node borg/live/flow-boundary-executor.js
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=8192
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

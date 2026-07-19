@@ -1,0 +1,39 @@
+{
+  "manifest_format": "borg-experiment-v1",
+  "experiment_id": "main-v3-robust-source-envelope-v1",
+  "status": "FROZEN_FORWARD_EVAL",
+  "phase": "eval",
+  "family": "main_v3_robust_source_envelope",
+  "strategy_version": "main-v3-robust-source-envelope-v1",
+  "frozen_at_utc": "2026-07-16T14:34:03.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "research_capital_version": "500usd-v1",
+  "starting_bankroll_usd": 500,
+  "target_notional_usd": 10,
+  "primary_metric": "net_pnl_2x",
+  "strategy_bindings": [{
+    "strategy": "MAIN_V3_robust_source_envelope",
+    "family": "robust_source_envelope",
+    "phase": "eval",
+    "min_independent_markets": 500,
+    "min_days": 14,
+    "primary_metric": "net_pnl_2x"
+  }],
+  "hypothesis": "A five-minute binary is tradable only when the least favourable fair implied by causally aligned Binance, Coinbase and Chainlink returns still exceeds the executable ask after a 2x fee stress and one token tick.",
+  "mechanism": {
+    "markets": "BTC, ETH, SOL and XRP five-minute direction binaries",
+    "information_cadence": "source event, causally timestamped",
+    "source_alignment": "translate each source's 10-second return onto the current Binance level; never mix absolute source bases",
+    "uncertainty": "YES uses the minimum source-conditioned fair; NO uses one minus the maximum",
+    "resolver_veto": "Binance and Coinbase must agree in sign and the Binance-minus-Chainlink level divergence must have that sign",
+    "execution": "real CLOB ask, event_order_250ms quote-survival model, <=20% displayed touch, $10 cap",
+    "economic_gate": "worst-case probability clears executable ask, 2x crypto taker fees and one token tick",
+    "exit": "hold to terminal resolution"
+  },
+  "selection_disclosure": "V2's negative observations motivated a different causal model. No V2, legacy MAIN or prior BORG row counts as evidence for V3, and all tested families remain in the multiple-testing correction.",
+  "decision_rule": "After at least 500 independent markets and 14 calendar days, require >=90% non-F data, positive 2x-cost PnL in both chronological halves, a multiple-testing-adjusted market-clustered lower confidence bound above zero, and non-negative 5s/30s adverse-selection markouts. Otherwise reject.",
+  "zero_edge_disclosure": "The expected and acceptable result is that robust source uncertainty removes most claimed edge and the remaining strategy may be approximately zero.",
+  "no_optional_stopping": true,
+  "provisional": true
+}

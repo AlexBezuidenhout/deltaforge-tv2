@@ -1,0 +1,17 @@
+[Unit]
+Description=Compact sealed DeltaForge research events to immutable Parquet
+
+[Service]
+Type=oneshot
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_ARCHIVE_DIR=/var/lib/deltaforge/archive/borg-raw
+Environment=BORG_PARQUET_MIRROR_DIR=/var/lib/deltaforge/parquet
+ExecStart=/usr/local/bin/node scripts/parquet-mirror.js
+UMask=0077
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true

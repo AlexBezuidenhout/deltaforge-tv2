@@ -1,0 +1,47 @@
+{
+  "experiment_id": "research-h43-forward-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-18T10:30:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "prospective_resolution_boundary",
+  "supersedes": "research-v5-h32-h51-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "unchanged-research-v5-code-forward-only",
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "hypothesis": "The pre-existing H43 resolution-boundary buffer may retain positive executable returns on fresh markets after the 22-market discovery cohort is excluded and costs are doubled.",
+  "frozen_mechanics": {
+    "strategy_code_changed": false,
+    "thresholds_changed": false,
+    "asset_selection_changed": false,
+    "sizing_changed": false,
+    "reason": "The discovery point estimate was positive in both chronological halves but the interval was very wide and the family-wise adjusted p-value was one. Confirmatory evidence therefore begins under a new identity without changing the mechanism."
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "H43_resolution_boundary_buffer",
+      "family": "resolution_uncertainty",
+      "arm": "baseline",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "cluster_by": ["Polymarket market/window", "UTC day"],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "report_boundary_and_resolver_losses_separately": true,
+    "multiple_testing": "Correct across every H1-H51 strategy and discarded variant, not merely H43.",
+    "promotion": "No live path. Passing the mechanical read only triggers a separate implementation and risk review.",
+    "null_outcome": "Measured edge may be approximately zero; no parameter or inverse signal may be selected from the discovery cohort."
+  }
+}

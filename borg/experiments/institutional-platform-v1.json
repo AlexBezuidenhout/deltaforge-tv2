@@ -1,0 +1,21 @@
+{
+  "manifest_format": "borg-platform-manifest-v1",
+  "experiment_id": "institutional-platform-v1",
+  "status": "ACCEPTANCE_TEST",
+  "phase": "pilot",
+  "frozen_at_utc": "2026-07-15T18:00:00.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "family": "research_infrastructure",
+  "requirements": {
+    "raw_event_provenance": true,
+    "immutable_manifest_hashes": true,
+    "canonical_order_intent": true,
+    "separate_information_and_order_latency": true,
+    "shared_portfolio_capital": 500,
+    "quality_and_fidelity_grades": true,
+    "minimum_clean_collection_hours": 48,
+    "off_host_archive_required": true
+  },
+  "decision_rule": "Infrastructure acceptance does not imply strategy profitability or authorize a live-order path."
+}

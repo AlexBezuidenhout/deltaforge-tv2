@@ -1,0 +1,43 @@
+[Unit]
+Description=BORG event-driven structural payoff scanner (paper only)
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=NODE_ENV=production
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_WAL_MIN_FREE_GB=20
+Environment=BORG_COLLECTION_EPOCH_ID=dublin-local-pg-2026-07-16-v1
+Environment=BORG_COLLECTION_EPOCH_START=2026-07-16T13:28:05.289Z
+Environment=BORG_COLLECTION_LOCATION=dublin-ie
+Environment=BORG_CODE_VERSION=dublin-runtime-v3
+Environment=STRUCTURAL_MAX_CANDIDATES=16
+Environment=STRUCTURAL_MAX_TOKENS=48
+Environment=STRUCTURAL_CLOB_SHARDS=2
+Environment=STRUCTURAL_EVENT_PAGES=20
+Environment=STRUCTURAL_LATENCY_PROFILES_MS=20,50,100,250,500
+Environment=STRUCTURAL_TARGET_NOTIONAL_USD=10
+Environment=STRUCTURAL_MIN_CAPACITY_PROFIT_USD=0.05
+Environment=STRUCTURAL_NEGATIVE_SAMPLE_MS=5000
+Environment=STRUCTURAL_POSITIVE_SAMPLE_MS=100
+ExecStart=/usr/local/bin/node borg/structural/scanner.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=45
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

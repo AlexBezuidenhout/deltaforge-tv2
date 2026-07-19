@@ -1,0 +1,44 @@
+[Unit]
+Description=BORG Deribit option surface and Polymarket binary observer (paper only)
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=NODE_ENV=production
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_WAL_MIN_FREE_GB=20
+Environment=BORG_COLLECTION_EPOCH_ID=dublin-local-pg-2026-07-16-v1
+Environment=BORG_COLLECTION_EPOCH_START=2026-07-16T13:28:05.289Z
+Environment=BORG_COLLECTION_LOCATION=dublin-ie
+Environment=BORG_CODE_VERSION=options-surface-v1
+Environment=OPTIONS_CURRENCIES=BTC,ETH
+Environment=OPTIONS_MAX_INSTRUMENTS=160
+Environment=OPTIONS_DB_SAMPLE_MS=1000
+Environment=OPTIONS_MARK_SAMPLE_MS=1000
+Environment=OPTIONS_TARGET_BUDGET_USD=10
+Environment=OPTIONS_HEDGE_COST_BPS=5
+Environment=OPTIONS_RESOLVER_UNCERTAINTY_BPS=3
+Environment=OPTIONS_MIN_TTE_SEC=300
+Environment=OPTIONS_MAX_TTE_SEC=604800
+Environment=OPTIONS_CLOB_SHARDS=2
+ExecStart=/usr/local/bin/node borg/options/collector.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=45
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

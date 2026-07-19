@@ -1,0 +1,163 @@
+{
+  "format": "borg-infra-benchmark-v1",
+  "measured_at": "2026-07-15T22:50:00.215Z",
+  "location": "measured-dublin",
+  "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+  "platform": "linux 5.15.0-185-generic x64",
+  "duration_ms": 15000,
+  "database": {
+    "host": "ep-lucky-lab-at6bma3y-pooler.c-9.us-east-1.aws.neon.tech",
+    "rtt": {
+      "n": 20,
+      "min_ms": 76.715,
+      "p50_ms": 76.89,
+      "p95_ms": 78.002,
+      "max_ms": 590.056
+    }
+  },
+  "clock_calibration": {
+    "binance": {
+      "local_minus_source_ms": {
+        "n": 10,
+        "min_ms": -39.5,
+        "p50_ms": -2.5,
+        "p95_ms": -0.5,
+        "max_ms": 0.5
+      },
+      "midpoint_uncertainty_ms": {
+        "n": 10,
+        "min_ms": 111.282,
+        "p50_ms": 112.526,
+        "p95_ms": 124.061,
+        "max_ms": 149.481
+      },
+      "quantization_ms": 1,
+      "reliable": true,
+      "correction_ms": -2.5
+    },
+    "polymarket": {
+      "local_minus_source_ms": {
+        "n": 10,
+        "min_ms": 5.5,
+        "p50_ms": 89.5,
+        "p95_ms": 952.5,
+        "max_ms": 983.5
+      },
+      "midpoint_uncertainty_ms": {
+        "n": 10,
+        "min_ms": 8.84,
+        "p50_ms": 11.314,
+        "p95_ms": 20.429,
+        "max_ms": 20.636
+      },
+      "quantization_ms": 1000,
+      "reliable": false,
+      "correction_ms": 0
+    }
+  },
+  "public_http_rtt": {
+    "polymarket_clob_time": {
+      "n": 10,
+      "min_ms": 18.554,
+      "p50_ms": 20.069,
+      "p95_ms": 20.986,
+      "max_ms": 23.031
+    },
+    "binance_time": {
+      "n": 10,
+      "min_ms": 221.958,
+      "p50_ms": 226.033,
+      "p95_ms": 231.085,
+      "max_ms": 232.163
+    }
+  },
+  "websocket": {
+    "binance_aggTrade": {
+      "connect_ms": 748.9477980000001,
+      "freshness_corrected": {
+        "n": 18,
+        "min_ms": 134.5,
+        "p50_ms": 134.5,
+        "p95_ms": 135.5,
+        "max_ms": 135.5
+      },
+      "freshness_raw": {
+        "n": 18,
+        "min_ms": 132,
+        "p50_ms": 132,
+        "p95_ms": 133,
+        "max_ms": 133
+      },
+      "source_clock_correction_ms": -2.5,
+      "source_clock_uncertainty_ms": 112.526,
+      "interarrival": {
+        "n": 17,
+        "min_ms": 124,
+        "p50_ms": 521,
+        "p95_ms": 1591,
+        "max_ms": 2410
+      },
+      "error": null
+    },
+    "polymarket_chainlink_rtds": {
+      "connect_ms": 77.81417199999942,
+      "freshness_corrected": {
+        "n": 98,
+        "min_ms": 966,
+        "p50_ms": 1384,
+        "p95_ms": 1689,
+        "max_ms": 1887
+      },
+      "freshness_raw": {
+        "n": 98,
+        "min_ms": 966,
+        "p50_ms": 1384,
+        "p95_ms": 1689,
+        "max_ms": 1887
+      },
+      "source_clock_correction_ms": 0,
+      "source_clock_uncertainty_ms": 500,
+      "interarrival": {
+        "n": 98,
+        "min_ms": 1,
+        "p50_ms": 40,
+        "p95_ms": 911,
+        "max_ms": 1051
+      },
+      "error": null
+    },
+    "polymarket_clob": {
+      "connect_ms": 46.93876700000055,
+      "freshness_corrected": {
+        "n": 14,
+        "min_ms": 8,
+        "p50_ms": 9,
+        "p95_ms": 14,
+        "max_ms": 626
+      },
+      "freshness_raw": {
+        "n": 14,
+        "min_ms": 8,
+        "p50_ms": 9,
+        "p95_ms": 14,
+        "max_ms": 626
+      },
+      "source_clock_correction_ms": 0,
+      "source_clock_uncertainty_ms": 500,
+      "interarrival": {
+        "n": 13,
+        "min_ms": 0,
+        "p50_ms": 44,
+        "p95_ms": 3682,
+        "max_ms": 4018
+      },
+      "error": null
+    }
+  },
+  "order_acknowledgement": {
+    "status": "NOT_MEASURED",
+    "reason": "Read-only benchmark: no signed/live order was authorized. HTTP RTT is a routing proxy, not order acknowledgement."
+  },
+  "suggested_order_latency_ms": 100,
+  "interpretation": "Compare identical reports from Mac, Dublin and us-east. A VPS claim is invalid unless feed freshness and CLOB RTT improve without a remote database bottleneck."
+}

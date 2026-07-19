@@ -1,0 +1,846 @@
+{
+  "version": "crossvenue-identity-v2",
+  "reviewedAt": "2026-07-19T18:40:00Z",
+  "sourceSnapshot": "Live Polymarket Gamma rules, Kalshi Trade API rules, synchronized books, public trade tapes and finalized outcomes through 2026-07-17.",
+  "warning": "Approval asserts payoff equivalence, not order atomicity. Family-level records may reject but can never approve; approval requires exact condition and ticker ids after full rule review.",
+  "matches": [
+    {
+      "polyConditionId": "0xe10fc4d148f46fb57b8ced09ea771009035d50df28cedcd45150004d3e2be034",
+      "kalshiTicker": "KXSEXYMAN-26-CON",
+      "reviewed": true,
+      "approved": true,
+      "reviewedAt": "2026-07-19T18:40:00Z",
+      "resolutionAudit": {
+        "decision": "APPROVED",
+        "reviewedAt": "2026-07-19T18:40:00Z",
+        "reviewer": "operator (Alex) via chat instruction 2026-07-19: approvals directed after full disclosure of rule differences AND of the prior frozen family rejection people-sexiest-man-fallbacks, which this review supersedes for these two exact ids only",
+        "acknowledgedDifferences": [
+          "MULTIPLE_WINNER_RULE_MISMATCH: Polymarket resolves alphabetically among multiple honorees; Kalshi rules silent",
+          "NO_ANNOUNCEMENT_DEADLINE_MISMATCH: Polymarket resolves Other if no 2026 announcement by Dec 31 11:59PM ET; Kalshi rules silent",
+          "RESOLUTION_SOURCE_RULE_MISMATCH: Polymarket names People or credible-reporting consensus; Kalshi names no fallback hierarchy"
+        ],
+        "rationale": "Paper research only. Both tail differences require People to either name multiple honorees or skip the 2026 announcement; every prior year has produced a single named honoree. Approval accepted as bounded basis risk for episode/basis measurement; no capital path exists.",
+        "priorFamilyRejection": {
+          "id": "people-sexiest-man-fallbacks",
+          "polyEventTitle": "People's Sexiest Man Alive 2026",
+          "kalshiEventTicker": "KXSEXYMAN-26",
+          "reasonCodes": [
+            "MULTIPLE_WINNER_RULE_MISMATCH",
+            "NO_ANNOUNCEMENT_DEADLINE_MISMATCH",
+            "RESOLUTION_SOURCE_RULE_MISMATCH"
+          ],
+          "dimensions": [
+            "tie",
+            "deadline",
+            "source"
+          ],
+          "rationale": "Polymarket alphabetically selects among multiple honorees and selects Other after the year-end deadline; Kalshi does not state the same fallbacks or source hierarchy."
+        },
+        "subject": "Connor Storrie"
+      },
+      "identitySnapshotHash": "1a229dda51ebd59902ea75b1a28baef24d1a06f8db3a79a513d399784ce8a236",
+      "ruleBinding": {
+        "snapshotHash": "1a229dda51ebd59902ea75b1a28baef24d1a06f8db3a79a513d399784ce8a236",
+        "polyRuleHash": "150f5a74ffbe3794a6748b198d382122e93d6ac3427e84b067c3f26591278e65",
+        "kalshiRuleHash": "c8863e42effce7a3e00690f74666ac90361450c2b240133187a29c7533c31b42"
+      }
+    },
+    {
+      "polyConditionId": "0x34f6849f2f6d6d7ab6830a62d0a4f13f458b63f27322224cad453b8d642417d1",
+      "kalshiTicker": "KXSEXYMAN-26-HUD",
+      "reviewed": true,
+      "approved": true,
+      "reviewedAt": "2026-07-19T18:40:00Z",
+      "resolutionAudit": {
+        "decision": "APPROVED",
+        "reviewedAt": "2026-07-19T18:40:00Z",
+        "reviewer": "operator (Alex) via chat instruction 2026-07-19: approvals directed after full disclosure of rule differences AND of the prior frozen family rejection people-sexiest-man-fallbacks, which this review supersedes for these two exact ids only",
+        "acknowledgedDifferences": [
+          "MULTIPLE_WINNER_RULE_MISMATCH: Polymarket resolves alphabetically among multiple honorees; Kalshi rules silent",
+          "NO_ANNOUNCEMENT_DEADLINE_MISMATCH: Polymarket resolves Other if no 2026 announcement by Dec 31 11:59PM ET; Kalshi rules silent",
+          "RESOLUTION_SOURCE_RULE_MISMATCH: Polymarket names People or credible-reporting consensus; Kalshi names no fallback hierarchy"
+        ],
+        "rationale": "Paper research only. Both tail differences require People to either name multiple honorees or skip the 2026 announcement; every prior year has produced a single named honoree. Approval accepted as bounded basis risk for episode/basis measurement; no capital path exists.",
+        "priorFamilyRejection": {
+          "id": "people-sexiest-man-fallbacks",
+          "polyEventTitle": "People's Sexiest Man Alive 2026",
+          "kalshiEventTicker": "KXSEXYMAN-26",
+          "reasonCodes": [
+            "MULTIPLE_WINNER_RULE_MISMATCH",
+            "NO_ANNOUNCEMENT_DEADLINE_MISMATCH",
+            "RESOLUTION_SOURCE_RULE_MISMATCH"
+          ],
+          "dimensions": [
+            "tie",
+            "deadline",
+            "source"
+          ],
+          "rationale": "Polymarket alphabetically selects among multiple honorees and selects Other after the year-end deadline; Kalshi does not state the same fallbacks or source hierarchy."
+        },
+        "subject": "Hudson Williams"
+      },
+      "identitySnapshotHash": "689653b94d29bcfce290d0958c23f238152bccf06a693569a72ff27d1f85a25a",
+      "ruleBinding": {
+        "snapshotHash": "689653b94d29bcfce290d0958c23f238152bccf06a693569a72ff27d1f85a25a",
+        "polyRuleHash": "0d85ef70874a773b40d70cfe0532a9cd86d5d22c19dc4403b9bf83568c41ac3d",
+        "kalshiRuleHash": "66989405f55f2516208b19e86447a1394218671eba9bdfff8eca3964e7d4208d"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "trump-speech-30m-state-conditioned-2026-07-17",
+      "polyConditionId": "0xc676a4f27cb9a3e05b34641cff6e2f1c3f7634722eea6814b619859c99d5d293",
+      "kalshiTicker": "KXTRUMPMENTIONDURATION-JUL1726-29",
+      "relationType": "POLY_IMPLIES_KALSHI",
+      "reviewed": true,
+      "approved": true,
+      "stateRequirements": [
+        {
+          "id": "speech_started_inside_both_contract_windows",
+          "satisfied": true,
+          "observedAt": "2026-07-17T01:27:17Z",
+          "source": "CROSSVENUE_RELATION_REVIEW_2026-07-17.md",
+          "note": "Conservative activation at the reviewed executable candidate; no earlier snapshots are approved by this state gate."
+        }
+      ],
+      "resolutionAudit": {
+        "decision": "APPROVED_STATE_CONDITIONED_IMPLICATION",
+        "reviewedAt": "2026-07-17T16:10:26Z",
+        "rationale": "After the speech had begun inside both venue windows, reaching 30 minutes under Polymarket's shorter podium interval implied reaching 30 minutes under Kalshi's weakly longer first-to-last-audible-word interval. The deterministic safe bundle is Polymarket NO plus Kalshi YES. This does not assert exact identity or atomic execution.",
+        "ordinaryStateMinimumPayoutPerShare": 1,
+        "nonAtomic": true
+      }
+    }
+  ],
+  "rejectionFamilies": [
+    {
+      "id": "golf-corales-winner-fallbacks",
+      "polyEventTitle": "PGA Tour: Corales Puntacana Championship Winner",
+      "kalshiEventTicker": "KXPGATOUR-COPC26",
+      "reasonCodes": [
+        "NO_RESULT_DEADLINE_MISMATCH",
+        "MULTIPLE_WINNER_RULE_MISMATCH",
+        "RESOLUTION_SOURCE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "deadline",
+        "tie",
+        "source",
+        "withdrawal"
+      ],
+      "rationale": "Polymarket selects Other if no winner is announced by July 25 and alphabetically selects among multiple winners; Kalshi can remain open through August 2 and does not state those same fallback rules."
+    },
+    {
+      "id": "nwsl-exact-score-vs-winner",
+      "polyEventTitle": "Kansas City Current vs. San Diego Wave FC - Exact Score",
+      "kalshiEventTicker": "KXNWSLGAME-26JUL17KCSAN",
+      "reasonCodes": [
+        "OUTCOME_PREDICATE_MISMATCH"
+      ],
+      "dimensions": [
+        "predicate"
+      ],
+      "rationale": "An exact final score or draw is not the same payoff as a Kansas City match win."
+    },
+    {
+      "id": "golf-open-winner-fallbacks",
+      "polyEventTitle": "PGA Tour: The Open Championship Winner",
+      "kalshiEventTicker": "KXPGATOUR-THOC26",
+      "reasonCodes": [
+        "NO_RESULT_DEADLINE_MISMATCH",
+        "MULTIPLE_WINNER_RULE_MISMATCH",
+        "RESOLUTION_SOURCE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "deadline",
+        "tie",
+        "source",
+        "withdrawal"
+      ],
+      "rationale": "Polymarket selects Other if no winner is announced by July 25 and alphabetically selects among multiple winners; Kalshi can remain open through August 2 and does not state those same fallback rules."
+    },
+    {
+      "id": "sc-senate-primary-determination",
+      "polyEventTitle": "South Carolina Republican Senate Special Primary Winner",
+      "kalshiEventTicker": "KXSCRSENS-26",
+      "reasonCodes": [
+        "NOMINATION_FALLBACK_MISMATCH",
+        "DETERMINATION_SOURCE_TIMING_MISMATCH"
+      ],
+      "dimensions": [
+        "source",
+        "deadline",
+        "runoff",
+        "early determination"
+      ],
+      "rationale": "Polymarket includes a November nominee fallback and Other deadline; Kalshi permits accelerated media-projection determination and remains open materially longer."
+    },
+    {
+      "id": "soccer-beijing-liaoning-cancellation",
+      "polyEventTitle": "Beijing Guoan FC vs. Liaoning Tieren FC",
+      "kalshiEventTicker": "KXCHNSLGAME-26JUL17BJGLIT",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "Polymarket remains open for a postponement and pays No only after complete cancellation; Kalshi can settle at fair value when cancelled or moved more than two weeks."
+    },
+    {
+      "id": "soccer-vitoria-vasco-cancellation",
+      "polyEventTitle": "EC Vit\u00f3ria vs. CR Vasco da Gama",
+      "kalshiEventTicker": "KXBRASILEIROGAME-26JUL16VITVDG",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "soccer-henan-qingdao-cancellation",
+      "polyEventTitle": "Henan FC vs. Qingdao Hainiu FC",
+      "kalshiEventTicker": "KXCHNSLGAME-26JUL17HENQIN",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "soccer-kansas-san-diego-cancellation",
+      "polyEventTitle": "Kansas City Current vs. San Diego Wave FC",
+      "kalshiEventTicker": "KXNWSLGAME-26JUL17KCSAN",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "Polymarket remains open for a postponement and pays No only after complete cancellation; Kalshi can settle at fair value when cancelled or moved more than two weeks."
+    },
+    {
+      "id": "soccer-dinamo-mondorf-winner-vs-advance",
+      "polyEventTitle": "SK Dinamo Tbilisi vs. US Mondorf-les-Bains",
+      "kalshiEventTicker": "KXUECLADVANCE-26JUL16TBIMLB",
+      "reasonCodes": [
+        "MATCH_WINNER_VS_ADVANCEMENT_MISMATCH"
+      ],
+      "dimensions": [
+        "predicate",
+        "aggregation"
+      ],
+      "rationale": "Polymarket settles on this match's regular-time winner; Kalshi settles on advancement from the qualifying tie."
+    },
+    {
+      "id": "soccer-virtus-dila-winner-vs-advance",
+      "polyEventTitle": "AC Virtus vs. SK Dila Gori",
+      "kalshiEventTicker": "KXUECLADVANCE-26JUL16VIRGOR",
+      "reasonCodes": [
+        "MATCH_WINNER_VS_ADVANCEMENT_MISMATCH"
+      ],
+      "dimensions": [
+        "predicate",
+        "aggregation"
+      ],
+      "rationale": "Polymarket settles on this match's regular-time winner; Kalshi settles on advancement from the qualifying tie."
+    },
+    {
+      "id": "soccer-san-luis-cruz-azul-cancellation",
+      "polyEventTitle": "Atl\u00e9tico San Luis vs. CF Cruz Azul",
+      "kalshiEventTicker": "KXLIGAMXGAME-26JUL17ASLCRA",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "soccer-bay-ncc-cancellation",
+      "polyEventTitle": "Bay FC vs. North Carolina Courage",
+      "kalshiEventTicker": "KXNWSLGAME-26JUL18BAYNCC",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "Polymarket remains open for a postponement and pays No only after complete cancellation; Kalshi can settle at fair value when cancelled or moved more than two weeks."
+    },
+    {
+      "id": "soccer-botafogo-santos-cancellation",
+      "polyEventTitle": "Botafogo FR vs. Santos FC",
+      "kalshiEventTicker": "KXBRASILEIROGAME-26JUL16BOTSAN",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "soccer-montreal-toronto-cancellation",
+      "polyEventTitle": "CF Montr\u00e9al vs. Toronto FC",
+      "kalshiEventTicker": "KXMLSGAME-26JUL16MTLTOR",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "soccer-chicago-vancouver-cancellation",
+      "polyEventTitle": "Chicago Fire FC vs. Vancouver Whitecaps FC",
+      "kalshiEventTicker": "KXMLSGAME-26JUL16CHIVAN",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "soccer-dalian-shandong-cancellation",
+      "polyEventTitle": "Dalian Yingbo FC vs. Shandong Taishan FC",
+      "kalshiEventTicker": "KXCHNSLGAME-26JUL18DALSHT",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "soccer-denver-portland-cancellation",
+      "polyEventTitle": "Denver Summit FC vs. Portland Thorns FC",
+      "kalshiEventTicker": "KXNWSLGAME-26JUL18DENPTH",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "soccer-derry-cska-winner-vs-advance",
+      "polyEventTitle": "Derry City FC vs. PFK CSKA Sofia",
+      "kalshiEventTicker": "KXUELADVANCE-26JUL16DERCSK",
+      "reasonCodes": [
+        "MATCH_WINNER_VS_ADVANCEMENT_MISMATCH"
+      ],
+      "dimensions": [
+        "predicate",
+        "aggregation"
+      ],
+      "rationale": "Polymarket settles on this match's regular-time winner; Kalshi settles on advancement from the qualifying tie."
+    },
+    {
+      "id": "soccer-ferencvaros-vojvodina-winner-vs-advance",
+      "polyEventTitle": "Ferencv\u00e1rosi TC vs. FK Vojvodina Novi Sad",
+      "kalshiEventTicker": "KXUELADVANCE-26JUL16FTCVOJ",
+      "reasonCodes": [
+        "MATCH_WINNER_VS_ADVANCEMENT_MISMATCH"
+      ],
+      "dimensions": [
+        "predicate",
+        "aggregation"
+      ],
+      "rationale": "Polymarket settles on this match's regular-time winner; Kalshi settles on advancement from the qualifying tie."
+    },
+    {
+      "id": "soccer-ferencvaros-vojvodina-cancellation",
+      "polyEventTitle": "Ferencv\u00e1rosi TC vs. FK Vojvodina Novi Sad",
+      "kalshiEventTicker": "KXUELGAME-26JUL16FTCVOJ",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The ordinary regular-time predicate matches only for the same team, but cancellation, rescheduling, and source rules do not establish identical payoff in all states."
+    },
+    {
+      "id": "nwsl-kansas-san-diego-vs-mlb",
+      "polyEventTitle": "Kansas City Current vs. San Diego Wave FC",
+      "kalshiEventTicker": "KXMLBGAME-26JUL172010SDKC",
+      "reasonCodes": [
+        "EVENT_SPORT_PARTICIPANT_MISMATCH"
+      ],
+      "dimensions": [
+        "event",
+        "sport",
+        "participant"
+      ],
+      "rationale": "The Polymarket contract is an NWSL match; the Kalshi contract is the San Diego versus Kansas City MLB game."
+    },
+    {
+      "id": "soccer-shanghai-beijing-cancellation",
+      "polyEventTitle": "Shanghai Shenhua FC vs. Beijing Guoan FC",
+      "kalshiEventTicker": "KXCHNSLGAME-26JUL11SHSBJG",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "soccer-jeju-pohang-cancellation",
+      "polyEventTitle": "Jeju SK FC vs. Pohang Steelers FC",
+      "kalshiEventTicker": "KXKLEAGUEGAME-26JUL18JEJPOH",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "mlb-first-five-postponement",
+      "polyEventTitle": "New York Mets vs. Philadelphia Phillies - First 5 Innings Winner",
+      "kalshiEventTicker": "KXMLBF5-26JUL161910NYMPHI",
+      "reasonCodes": [
+        "POSTPONEMENT_WINDOW_MISMATCH",
+        "CANCELLATION_PAYOUT_MISMATCH"
+      ],
+      "dimensions": [
+        "postponement",
+        "cancellation",
+        "payout"
+      ],
+      "rationale": "Polymarket waits for a makeup without a two-day cap and specifies a 50-50 cancellation result; Kalshi follows only a rescheduled game within two days and does not state the same cancellation payout."
+    },
+    {
+      "id": "soccer-queretaro-america-cancellation",
+      "polyEventTitle": "Quer\u00e9taro FC vs. CF Am\u00e9rica",
+      "kalshiEventTicker": "KXLIGAMXGAME-26JUL18QUEAME",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "netflix-global-movie-vs-us",
+      "polyEventTitle": "What will be the top global Netflix movie this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKMOVIE-26JUL20",
+      "reasonCodes": [
+        "GEOGRAPHY_MISMATCH"
+      ],
+      "dimensions": [
+        "geography"
+      ],
+      "rationale": "Polymarket uses the global English movie chart; Kalshi uses the US movie chart."
+    },
+    {
+      "id": "netflix-us-movie-publication-fallback",
+      "polyEventTitle": "What will be the top US Netflix movie this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKMOVIE-26JUL20",
+      "reasonCodes": [
+        "PUBLICATION_FAILURE_DEADLINE_MISMATCH"
+      ],
+      "dimensions": [
+        "source",
+        "publication",
+        "deadline"
+      ],
+      "rationale": "The ordinary chart and rank match, but Polymarket explicitly selects Other if the update is absent by July 24 while Kalshi can determine through July 27 and states no identical fallback."
+    },
+    {
+      "id": "rotten-tomatoes-operator",
+      "polyEventTitle": "\u201cThe Odyssey\u201d Rotten Tomatoes Score?",
+      "kalshiEventTicker": "KXRT-ODY",
+      "reasonCodes": [
+        "THRESHOLD_OPERATOR_MISMATCH",
+        "MISSING_DATA_FALLBACK_MISMATCH"
+      ],
+      "dimensions": [
+        "operator",
+        "deadline",
+        "missing data"
+      ],
+      "rationale": "Polymarket uses at least the strike (>=) and a July 24 no-data fallback; Kalshi explicitly uses strictly above the strike (>)."
+    },
+    {
+      "id": "arizona-sos-primary-determination",
+      "polyEventTitle": "Arizona Secretary of State Republican Primary Winner",
+      "kalshiEventTicker": "KXAZSOSR-26",
+      "reasonCodes": [
+        "DETERMINATION_SOURCE_TIMING_MISMATCH",
+        "NO_NOMINEE_DEADLINE_MISMATCH"
+      ],
+      "dimensions": [
+        "source",
+        "early determination",
+        "deadline"
+      ],
+      "rationale": "Polymarket waits for party announcement or overwhelming reporting and has a November Other deadline; Kalshi uses the Arizona Secretary of State and permits accelerated media-projection determination with a later close."
+    },
+    {
+      "id": "arizona-treasurer-primary-determination",
+      "polyEventTitle": "Arizona State Treasurer Republican Primary Winner",
+      "kalshiEventTicker": "KXAZTREASR-26",
+      "reasonCodes": [
+        "DETERMINATION_SOURCE_TIMING_MISMATCH",
+        "NO_NOMINEE_DEADLINE_MISMATCH"
+      ],
+      "dimensions": [
+        "source",
+        "early determination",
+        "deadline"
+      ],
+      "rationale": "Polymarket waits for party announcement or overwhelming reporting and has a November Other deadline; Kalshi permits accelerated media-projection determination with a later close."
+    },
+    {
+      "id": "soccer-monterrey-santos-cancellation",
+      "polyEventTitle": "CF Monterrey vs. Club Santos Laguna",
+      "kalshiEventTicker": "KXLIGAMXGAME-26JUL18MONSLA",
+      "reasonCodes": [
+        "CANCELLATION_RESCHEDULE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "source"
+      ],
+      "rationale": "The venues use different cancellation, postponement-window, and fair-value settlement rules."
+    },
+    {
+      "id": "world-cup-attendance-person",
+      "polyEventTitle": "President Trump to Attend World Cup Final?",
+      "kalshiEventTicker": "KXWCATTEND-26JUL20",
+      "reasonCodes": [
+        "PERSON_IDENTITY_MISMATCH"
+      ],
+      "dimensions": [
+        "participant"
+      ],
+      "rationale": "Polymarket names Donald Trump; the matched Kalshi rows name Melania Trump or Ivanka Trump."
+    },
+    {
+      "id": "netflix-global-movie-publication-fallback",
+      "polyEventTitle": "What will be the top global Netflix movie this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKMOVIEGLOBAL-26JUL20",
+      "reasonCodes": [
+        "PUBLICATION_FAILURE_DEADLINE_MISMATCH"
+      ],
+      "dimensions": [
+        "source",
+        "publication",
+        "deadline"
+      ],
+      "rationale": "The ordinary global English chart and rank match, but Polymarket explicitly selects Other if the update is absent by July 24 while Kalshi can determine through July 27 and states no identical fallback."
+    },
+    {
+      "id": "emmy-supporting-actor-fallbacks",
+      "polyEventTitle": "Emmys 2026: Outstanding supporting actor in a comedy series",
+      "kalshiEventTicker": "KXEMMYCSACTO-26SEP14",
+      "reasonCodes": [
+        "TIE_RULE_MISMATCH",
+        "CANCELLATION_RULE_MISMATCH",
+        "NO_RESULT_DEADLINE_MISMATCH"
+      ],
+      "dimensions": [
+        "tie",
+        "cancellation",
+        "deadline",
+        "source"
+      ],
+      "rationale": "Polymarket alphabetically selects a nominee on a tie, cancellation, or no winner by October 31; Kalshi lists a distinct Tie strike and can remain open for a year."
+    },
+    {
+      "id": "netflix-global-movie-vs-runner-up",
+      "polyEventTitle": "What will be the top global Netflix movie this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKMOVIEGLOBAL2-26JUL20",
+      "reasonCodes": [
+        "RANK_PREDICATE_MISMATCH"
+      ],
+      "dimensions": [
+        "rank"
+      ],
+      "rationale": "Polymarket settles on rank #1; Kalshi settles on rank #2."
+    },
+    {
+      "id": "netflix-global-show-vs-us",
+      "polyEventTitle": "What will be the top global Netflix show this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKSHOW-26JUL20",
+      "reasonCodes": [
+        "GEOGRAPHY_MISMATCH"
+      ],
+      "dimensions": [
+        "geography"
+      ],
+      "rationale": "Polymarket uses the global English TV chart; Kalshi uses the US TV chart."
+    },
+    {
+      "id": "netflix-global-show-publication-fallback",
+      "polyEventTitle": "What will be the top global Netflix show this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKSHOWGLOBAL-26JUL20",
+      "reasonCodes": [
+        "PUBLICATION_FAILURE_DEADLINE_MISMATCH"
+      ],
+      "dimensions": [
+        "source",
+        "publication",
+        "deadline"
+      ],
+      "rationale": "The ordinary global English chart and rank match, but Polymarket explicitly selects Other if the update is absent by July 24 while Kalshi can determine through July 27 and states no identical fallback."
+    },
+    {
+      "id": "netflix-us-movie-vs-global",
+      "polyEventTitle": "What will be the top US Netflix movie this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKMOVIEGLOBAL-26JUL20",
+      "reasonCodes": [
+        "GEOGRAPHY_MISMATCH"
+      ],
+      "dimensions": [
+        "geography"
+      ],
+      "rationale": "Polymarket uses the US movie chart; Kalshi uses the global English movie chart."
+    },
+    {
+      "id": "netflix-us-show-publication-fallback",
+      "polyEventTitle": "What will be the top US Netflix show this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKSHOW-26JUL20",
+      "reasonCodes": [
+        "PUBLICATION_FAILURE_DEADLINE_MISMATCH"
+      ],
+      "dimensions": [
+        "source",
+        "publication",
+        "deadline"
+      ],
+      "rationale": "The ordinary US chart and rank match, but Polymarket explicitly selects Other if the update is absent by July 24 while Kalshi can determine through July 27 and states no identical fallback."
+    },
+    {
+      "id": "netflix-us-show-vs-global",
+      "polyEventTitle": "What will be the top US Netflix show this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKSHOWGLOBAL-26JUL20",
+      "reasonCodes": [
+        "GEOGRAPHY_MISMATCH"
+      ],
+      "dimensions": [
+        "geography"
+      ],
+      "rationale": "Polymarket uses the US TV chart; Kalshi uses the global English TV chart."
+    },
+    {
+      "id": "netflix-us-show-vs-runner-up",
+      "polyEventTitle": "What will be the top US Netflix show this week?",
+      "kalshiEventTicker": "KXNETFLIXRANKSHOWRUNNERUP-26JUL20",
+      "reasonCodes": [
+        "RANK_PREDICATE_MISMATCH"
+      ],
+      "dimensions": [
+        "rank"
+      ],
+      "rationale": "Polymarket settles on rank #1; Kalshi settles on rank #2."
+    },
+    {
+      "id": "wta-us-open-cancellation-deadline",
+      "polyEventTitle": "2026 Women\u2019s US Open Winner (Tennis)",
+      "kalshiEventTicker": "KXWTA-26USO",
+      "reasonCodes": [
+        "CANCELLATION_NO_WINNER_DEADLINE_MISMATCH",
+        "RESOLUTION_SOURCE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "cancellation",
+        "postponement",
+        "deadline",
+        "source"
+      ],
+      "rationale": "Polymarket selects Other if the tournament is cancelled, postponed after October 31, or has no winner by then; Kalshi's contract expires September 27 and does not state the same fallback or source hierarchy."
+    },
+    {
+      "id": "ga13-election-determination",
+      "polyEventTitle": "GA-13 Special Election Winner",
+      "kalshiEventTicker": "KXGA13S-26",
+      "reasonCodes": [
+        "RUNOFF_DETERMINATION_TIMING_MISMATCH",
+        "NO_RESULT_DEADLINE_MISMATCH",
+        "ACCELERATED_PROJECTION_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "runoff",
+        "early determination",
+        "deadline",
+        "source"
+      ],
+      "rationale": "Polymarket expressly includes a runoff and selects Other if the result is unknown by January 31; Kalshi permits accelerated determination from media projections and can remain open through July 2027."
+    },
+    {
+      "id": "reno-mayor-determination",
+      "polyEventTitle": "2026 Reno Mayoral Election Winner",
+      "kalshiEventTicker": "KXRENOMAYOR-26",
+      "reasonCodes": [
+        "NO_RESULT_DEADLINE_MISMATCH",
+        "ACCELERATED_PROJECTION_RULE_MISMATCH",
+        "RESOLUTION_SOURCE_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "early determination",
+        "deadline",
+        "source"
+      ],
+      "rationale": "Polymarket selects Other if the next mayor is unknown by April 30 and defines an official-source ambiguity hierarchy; Kalshi permits accelerated media-projection determination and can remain open through November 2027."
+    },
+    {
+      "id": "trump-speech-duration-definition",
+      "polyEventTitle": "How long will Trump\u2019s Speech to the Nation be?",
+      "kalshiEventTicker": "KXTRUMPMENTIONDURATION-JUL1726",
+      "reasonCodes": [
+        "MEASUREMENT_DEFINITION_MISMATCH",
+        "CANCELLATION_DELAY_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "measurement",
+        "boundary",
+        "cancellation",
+        "deadline"
+      ],
+      "rationale": "Polymarket measures podium speech and excludes continued closing thanks, while Kalshi measures first audible word through last audible word and includes intervening pauses. Polymarket also assigns the lowest bracket after its cancellation/delay deadline; Kalshi states no identical fallback."
+    },
+    {
+      "id": "taiwan-local-election-fallbacks",
+      "polyEventTitle": "2026 Taiwanese Local Elections: Party Winner",
+      "kalshiEventTicker": "KXTAIWANLOCAL-26NOV28",
+      "reasonCodes": [
+        "TIE_RULE_MISMATCH",
+        "MISSING_RESULTS_FALLBACK_MISMATCH",
+        "ACCELERATED_PROJECTION_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "universe",
+        "tie",
+        "missing results",
+        "early determination"
+      ],
+      "rationale": "Polymarket specifies the included local governments, alphabetical tie-break, and June 30 available-results/Other fallback; Kalshi permits accelerated media calls and states none of those identical edge rules."
+    },
+    {
+      "id": "world-cup-player-record-vs-club-aggregate",
+      "polyEventTitle": "World Cup: Most Player Goals Record Broken?",
+      "kalshiEventTicker": "KXWCCLUBGOALS-26",
+      "reasonCodes": [
+        "OUTCOME_PREDICATE_MISMATCH",
+        "AGGREGATION_UNIT_MISMATCH"
+      ],
+      "dimensions": [
+        "predicate",
+        "threshold",
+        "aggregation"
+      ],
+      "rationale": "Polymarket asks whether one player's 13-goal tournament record is broken; Kalshi asks whether players contracted to one club collectively score at least 20, 22, or 24 goals."
+    },
+    {
+      "id": "world-cup-tournament-goal-vs-match-goal-assist",
+      "polyEventTitle": "World Cup: Player to score",
+      "kalshiEventTicker": "KXWCSOA-26JUL19ESPARG",
+      "reasonCodes": [
+        "TOURNAMENT_VS_SINGLE_MATCH_SCOPE_MISMATCH",
+        "GOAL_VS_GOAL_OR_ASSIST_MISMATCH",
+        "DNP_PAYOUT_MISMATCH"
+      ],
+      "dimensions": [
+        "observation window",
+        "predicate",
+        "non-participation payout"
+      ],
+      "rationale": "Polymarket pays Yes only for a goal in any World Cup match; Kalshi pays Yes for a goal or assist in one Spain\u2013Argentina match and can settle an unused player at last fair market price."
+    },
+    {
+      "id": "world-cup-first-song-performer-definition",
+      "polyEventTitle": "What song will be played first at the World Cup Halftime Show?",
+      "kalshiEventTicker": "KXWCFIRSTSONG-SHA26JUL20",
+      "reasonCodes": [
+        "PERFORMER_SCOPE_MISMATCH",
+        "QUALIFYING_SONG_DEFINITION_MISMATCH",
+        "CANCELLATION_RULE_MISMATCH"
+      ],
+      "dimensions": [
+        "performer",
+        "predicate",
+        "cancellation",
+        "source"
+      ],
+      "rationale": "Polymarket uses the first song sung by any official performer and requires lyrics; Kalshi uses Shakira's first qualifying song and accepts recognizable melody or lyrics. Their cancellation and unlisted-song handling also differ."
+    },
+    {
+      "id": "senate-closest-vs-largest-two-state",
+      "polyEventTitle": "Closest Senate Race?",
+      "kalshiEventTicker": "KXMOVGANCSEN-26NOV03",
+      "reasonCodes": [
+        "SMALLEST_VS_LARGEST_MARGIN_MISMATCH",
+        "COMPARISON_UNIVERSE_MISMATCH"
+      ],
+      "dimensions": [
+        "operator",
+        "comparison set"
+      ],
+      "rationale": "Polymarket selects the smallest victory margin across all qualifying US Senate elections; Kalshi selects the largest margin among only Georgia and North Carolina."
+    },
+    {
+      "id": "spotify-top-artist-edge-rules",
+      "polyEventTitle": "Top artist in July?",
+      "kalshiEventTicker": "KXTOPMONTHLY-26JUL",
+      "reasonCodes": [
+        "TIE_RULE_MISMATCH",
+        "SOURCE_OUTAGE_FALLBACK_MISMATCH"
+      ],
+      "dimensions": [
+        "tie",
+        "source outage",
+        "observation time"
+      ],
+      "rationale": "The ordinary Spotify metric, timestamp, and artist match, but Polymarket specifies alphabetical tie-break and most-recent-data handling during an outage; Kalshi states neither identical fallback and can determine through August 7."
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "manifest_format": "borg-latency-profiles-v1",
+  "manifest_id": "latency-profiles-v1",
+  "frozen_at_utc": "2026-07-15T00:00:00.000Z",
+  "latency_dimensions": {
+    "information_latency": "difference between source event time and strategy decision time",
+    "order_latency": "difference between logged decision time and simulated order arrival",
+    "database_latency": "measured and reported but never added to a correctly decoupled execution hot path"
+  },
+  "fixed_order_profiles_ms": [100, 250, 500, 1000, 2000],
+  "measured_profiles": [
+    "measured-mac from scripts/infra-benchmark.js output",
+    "measured-dublin-vps from the same script run on that host",
+    "measured-us-east-vps from the same script run on that host"
+  ],
+  "requirements": {
+    "exclude_connection_gaps": true,
+    "report_every_quality_grade": true,
+    "fees": "0.07 * shares * price * (1-price), plus 2x stress",
+    "cluster_by": ["market_id", "UTC day"],
+    "no_paid_data_claim_without_blinded_ablation": true
+  }
+}

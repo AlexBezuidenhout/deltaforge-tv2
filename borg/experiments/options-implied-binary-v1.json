@@ -1,0 +1,78 @@
+{
+  "experiment_id": "options-implied-binary-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-18T18:25:48.389Z",
+  "evidence_started_at": "2026-07-18T18:25:48.389Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "options_implied_prediction_market_value",
+  "strategy_version": "deribit-surface-digital-v1",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "discovery_control": {
+    "prior_proxy": "30-day Deribit DVOL applied as flat volatility to BTC/ETH daily thresholds",
+    "selected_trades": 34,
+    "independent_events": 18,
+    "wins": 31,
+    "pnl_2x_usd": -31.870707,
+    "turnover_usd": 339.828,
+    "roi_2x_pct": -9.3785,
+    "first_half_pnl_2x_usd": 0.22477,
+    "second_half_pnl_2x_usd": -32.095477,
+    "event_clustered_ci95_usd": [-3.009163, 0.015143],
+    "interpretation": "The high hit rate concealed rare full binary losses and is not evidence of edge. No prior DVOL row enters this forward surface cohort."
+  },
+  "market_scope": {
+    "assets": ["BTC", "ETH"],
+    "polymarket_contracts": "active threshold_daily markets with a numeric strike, known resolver boundary and published fee/minimum metadata",
+    "deribit_selection": "calls at two strikes on each side and expiries bracketing each Polymarket strike/expiry, maximum 160 subscriptions",
+    "raw_capture": "100ms public ticker WebSocket frames in durable WAL",
+    "hot_database": "one-second latest-per-instrument touches"
+  },
+  "valuation": {
+    "model": "cash digital under a lognormal risk-neutral distribution",
+    "strike_interpolation": "linear in IV over log strike",
+    "term_interpolation": "linear in total variance",
+    "uncertainty": "Deribit bid/mark/ask IV envelope plus live Chainlink-versus-Deribit resolver basis +/- 3 bps",
+    "benchmark": "conservative fair bound minus full executable Polymarket ask walk",
+    "fees": "current per-market fee curve stressed at 2x; unknown schedule fails closed",
+    "hedge": "rounded spot/perpetual base quantity equal to negative model delta",
+    "hedge_cost_stress_bps": 5,
+    "residual_risk": "spot/IV/resolver-basis scenario CVaR retained per observation; delta hedge never labels binary gamma or settlement basis as risk-free"
+  },
+  "execution": {
+    "target_budget_usd": 10,
+    "venue_minimum_required": true,
+    "full_depth_walk": true,
+    "minimum_tte_sec": 300,
+    "maximum_tte_sec": 604800,
+    "surface_max_age_ms": 3000,
+    "polymarket_book_max_age_ms": 500,
+    "shadow_executable_surface_grades": ["A", "B"],
+    "live_orders": false
+  },
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "primary_metric": "terminal_binary_pnl_plus_causal_hedge_pnl_after_2x_poly_fees_and_hedge_cost",
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "require_positive_under_250ms_and_500ms_order_latency": true,
+    "multiple_testing": "Holm correction across asset, side, horizon, surface fidelity and latency profile",
+    "capacity": "reported from displayed Polymarket depth and Deribit hedge depth; never extrapolated from win rate",
+    "promotion": "Passing permits a separately reviewed tiny live canary; this manifest grants no live authority.",
+    "zero_edge_disclosure": "A zero or negative result is plausible and must be reported without retuning this cohort."
+  },
+  "strategy_bindings": [{
+    "strategy": "options_implied_binary_v1",
+    "family": "options_implied_prediction_market_value",
+    "arm": "baseline",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "terminal_net_pnl_2x_plus_hedge"
+  }]
+}

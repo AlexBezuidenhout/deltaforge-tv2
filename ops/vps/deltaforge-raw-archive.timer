@@ -1,0 +1,11 @@
+[Unit]
+Description=Archive DeltaForge raw PostgreSQL tape every five minutes
+
+[Timer]
+OnBootSec=3min
+OnCalendar=*-*-* *:00/5:00
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

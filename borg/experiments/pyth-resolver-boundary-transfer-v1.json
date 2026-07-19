@@ -1,0 +1,39 @@
+{
+  "experiment_id": "pyth-resolver-boundary-transfer-v1",
+  "registered_at": "2026-07-18T00:00:00.000Z",
+  "mode": "paper_only_forward_observation",
+  "historical_rows_reused": false,
+  "claim": "measurement_only_no_profitability_claim",
+  "universe": {
+    "resolution_source": "Pyth",
+    "market_family": "finance Up or Down",
+    "required_certificate": "exact Gamma identifiers + exact rule text + successful price-to-beat response",
+    "excluded": ["Binance-resolved crypto Up or Down", "ambiguous rules", "unknown fees", "unknown minimum order size"]
+  },
+  "signals": {
+    "checkpoint_seconds": [300, 120, 60, 30, 10],
+    "additional_trigger": "every live Pyth sign flip around the certified price-to-beat",
+    "historical_snapshot_triggers": false,
+    "carried_forward_triggers": false
+  },
+  "execution": {
+    "latency_profiles_ms": [20, 50, 100, 250, 500],
+    "budget_usd_per_probe": 10,
+    "entry": "walk executable asks at simulated arrival; require full displayed depth and minimum size; include current taker fee",
+    "markouts_seconds": [1, 5, 30],
+    "markout": "walk executable bids; require full displayed depth; include exit taker fee",
+    "terminal": "resolution payout less entry cost and pre-registered settlement-cost stress",
+    "orders_submitted": false
+  },
+  "acceptance": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "multiple_testing": "Holm correction across checkpoint, side and latency arms",
+    "required": [
+      "positive terminal post-cost PnL in both chronological halves",
+      "market/day clustered lower confidence bound above zero",
+      "robust under doubled fees and settlement-cost stress",
+      "no result may count carried-forward, historical, stale-book or incomplete-depth rows"
+    ]
+  }
+}

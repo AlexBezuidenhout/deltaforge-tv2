@@ -1,0 +1,23 @@
+[Unit]
+Description=Prune replayable DeltaForge PostgreSQL hot-tier rows
+Requires=postgresql.service
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=NODE_ENV=production
+Environment=ALLMARKET_SQL_HOT_HOURS=6
+Environment=FLOW_SQL_HOT_HOURS=6
+Environment=FLOW_TRADE_SQL_HOT_HOURS=24
+Environment=DELTAFORGE_HOT_PRUNE_BATCH_ROWS=20000
+Environment=DELTAFORGE_HOT_PRUNE_MAX_BATCHES=4
+ExecStart=/usr/local/bin/node scripts/hot-tier-prune.js
+Nice=10
+IOSchedulingClass=idle
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

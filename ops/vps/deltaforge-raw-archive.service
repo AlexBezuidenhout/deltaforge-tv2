@@ -1,0 +1,26 @@
+[Unit]
+Description=Archive and prune verified DeltaForge raw PostgreSQL tape
+Requires=postgresql.service
+After=postgresql.service borg-collector.service
+
+[Service]
+Type=oneshot
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=NODE_ENV=production
+Environment=BORG_ARCHIVE_DIR=/var/lib/deltaforge/archive/borg-raw
+Environment=BORG_ARCHIVE_MIN_FREE_GB=20
+Environment=BORG_DB_HOT_RETENTION_HOURS=24
+Environment=BORG_ARCHIVE_BATCH_ROWS=5000
+Environment=BORG_ARCHIVE_DEFAULT_MAX_BATCHES=4
+Environment=BORG_ARCHIVE_CLOB_MAX_BATCHES=24
+Environment=BORG_ARCHIVE_MAX_RUNTIME_MS=120000
+ExecStart=/usr/local/bin/node scripts/raw-archive.js
+TimeoutStartSec=3min
+Nice=10
+IOSchedulingClass=idle
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

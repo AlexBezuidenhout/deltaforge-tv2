@@ -1,0 +1,72 @@
+{
+  "experiment_id": "research-h53-5m-neareven-favorite-live-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-18T20:45:00.000Z",
+  "phase": "eval",
+  "status": "frozen_operator_live_override",
+  "paper_only": false,
+  "live_order_path": "borg/live/h53-executor.js; independently gated; operator accepted unproven live risk",
+  "family": "accidental_5m_terminal_favorite_replication",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "research-h53-live-v1",
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "operator_override": {
+    "requested_at": "2026-07-18T20:45:00.000Z",
+    "instruction": "Preserve the exact accidental 5-minute rule unchanged as a new hypothesis and make it live before minimum evidence criteria.",
+    "evidence_disposition": "Live operation does not promote or validate the strategy. H52 v1 rows remain discovery-only and excluded from H53's forward evidence clock.",
+    "risk_acknowledgement": "The historical positive cohort spans one UTC day and 26 correlated resolution windows; the larger 5m control was fee-negative. Loss of the deployed wallet balance is possible."
+  },
+  "source_discovery": {
+    "strategy": "H52_hourly_neareven_favorite_v1",
+    "defect": "A market-classification defect dispatched the intended hourly rule to true direction_5m records.",
+    "accidental_5m_cohort": {
+      "places": 95,
+      "fills": 83,
+      "wins": 54,
+      "pnl_1x_usd": 70.50,
+      "pnl_2x_usd": 57.45,
+      "independent_resolution_windows": 26,
+      "calendar_days": 1
+    },
+    "negative_control": "Identical retrospective 5m cell: n=1,720, win rate 0.528, approximately -$0.033/share at 1x fees.",
+    "venue_minimum_warning": "35/95 accidental signals requested fewer than five shares. H53 shadow preserves those exact decisions, but live execution skips venue-infeasible orders rather than increasing size."
+  },
+  "frozen_mechanics": {
+    "market_types": ["direction_5m"],
+    "assets": ["btc", "eth", "sol", "xrp"],
+    "entry_window_tte_sec": [60, 300],
+    "favorite_definition": "side with the strictly higher best ask; equal asks skip",
+    "favorite_ask_band": [0.50, 0.60],
+    "fair_favorite_probability_frozen": 0.675,
+    "edge_hurdle": "0.675 - favoriteAsk - 2 * 0.07 * favoriteAsk * (1-favoriteAsk) >= 0.01",
+    "sizing": "min($10/favoriteAsk, 20% of displayed favorite touch); skip below $1 notional",
+    "shadow_execution": "latency_1s quote-survival and depth walk; hold to terminal resolution",
+    "live_execution": "fresh shadow intent mirrored as FAK BUY for exact shadow notional, worst price equal to decision ask, no chase, no size inflation, one order per market",
+    "no_exit_logic": true,
+    "thresholds_may_not_change_during_eval": true
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "H53_5m_neareven_favorite_live_v1",
+      "family": "accidental_5m_terminal_favorite_replication",
+      "arm": "operator_live_override",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "cluster_by": ["five-minute resolution window", "UTC day", "same-window cross-asset cohort"],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "multiple_testing": "Correct across H1-H53 and every inspected/discarded variant.",
+    "live_data_treatment": "Live fills measure execution fidelity but do not relax the forward shadow promotion criteria.",
+    "null_outcome": "Measured edge may be zero or negative. No threshold or asset subgroup may be changed within this strategy ID."
+  }
+}

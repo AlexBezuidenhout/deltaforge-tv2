@@ -1,0 +1,41 @@
+[Unit]
+Description=BORG paired complete-set maker laboratory (paper only)
+Wants=network-online.target
+Requires=postgresql.service
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=NODE_ENV=production
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_WAL_MIN_FREE_GB=20
+Environment=BORG_COLLECTION_EPOCH_ID=dublin-local-pg-2026-07-16-v1
+Environment=BORG_COLLECTION_EPOCH_START=2026-07-16T13:28:05.289Z
+Environment=BORG_COLLECTION_LOCATION=dublin-ie
+Environment=BORG_CODE_VERSION=dublin-runtime-v3
+Environment=PAIRED_MAKER_MAX_MARKETS=6
+Environment=PAIRED_MAKER_CLOB_SHARDS=1
+Environment=PAIRED_MAKER_GAMMA_PAGES=20
+Environment=PAIRED_MAKER_GAMMA_WINDOWS=10
+Environment=PAIRED_MAKER_REWARD_PAGES=8
+ExecStart=/usr/local/bin/node borg/pairedmaker/collector.js
+Restart=always
+RestartSec=3
+TimeoutStartSec=120
+TimeoutStopSec=45
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
