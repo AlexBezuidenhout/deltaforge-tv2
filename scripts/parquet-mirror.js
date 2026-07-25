@@ -42,6 +42,11 @@ function positiveInt(value, fallback = Infinity) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function enabled(value, fallback = false) {
+  if (value == null) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+}
+
 function compressionCodec(value = process.env.BORG_PARQUET_COMPRESSION) {
   const codec = String(value || DEFAULT_COMPRESSION).trim().toUpperCase();
   if (!SUPPORTED_COMPRESSION.has(codec)) {
@@ -67,6 +72,16 @@ async function filesBelow(root) {
     else if (entry.name.endsWith('.ndjson.gz')) out.push(full);
   }
   return out;
+}
+
+async function fileExists(file) {
+  try {
+    await fsp.access(file, fs.constants.F_OK);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  }
 }
 
 function explicitFilesByRoot(content, roots) {
@@ -301,10 +316,13 @@ async function main() {
     ? explicitFilesByRoot(await fsp.readFile(inputList, 'utf8'), roots)
     : null;
   const maxFiles = positiveInt(arg('--max-files') || process.env.BORG_PARQUET_MAX_FILES);
+  const existingOnly = process.argv.includes('--existing-only')
+    || enabled(process.env.BORG_PARQUET_EXISTING_ONLY);
   const results = [];
   let workFiles = 0;
   let pending = 0;
   let deferredCloudPlaceholders = 0;
+  let notMaterialized = 0;
   for (const root of roots) {
     const files = explicit ? explicit.get(root) : await filesBelow(root);
     // Newly mirrored objects are still resident on the Mac. Process newest
@@ -316,6 +334,22 @@ async function main() {
         const fast = await fastExistingResult(file, root, path.resolve(mirror));
         if (fast) {
           results.push(fast);
+        } else if (existingOnly) {
+          const output = outputFiles(file, root, path.resolve(mirror));
+          const [hasParquet, hasManifest] = await Promise.all([
+            fileExists(output.output),
+            fileExists(output.manifestFile),
+          ]);
+          if (!hasParquet || !hasManifest) {
+            notMaterialized += 1;
+            continue;
+          }
+          if (workFiles < maxFiles) {
+            results.push(await convertFile(file, root, path.resolve(mirror)));
+            workFiles += 1;
+          } else {
+            pending += 1;
+          }
         } else if (workFiles < maxFiles) {
           results.push(await convertFile(file, root, path.resolve(mirror)));
           workFiles += 1;
@@ -340,8 +374,10 @@ async function main() {
     verified_existing: results.filter((row) => row.status.startsWith('verified_existing')).length,
     invalid_source: results.filter((row) => row.status === 'invalid_source').length,
     pending,
+    not_materialized: notMaterialized,
     deferred_cloud_placeholders: deferredCloudPlaceholders,
     max_work_files: Number.isFinite(maxFiles) ? maxFiles : null,
+    existing_only: existingOnly,
     input_mode: explicit ? 'explicit_new_files' : 'historical_scan',
     rows: results.reduce((sum, row) => sum + row.rows, 0),
     mirror: path.resolve(mirror),
@@ -353,7 +389,7 @@ if (require.main === module) main().catch((err) => { console.error(err.message);
 
 module.exports = {
   DEFAULT_COMPRESSION, InvalidSegmentError, canonicalSource, compressionCodec,
-  convertFile, decodeSegment,
+  convertFile, decodeSegment, enabled, fileExists,
   fastExistingResult, explicitFilesByRoot, isCloudPlaceholderError,
   outputFiles, positiveInt, recordInvalidSource, schemaFor,
 };

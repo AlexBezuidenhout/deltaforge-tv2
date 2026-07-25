@@ -9,7 +9,7 @@ const parquet = require('@dsnp/parquetjs');
 const { writeArchiveBatch } = require('../borg/shadow/archive');
 const {
   DEFAULT_COMPRESSION, canonicalSource, compressionCodec, convertFile,
-  decodeSegment, explicitFilesByRoot,
+  decodeSegment, enabled, explicitFilesByRoot, fileExists,
   isCloudPlaceholderError, recordInvalidSource,
 } = require('../scripts/parquet-mirror');
 
@@ -23,6 +23,17 @@ test('Parquet derivatives use an explicit supported compression codec', () => {
   assert.equal(compressionCodec(), DEFAULT_COMPRESSION);
   assert.equal(compressionCodec('snappy'), 'SNAPPY');
   assert.throws(() => compressionCodec('uncompressed'), /unsupported/);
+  assert.equal(enabled('true'), true);
+  assert.equal(enabled('0'), false);
+});
+
+test('existing-only compaction can distinguish materialized derivatives', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'borg-parquet-exists-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const existing = path.join(root, 'existing.parquet');
+  fs.writeFileSync(existing, 'derivative');
+  assert.equal(await fileExists(existing), true);
+  assert.equal(await fileExists(path.join(root, 'missing.parquet')), false);
 });
 
 test('explicit Parquet input is deduplicated and confined to immutable roots', () => {
