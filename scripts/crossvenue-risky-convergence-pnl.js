@@ -83,6 +83,12 @@ function classifyReplayRow(row) {
     ? null : finite(row.target_exit_proceeds) - finite(row.entry_total_cost, 0);
   const timeoutPnl = finite(row.timeout_exit_proceeds) == null
     ? null : finite(row.timeout_exit_proceeds) - finite(row.entry_total_cost, 0);
+  const entryFees = finite(row.poly_entry_fee, 0)
+    + finite(row.kalshi_entry_fee, 0);
+  const targetExitFees = finite(row.target_poly_exit_fee, 0)
+    + finite(row.target_kalshi_exit_fee, 0);
+  const timeoutExitFees = finite(row.timeout_poly_exit_fee, 0)
+    + finite(row.timeout_kalshi_exit_fee, 0);
   const polyOutcome = String(row.poly_outcome || '').toUpperCase();
   const kalshiOutcome = String(row.kalshi_result || '').toUpperCase();
   const direction = String(row.direction || '').toUpperCase();
@@ -106,21 +112,41 @@ function classifyReplayRow(row) {
   let status = 'RIGHT_CENSORED';
   let exitAt = null;
   let pnl = null;
+  let exitFees = null;
+  let executionCount = null;
   if (Number.isFinite(targetAt)) {
     status = 'TARGET_EXIT';
     exitAt = targetAt;
     pnl = targetPnl;
+    exitFees = targetExitFees;
+    executionCount = 2;
   } else if (mature && Number.isFinite(timeoutAt)) {
     status = 'TIMEOUT_EXIT';
     exitAt = timeoutAt;
     pnl = timeoutPnl;
+    exitFees = timeoutExitFees;
+    executionCount = 2;
   } else if (terminalPnl != null) {
     status = 'TERMINAL_FALLBACK';
     exitAt = settlementTimes.length ? Math.max(...settlementTimes) : coverageAt;
     pnl = terminalPnl;
+    exitFees = 0;
+    executionCount = 1;
   } else if (mature) {
     status = 'NO_EXECUTABLE_TIMEOUT_EXIT';
   }
+  const polyTick = Math.max(0, finite(row.poly_tick, 0.01));
+  const kalshiTick = Math.max(0, finite(row.kalshi_tick, 0.01));
+  const additionalFeeStress = Number.isFinite(pnl)
+    ? entryFees + finite(exitFees, 0) : null;
+  // Each execution crosses both venues. Stress every entry/exit leg by one
+  // adverse tick, in addition to charging every observed fee a second time.
+  const adverseTickStress = Number.isFinite(pnl)
+    ? quantity * (polyTick + kalshiTick) * executionCount : null;
+  const pnl2xFees = Number.isFinite(pnl)
+    ? pnl - additionalFeeStress : null;
+  const pnl2xFeesOneTick = Number.isFinite(pnl)
+    ? pnl2xFees - adverseTickStress : null;
   const mismatchReasons = Array.isArray(row.mismatch_reasons)
     ? row.mismatch_reasons : [];
   return {
@@ -132,6 +158,10 @@ function classifyReplayRow(row) {
     mature,
     status,
     pnl,
+    pnl2xFees,
+    pnl2xFeesOneTick,
+    additionalFeeStress,
+    adverseTickStress,
     holdMs: exitAt == null ? null : Math.max(0, exitAt - entryAt),
     mismatchClass: mismatchClass(mismatchReasons),
     edgeBucket: edgeBucket(row),
@@ -170,7 +200,14 @@ function summarize(rows) {
   const realized = ordered.filter((row) => Number.isFinite(row.pnl));
   const midpoint = Math.floor(realized.length / 2);
   const pnl = realized.map((row) => row.pnl);
+  const pnl2xFees = realized.map((row) => row.pnl2xFees)
+    .filter(Number.isFinite);
+  const pnl2xFeesOneTick = realized.map((row) => row.pnl2xFeesOneTick)
+    .filter(Number.isFinite);
   const totalPnl = pnl.reduce((sum, value) => sum + value, 0);
+  const totalPnl2xFees = pnl2xFees.reduce((sum, value) => sum + value, 0);
+  const totalPnl2xFeesOneTick = pnl2xFeesOneTick
+    .reduce((sum, value) => sum + value, 0);
   const deployed = realized.reduce((sum, row) => sum + row.entryCost, 0);
   return {
     entries: ordered.length,
@@ -188,6 +225,10 @@ function summarize(rows) {
     wins: realized.filter((row) => row.pnl > 0).length,
     losses: realized.filter((row) => row.pnl < 0).length,
     pnlUsd: round(totalPnl),
+    pnl2xFeesUsd: round(totalPnl2xFees),
+    pnl2xFeesOneTickUsd: round(totalPnl2xFeesOneTick),
+    stressWins: realized.filter((row) => row.pnl2xFeesOneTick > 0).length,
+    stressLosses: realized.filter((row) => row.pnl2xFeesOneTick < 0).length,
     meanPnlUsd: realized.length ? round(totalPnl / realized.length) : null,
     medianPnlUsd: round(median(pnl)),
     worstPnlUsd: realized.length ? round(Math.min(...pnl)) : null,
@@ -200,6 +241,10 @@ function summarize(rows) {
       .reduce((sum, row) => sum + row.pnl, 0)),
     secondHalfPnlUsd: round(realized.slice(midpoint)
       .reduce((sum, row) => sum + row.pnl, 0)),
+    firstHalfStressPnlUsd: round(realized.slice(0, midpoint)
+      .reduce((sum, row) => sum + row.pnl2xFeesOneTick, 0)),
+    secondHalfStressPnlUsd: round(realized.slice(midpoint)
+      .reduce((sum, row) => sum + row.pnl2xFeesOneTick, 0)),
     maxConcurrentCapitalUsd: round(maxConcurrentCapital(ordered)),
   };
 }
@@ -244,7 +289,9 @@ async function queryReplay(pool, { days, experimentId }) {
              s.poly_outcome,s.kalshi_result,s.poly_resolved_at,s.kalshi_settled_at,
              m.match_score::float8,m.paper_eval_score_at_approval::float8,
              m.mismatch_reasons,m.poly_question,m.kalshi_title,
-             m.end_delta_hours::float8,m.metadata
+             m.end_delta_hours::float8,m.metadata,
+             COALESCE((m.metadata->'poly'->>'tickSize')::float8,0.01) poly_tick,
+             0.01::float8 kalshi_tick
         FROM cv_basis_samples b
         JOIN cv_contract_matches m USING(match_id)
         LEFT JOIN cv_settlements s USING(match_id)
@@ -266,8 +313,12 @@ async function queryReplay(pool, { days, experimentId }) {
            coverage.last_at coverage_last_at,
            target.observed_at target_exit_at,
            target.net_liquidation_proceeds::float8 target_exit_proceeds,
+           target.poly_exit_fee::float8 target_poly_exit_fee,
+           target.kalshi_exit_fee::float8 target_kalshi_exit_fee,
            timeout.observed_at timeout_exit_at,
-           timeout.net_liquidation_proceeds::float8 timeout_exit_proceeds
+           timeout.net_liquidation_proceeds::float8 timeout_exit_proceeds,
+           timeout.poly_exit_fee::float8 timeout_poly_exit_fee,
+           timeout.kalshi_exit_fee::float8 timeout_kalshi_exit_fee
       FROM entries e
       CROSS JOIN grid g
       LEFT JOIN LATERAL (
@@ -278,7 +329,8 @@ async function queryReplay(pool, { days, experimentId }) {
            AND s.quantity=e.quantity AND s.observed_at>e.entry_at
       ) coverage ON true
       LEFT JOIN LATERAL (
-        SELECT s.observed_at,s.net_liquidation_proceeds
+        SELECT s.observed_at,s.net_liquidation_proceeds,
+               s.poly_exit_fee,s.kalshi_exit_fee
           FROM cv_basis_samples s
          WHERE g.target_roi IS NOT NULL
            AND s.experiment_id=$1
@@ -297,7 +349,8 @@ async function queryReplay(pool, { days, experimentId }) {
          LIMIT 1
       ) target ON true
       LEFT JOIN LATERAL (
-        SELECT s.observed_at,s.net_liquidation_proceeds
+        SELECT s.observed_at,s.net_liquidation_proceeds,
+               s.poly_exit_fee,s.kalshi_exit_fee
           FROM cv_basis_samples s
          WHERE s.experiment_id=$1
            AND s.match_id=e.match_id AND s.direction=e.direction
@@ -326,11 +379,11 @@ function markdown(report) {
     '',
     'Paper-only synchronized L2 replay. Entry and liquidation VWAPs include both venue taker fees. Unmatured positions are right-censored, never credited as zero-PnL wins.',
     '',
-    '| Match class | Horizon | Exit rule | Entries | Realized | Target | Terminal | Censored | PnL | ROI | Halves | Mean hold |',
-    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
+    '| Match class | Horizon | Exit rule | Entries | Realized | Target | Terminal | Censored | PnL | 2x + ticks | ROI | Halves | Mean hold |',
+    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
   ];
   for (const row of report.byMismatchClass) {
-    lines.push(`| ${row.mismatchClass} | ${row.horizon_label} | ${row.target_label} | ${row.entries} | ${row.realized} | ${row.targetExits} | ${row.terminalFallbacks} | ${row.rightCensored} | ${row.pnlUsd == null ? '—' : `$${row.pnlUsd.toFixed(2)}`} | ${row.realizedRoiPct == null ? '—' : `${row.realizedRoiPct.toFixed(2)}%`} | ${row.firstHalfPnlUsd}/${row.secondHalfPnlUsd} | ${row.meanHoldMinutes ?? '—'}m |`);
+    lines.push(`| ${row.mismatchClass} | ${row.horizon_label} | ${row.target_label} | ${row.entries} | ${row.realized} | ${row.targetExits} | ${row.terminalFallbacks} | ${row.rightCensored} | ${row.pnlUsd == null ? '—' : `$${row.pnlUsd.toFixed(2)}`} | ${row.pnl2xFeesOneTickUsd == null ? '—' : `$${row.pnl2xFeesOneTickUsd.toFixed(2)}`} | ${row.realizedRoiPct == null ? '—' : `${row.realizedRoiPct.toFixed(2)}%`} | ${row.firstHalfPnlUsd}/${row.secondHalfPnlUsd} | ${row.meanHoldMinutes ?? '—'}m |`);
   }
   lines.push(
     '',
@@ -375,7 +428,7 @@ async function main() {
       experimentId,
       paperOnly: true,
       liveOrderPath: false,
-      accounting: 'first eligible entry per match-direction-UTC-day; synchronized A/B L2; both entry and exit taker fees; 60-second timeout execution allowance',
+      accounting: 'first eligible entry per match-direction-UTC-day; synchronized A/B L2; both entry and exit taker fees; 60-second timeout execution allowance; promotion stress duplicates all observed fees and moves every entry/exit leg one adverse tick',
       coverage: {
         entries: entryRows.length,
         pairs: new Set(entryRows.map((row) => row.match_id)).size,

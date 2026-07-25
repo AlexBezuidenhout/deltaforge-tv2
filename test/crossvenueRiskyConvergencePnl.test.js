@@ -26,6 +26,13 @@ test('mature timeouts realize executable bid PnL while immature rows stay censor
     target_exit_at: null,
     target_exit_proceeds: null,
     entry_total_cost: '4.90',
+    poly_entry_fee: '0.03',
+    kalshi_entry_fee: '0.04',
+    timeout_poly_exit_fee: '0.02',
+    timeout_kalshi_exit_fee: '0.03',
+    quantity: '5',
+    poly_tick: '0.01',
+    kalshi_tick: '0.01',
     terminal_locked_profit: '0.10',
     horizon_ms: '3600000',
     mismatch_reasons: [],
@@ -44,6 +51,8 @@ test('mature timeouts realize executable bid PnL while immature rows stay censor
   });
   assert.equal(mature.status, 'TIMEOUT_EXIT');
   assert.ok(Math.abs(mature.pnl + 0.10) < 1e-9);
+  assert.ok(Math.abs(mature.pnl2xFees + 0.22) < 1e-9);
+  assert.ok(Math.abs(mature.pnl2xFeesOneTick + 0.42) < 1e-9);
   assert.equal(censored.status, 'RIGHT_CENSORED');
   assert.equal(censored.pnl, null);
 });
@@ -52,12 +61,14 @@ test('summary never turns right-censored positions into profitable exits', () =>
   const rows = [
     {
       entryAt: 0, exitAt: 60_000, coverageAt: 60_000,
-      entryCost: 5, pnl: 0.10, holdMs: 60_000, status: 'TARGET_EXIT',
+      entryCost: 5, pnl: 0.10, pnl2xFees: 0.08,
+      pnl2xFeesOneTick: 0.04, holdMs: 60_000, status: 'TARGET_EXIT',
       match_id: 'a',
     },
     {
       entryAt: 120_000, exitAt: null, coverageAt: 130_000,
-      entryCost: 5, pnl: null, holdMs: null, status: 'RIGHT_CENSORED',
+      entryCost: 5, pnl: null, pnl2xFees: null, pnl2xFeesOneTick: null,
+      holdMs: null, status: 'RIGHT_CENSORED',
       match_id: 'b',
     },
   ];
@@ -67,6 +78,8 @@ test('summary never turns right-censored positions into profitable exits', () =>
   assert.equal(result.wins, 1);
   assert.equal(result.rightCensored, 1);
   assert.equal(result.pnlUsd, 0.1);
+  assert.equal(result.pnl2xFeesUsd, 0.08);
+  assert.equal(result.pnl2xFeesOneTickUsd, 0.04);
 });
 
 test('a vanished executable tape is scored from both settlements when available', () => {
@@ -78,6 +91,10 @@ test('a vanished executable tape is scored from both settlements when available'
     target_exit_at: null,
     target_exit_proceeds: null,
     entry_total_cost: '4.80',
+    poly_entry_fee: '0.04',
+    kalshi_entry_fee: '0.05',
+    poly_tick: '0.01',
+    kalshi_tick: '0.01',
     terminal_locked_profit: '0.20',
     horizon_ms: '3600000',
     mismatch_reasons: ['NUMERIC_OR_THRESHOLD_MISMATCH'],
@@ -90,5 +107,7 @@ test('a vanished executable tape is scored from both settlements when available'
   });
   assert.equal(settled.status, 'TERMINAL_FALLBACK');
   assert.ok(Math.abs(settled.pnl + 4.80) < 1e-9);
+  assert.ok(Math.abs(settled.pnl2xFees + 4.89) < 1e-9);
+  assert.ok(Math.abs(settled.pnl2xFeesOneTick + 4.99) < 1e-9);
   assert.equal(settled.exitAt, Date.parse('2026-07-25T01:30:00Z'));
 });
