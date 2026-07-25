@@ -3,13 +3,18 @@ const CopyBotInstance = require('./CopyBotInstance');
 const GeorgeBotInstance = require('./GeorgeBotInstance');
 
 class BotManager {
-  constructor() {
+  constructor({ runnerEnabled = true, instanceId = 'unspecified' } = {}) {
+    this.runnerEnabled = runnerEnabled;
+    this.instanceId = instanceId;
     this.instances = new Map();       // userId -> BotInstance
     this.copyInstances = new Map();   // userId -> CopyBotInstance
     this.georgeInstances = new Map(); // userId -> retired legacy-source telemetry/control
   }
 
   async startBot(userId, settings) {
+    if (!this.runnerEnabled) {
+      throw new Error(`bot runner is disabled for application instance ${this.instanceId}`);
+    }
     // Stop existing instance if running
     if (this.instances.has(userId)) {
       await this.stopBot(userId);
@@ -41,6 +46,9 @@ class BotManager {
   }
 
   async startCopyBot(userId, settings) {
+    if (!this.runnerEnabled) {
+      throw new Error(`bot runner is disabled for application instance ${this.instanceId}`);
+    }
     if (this.copyInstances.has(userId)) {
       await this.stopCopyBot(userId);
     }
@@ -60,6 +68,9 @@ class BotManager {
   }
 
   async startGeorgeBot(userId, settings) {
+    if (!this.runnerEnabled) {
+      throw new Error(`bot runner is disabled for application instance ${this.instanceId}`);
+    }
     if (this.georgeInstances.has(userId)) {
       await this.stopGeorgeBot(userId);
     }

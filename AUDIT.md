@@ -371,3 +371,196 @@ Coinbase agreement, a Binance residual, actual CLOB depth and a 2×-cost gate.
 Prior H49 observations are disclosed as mechanism-selection data and excluded
 from evidence. See `MAIN_V2_AUDIT.md` and `scripts/main-v2-report.js` for the
 full specification and promotion rule.
+
+---
+
+## 7. Money-finding platform cutover — 2026-07-21
+
+### Storage and evidence integrity
+
+The VPS was not merely approaching a capacity warning: PostgreSQL occupied
+approximately 76 GiB and root free space had fallen to approximately 19 GiB.
+The largest relations were append-derived event tables with severe dead-tuple
+or index bloat (`borg_clob_touch`, `am_book_touches`, `pm_flow_trades` and
+`cv_opportunities`). A collector that stops when the disk reserve is crossed
+creates selection bias, so no strategy result from an unobserved interval may
+be treated as evidence.
+
+The repaired lifecycle is now:
+
+1. append every source frame to the fsynced local WAL before processing;
+2. write old normalized raw rows to deterministic gzip-NDJSON batches;
+3. verify the batch header, row count and SHA-256 before deleting those exact
+   PostgreSQL rows;
+4. copy immutable WAL/archive objects off-host without `--delete`;
+5. issue a deletion-authorizing receipt only after a clean traversal;
+6. incrementally convert the off-host source objects to Parquet; and
+7. retain only a rolling normalized hot tier in local PostgreSQL.
+
+The maintenance cutover preserved and removed approximately 49.7 million old
+raw rows in verified batches, then physically compacted the bloated relations.
+At completion the `deltaforge` database was approximately 23 GiB, the
+PostgreSQL directory approximately 28 GiB, and root free space approximately
+73 GiB (versus approximately 19 GiB before maintenance). These are operational
+capacity figures, not strategy-performance evidence.
+
+Parquet is a reproducible research projection, not the source of truth. A
+Parquet conversion failure cannot revoke or conceal a successful raw archive.
+Database snapshots are recovery artifacts and may be removed from the VPS only
+after their independent off-host receipt. The prior Mac mirror race on the
+mutable `archive-state.json` file is removed by excluding that state file from
+the immutable traversal.
+
+The active feeds persist source time, local receive time, monotonic time,
+connection epoch and event sequence in their append-before-process WAL;
+normalized high-rate tables retain the same fields where the source supplies a
+clock. The new evidence monitor fails the epoch on stale heartbeats, sequence
+gaps, parser/WAL failures, missing market coverage, collector failures, archive
+errors or less than 30 GiB free.
+
+### Research fleet disposition
+
+`governance-dispositions-2026-07-21-v4.json` freezes the falsified fleet as
+immutable parked controls. This includes legacy MAIN variants, George legacy,
+G late arb, H53, T-240, generic flow, generic all-market maker/taker studies,
+paired maker and the old cross-venue funding switcher. Their records and
+multiple-testing burden remain queryable, but they cannot be inverted,
+silently restarted or promoted. Generic all-market and public-flow processes
+now capture data only; their strategy-signal switches are off. Paired maker,
+the Flow live canary, G paper and H53 live are disabled at epoch start.
+
+H43 is deliberately unchanged. Three resolver-source manifests are separate:
+Pyth v2 is a paper observer, while Chainlink Data Streams and CF arms remain
+explicitly blocked until an exact authoritative resolver feed and price-to-beat
+contract are available. An Ethereum push-feed or Binance proxy is not accepted
+as the missing source.
+
+Cross-venue v5 now distinguishes certified terminal locks from risky
+similar-contract convergence. The former requires an exact payoff identity;
+the latter can never be labelled risk-free. Repeated full rule documents were
+removed from millisecond hot rows and remain in content-addressed rule tables
+and the decision WAL. The options lane permits only exact-expiry grade A or
+bounded total-variance interpolation grade B observations to be executable;
+DVOL and one-sided horizon extrapolation remain diagnostics.
+
+### Promotion contract
+
+`scripts/promotion-report.js` applies one non-negotiable desk-wide standard:
+fresh confirmatory evaluation rows only; A/B data and execution fidelity;
+minimum 300 independent markets; the manifest's 14- or 30-day minimum;
+positive doubled-cost PnL overall and in both chronological halves; positive
+market- and day-clustered lower bounds; Holm correction over every registered
+arm; positive 100/250/500 ms profiles; no market/day/asset dominance; and
+positive capacity when every collecting strategy competes for one chronological
+$500 bankroll. A clean, gap-free 24-hour evidence epoch is an additional gate.
+
+Passing these gates does not enable live trading. It permits review of a
+separate 50-authenticated-fill canary at $1–$2 per order; $5–$10 sizing is
+considered only after fill, rejection, partial-fill and realised-PnL
+reconciliation. No live-order call site was changed and paper trading remains
+the default. This cutover improves the validity of future evidence; it is not
+evidence that any current strategy is profitable.
+
+### Cutover verification and faults found during activation
+
+The authoritative cohort is `money-finding-2026-07-21-v8`, started at
+`2026-07-21T16:51:05.602Z`. Earlier same-day startup attempts are explicitly
+non-authoritative: preflight exposed defects before any promotion sample was
+accepted. Four additional root causes were corrected:
+
+1. `cv_relation_episodes` keyed a lifecycle state without `experiment_id`, so
+   a fresh frozen cross-venue trial collided with historical episodes. The
+   unique key now includes the experiment and normalizes a NULL active state.
+2. Flow labelled a deliberately bounded first REST bootstrap as a live
+   coverage gap, while the evidence checker did not recognize feed-specific
+   `coverageGaps` counters. Bootstrap truncation and cursor loss are now
+   separate; a real coverage gap fails the epoch.
+3. Old collectors and persistent timers could emit a shutdown error or stale
+   heartbeat after the successor epoch timestamp. The launcher now drains all
+   cohort producers first, starts the new processes once, seeds the slow
+   scorer/archive heartbeats, preflights without recording, and only then
+   enables the evidence timer.
+4. `PROTOCOL_COMPLETION_ONLY` was not in the parked-status set, leaving H40
+   active despite the focused-fleet policy. H40 remains queryable but is now
+   parked; the primary shadow engine evaluates only unchanged H43.
+5. The structural scanner launched 50 Gamma pages concurrently and aborted an
+   entire refresh after 15 seconds if any one page stalled. v5 recorded two
+   such errors and is permanently failed. The scanner now caps concurrency at
+   four, retries retryable failures with bounded backoff, allows 30 seconds per
+   attempt and fails with an explicit timeout after exhaustion. A production
+   sweep returned 3,964 events in 4.455 seconds after the repair.
+6. The first v6 cutover restarted the CLOB writer before seeding raw archival,
+   creating a lock timeout on `borg_clob_touch`. The launcher now archives and
+   verifies while hot writers remain drained, then starts the collectors. v6
+   remains discarded rather than being relabelled.
+7. v7 passed startup but a discovery-only Flow Data API request exhausted its
+   single ten-second attempt. It remains failed. Flow REST discovery now uses
+   four bounded attempts, a 20-second per-attempt timeout, retry telemetry and
+   task-labelled terminal errors. Its latency-sensitive CLOB tape remains
+   WebSocket driven; exhausted retries still fail the evidence epoch.
+
+At final verification the research-platform acceptance check was `PASS` with
+no warnings, all seven focused collectors and both dashboards were active,
+all retired executors were disabled, and 379/379 tests passed locally and on
+the VPS. v8 began with zero critical conditions, zero error/gap counters,
+complete minute-sample coverage and approximately 75.5 GiB free. Its status is
+`PENDING_24H`; this document must not be read as a profitability or promotion
+claim until the full burn-in and strategy-specific sample rules pass.
+
+### Neglected-capacity programme
+
+The executable opportunity benchmark is now implemented in
+`borg/research/opportunity-economics.js` and exposed by
+`scripts/neglected-edge-report.js`. It parses every PostgreSQL numeric as a
+number, keeps all terms in USD, requires A/B data and execution fidelity,
+requires full depth and fresh books, fails closed on missing capital duration
+or failure reserve, and sets `liveEligible=false` unconditionally.
+
+The first live-database report found no candidate that passed the common
+standard. The current structural graph had zero economic/qualified cells; the
+cross-venue v5 cohort had zero trade-eligible proved episodes and a negative
+best approved stressed residual; the options lane had no executable target;
+and both generic and paired maker controls were negative. H43 remained
+positive but underpowered and incompletely replayable at A/B execution
+fidelity. These are falsification results, not a reason to weaken the hurdle.
+
+The next broad capture panel is staged, not active. It removes historical PnL
+and toxicity from panel selection and freezes a content-addressed cohort per
+evidence epoch. The current `money-finding-2026-07-21-v8` process retains its
+legacy ten-market raw-only panel unchanged. No live-order path was added or
+modified.
+
+### Five-lane activation and authoritative evidence boundary
+
+The v8 statement above is historical. v8 failed at
+`2026-07-21T17:52:55Z` after an options persistence deadlock and is not an
+authoritative clean cohort. PostgreSQL proved the root cause: two overlapping
+one-second option flushes attempted `ON CONFLICT` inserts for the same sampled
+`borg_option_shadow_marks` keys in different batches. Hot-tier maintenance
+made the first flush slow enough for the next timer invocation to overlap.
+
+Option flushes are now single-flight, deterministically key-ordered and retried
+only for PostgreSQL deadlock/serialization/lock errors. The decision WAL is
+appended once before any idempotent SQL retry, failed batches retain newer
+coalesced observations, and unrecovered persistence errors are exposed to the
+evidence-health monitor. A forced hot-tier prune under live option collection
+completed successfully with zero option flush retries, zero persistence errors
+and zero epoch error events.
+
+v9 passed preflight but was deliberately superseded when the final audit found
+that the options runtime counter was not yet copied into the shared heartbeat.
+The authoritative platform cohort is now
+`money-finding-2026-07-21-v10`, started at
+`2026-07-21T22:25:22.489Z`. It began `PENDING_24H` with no critical conditions.
+H43's strategy code, thresholds, assets and sizing remain unchanged. The other
+active lanes are the certified payoff graph, rule-aware Polymarket/Kalshi
+collector and Deribit options-surface residual. The all-market process now
+captures a frozen 20-market `neglected-capacity-panel-v1`; every strategy signal
+inside that process remains disabled. Fair-bound passive making is therefore
+capture-only and emits no quote or order intent.
+
+This activation is measurement infrastructure, not proof of alpha. v10 must
+first complete 24 gap/error-free hours, and every strategy must still satisfy
+its independent 300-market, 14/30-day, doubled-cost, clustered-confidence,
+multiple-testing and shared-$500 requirements. No live-order path was added or
+modified.

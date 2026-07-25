@@ -21,9 +21,26 @@ const parquet = require('@dsnp/parquetjs');
 
 const fsp = fs.promises;
 
+class InvalidSegmentError extends Error {
+  constructor(message, options) {
+    super(message, options);
+    this.name = 'InvalidSegmentError';
+    this.code = 'BORG_INVALID_SEGMENT';
+  }
+}
+
 function arg(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : null;
+}
+
+function positiveInt(value, fallback = Infinity) {
+  const parsed = parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function isCloudPlaceholderError(error) {
+  return ['EDEADLK', 'EBUSY', 'EAGAIN', 'ETIMEDOUT'].includes(error?.code);
 }
 
 async function filesBelow(root) {
@@ -41,16 +58,52 @@ async function filesBelow(root) {
   return out;
 }
 
+function explicitFilesByRoot(content, roots) {
+  const result = new Map(roots.map((root) => [root, []]));
+  const seen = new Set();
+  for (const entry of content.split(/\r?\n/).filter(Boolean)) {
+    const file = path.resolve(entry);
+    if (seen.has(file) || !file.endsWith('.ndjson.gz')) continue;
+    const root = roots.find((candidate) => {
+      const relative = path.relative(candidate, file);
+      return relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`)
+        && !path.isAbsolute(relative);
+    });
+    if (!root) throw new Error(`Parquet input is outside an allowed immutable root: ${file}`);
+    result.get(root).push(file);
+    seen.add(file);
+  }
+  return result;
+}
+
 function sha256(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 
 function decodeSegment(packed) {
-  const plain = zlib.gunzipSync(packed).toString('utf8');
-  const lines = plain.split('\n').filter(Boolean).map(JSON.parse);
-  const header = lines.shift() || {};
-  if (!header._borg_archive && !header._borg_wal) throw new Error('unknown BORG segment header');
-  return { header, rows: lines };
+  let plain;
+  try {
+    plain = zlib.gunzipSync(packed).toString('utf8');
+  } catch (error) {
+    throw new InvalidSegmentError(`gzip integrity failure: ${error.message}`, { cause: error });
+  }
+  const sourceLines = plain.split('\n').filter(Boolean);
+  const decoded = [];
+  for (let index = 0; index < sourceLines.length; index += 1) {
+    try {
+      decoded.push(JSON.parse(sourceLines[index]));
+    } catch (error) {
+      throw new InvalidSegmentError(
+        `invalid NDJSON at line ${index + 1}: ${error.message}`,
+        { cause: error },
+      );
+    }
+  }
+  const header = decoded.shift() || {};
+  if (!header._borg_archive && !header._borg_wal) {
+    throw new InvalidSegmentError('unknown BORG segment header');
+  }
+  return { header, rows: decoded };
 }
 
 function isTimestampField(key, values) {
@@ -89,19 +142,90 @@ async function atomicJson(file, value) {
   await fsp.rename(temp, file);
 }
 
-async function convertFile(sourceFile, sourceRoot, mirrorRoot) {
+async function recordInvalidSource(sourceFile, sourceRoot, mirrorRoot, error) {
   const packed = await fsp.readFile(sourceFile);
-  const sourceSha256 = sha256(packed);
+  const stat = await fsp.stat(sourceFile);
+  const relative = path.relative(sourceRoot, sourceFile);
+  const namespace = path.basename(sourceRoot);
+  const report = path.join(mirrorRoot, '_invalid', namespace, `${relative}.invalid.json`);
+  let prior = null;
+  try {
+    prior = JSON.parse(await fsp.readFile(report, 'utf8'));
+  } catch (readError) {
+    if (readError.code !== 'ENOENT' && !/Unexpected end of JSON input/.test(readError.message)) {
+      throw readError;
+    }
+  }
+  const sourceHash = sha256(packed);
+  if (prior && prior.source_sha256 !== sourceHash) {
+    throw new Error(`immutable invalid-source collision at ${relative}`);
+  }
+  if (!prior) {
+    await atomicJson(report, {
+      format: 'borg-parquet-invalid-source-v1',
+      detected_at: new Date().toISOString(),
+      source: canonicalSource(sourceFile, sourceRoot),
+      source_sha256: sourceHash,
+      source_bytes: stat.size,
+      source_mtime_ms: stat.mtimeMs,
+      error: error.message,
+    });
+  }
+  return { status: 'invalid_source', output: report, rows: 0 };
+}
+
+function outputFiles(sourceFile, sourceRoot, mirrorRoot) {
   const relative = path.relative(sourceRoot, sourceFile).replace(/\.ndjson\.gz$/, '.parquet');
   const namespace = path.basename(sourceRoot);
   const output = path.join(mirrorRoot, namespace, relative);
-  const manifestFile = `${output}.manifest.json`;
+  return { relative, output, manifestFile: `${output}.manifest.json` };
+}
+
+function canonicalSource(sourceFile, sourceRoot) {
+  const base = process.env.BORG_PARQUET_CANONICAL_BASE;
+  if (!base) return sourceFile;
+  return path.join(path.resolve(base), path.basename(sourceRoot), path.relative(sourceRoot, sourceFile));
+}
+
+async function fastExistingResult(sourceFile, sourceRoot, mirrorRoot) {
+  const { output, manifestFile } = outputFiles(sourceFile, sourceRoot, mirrorRoot);
+  try {
+    const [prior, stat] = await Promise.all([
+      fsp.readFile(manifestFile, 'utf8').then(JSON.parse),
+      fsp.stat(sourceFile),
+      fsp.access(output, fs.constants.R_OK),
+    ]);
+    if (Number(prior.source_bytes) === stat.size
+      && Math.abs(Number(prior.source_mtime_ms) - stat.mtimeMs) < 1) {
+      return { status: 'verified_existing', output, rows: prior.row_count };
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT' && !/Unexpected end of JSON input/.test(err.message)) throw err;
+  }
+  return null;
+}
+
+async function convertFile(sourceFile, sourceRoot, mirrorRoot) {
+  const fast = await fastExistingResult(sourceFile, sourceRoot, mirrorRoot);
+  if (fast) return fast;
+  const sourceStat = await fsp.stat(sourceFile);
+  const packed = await fsp.readFile(sourceFile);
+  const sourceSha256 = sha256(packed);
+  const { relative, output, manifestFile } = outputFiles(sourceFile, sourceRoot, mirrorRoot);
   try {
     const prior = JSON.parse(await fsp.readFile(manifestFile, 'utf8'));
     if (prior.source_sha256 !== sourceSha256) {
       throw new Error(`immutable source collision at ${relative}`);
     }
     await fsp.access(output, fs.constants.R_OK);
+    if (Number(prior.source_bytes) !== sourceStat.size
+      || Math.abs(Number(prior.source_mtime_ms) - sourceStat.mtimeMs) >= 1) {
+      await atomicJson(manifestFile, {
+        ...prior,
+        source_bytes: sourceStat.size,
+        source_mtime_ms: sourceStat.mtimeMs,
+      });
+    }
     return { status: 'verified_existing', output, rows: prior.row_count };
   } catch (err) {
     if (err.code !== 'ENOENT' && !/Unexpected end of JSON input/.test(err.message)) throw err;
@@ -131,9 +255,11 @@ async function convertFile(sourceFile, sourceRoot, mirrorRoot) {
     format: 'borg-parquet-mirror-v1',
     created_at: new Date().toISOString(),
     host: os.hostname(),
-    source: sourceFile,
+    source: canonicalSource(sourceFile, sourceRoot),
     source_header: header,
     source_sha256: sourceSha256,
+    source_bytes: sourceStat.size,
+    source_mtime_ms: sourceStat.mtimeMs,
     parquet_sha256: sha256(parquetBytes),
     parquet_bytes: parquetBytes.length,
     row_count: rows.length,
@@ -150,14 +276,53 @@ async function main() {
     process.env.BORG_ARCHIVE_DIR || path.join(os.homedir(), '.deltaforge-archive', 'borg-raw'),
     process.env.BORG_WAL_DIR || path.join(os.homedir(), '.deltaforge-wal', 'borg'),
   ]).map((root) => path.resolve(root));
+  const inputList = arg('--file-list') || process.env.BORG_PARQUET_INPUT_LIST;
+  const explicit = inputList
+    ? explicitFilesByRoot(await fsp.readFile(inputList, 'utf8'), roots)
+    : null;
+  const maxFiles = positiveInt(arg('--max-files') || process.env.BORG_PARQUET_MAX_FILES);
   const results = [];
+  let workFiles = 0;
+  let pending = 0;
+  let deferredCloudPlaceholders = 0;
   for (const root of roots) {
-    for (const file of await filesBelow(root)) results.push(await convertFile(file, root, path.resolve(mirror)));
+    const files = explicit ? explicit.get(root) : await filesBelow(root);
+    // Newly mirrored objects are still resident on the Mac. Process newest
+    // first so iCloud eviction of an old, already archived object cannot starve
+    // the current evidence epoch.
+    files.sort((left, right) => right.localeCompare(left));
+    for (const file of files) {
+      try {
+        const fast = await fastExistingResult(file, root, path.resolve(mirror));
+        if (fast) {
+          results.push(fast);
+        } else if (workFiles < maxFiles) {
+          results.push(await convertFile(file, root, path.resolve(mirror)));
+          workFiles += 1;
+        } else {
+          pending += 1;
+        }
+      } catch (error) {
+        if (isCloudPlaceholderError(error)) {
+          deferredCloudPlaceholders += 1;
+        } else if (error?.code === 'BORG_INVALID_SEGMENT') {
+          results.push(await recordInvalidSource(file, root, path.resolve(mirror), error));
+          workFiles += 1;
+        } else {
+          throw error;
+        }
+      }
+    }
   }
   const summary = {
     files: results.length,
     created: results.filter((row) => row.status === 'created').length,
-    verified_existing: results.filter((row) => row.status === 'verified_existing').length,
+    verified_existing: results.filter((row) => row.status.startsWith('verified_existing')).length,
+    invalid_source: results.filter((row) => row.status === 'invalid_source').length,
+    pending,
+    deferred_cloud_placeholders: deferredCloudPlaceholders,
+    max_work_files: Number.isFinite(maxFiles) ? maxFiles : null,
+    input_mode: explicit ? 'explicit_new_files' : 'historical_scan',
     rows: results.reduce((sum, row) => sum + row.rows, 0),
     mirror: path.resolve(mirror),
   };
@@ -166,4 +331,8 @@ async function main() {
 
 if (require.main === module) main().catch((err) => { console.error(err.message); process.exit(1); });
 
-module.exports = { convertFile, decodeSegment, schemaFor };
+module.exports = {
+  InvalidSegmentError, canonicalSource, convertFile, decodeSegment,
+  fastExistingResult, explicitFilesByRoot, isCloudPlaceholderError,
+  outputFiles, positiveInt, recordInvalidSource, schemaFor,
+};

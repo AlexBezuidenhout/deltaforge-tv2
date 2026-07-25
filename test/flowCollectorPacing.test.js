@@ -6,11 +6,49 @@ const {
   FlowSocket,
   collectRecentTradePages,
   dataTradesUrl,
+  fetchText,
+  globalCoverageState,
   latestSourceWindow,
   makeNonOverlappingTask,
   paperArrivalState,
   sourceCursorCutoff,
 } = require('../borg/flow/collector');
+
+function response(payload, status = 200, headers = {}) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (name) => headers[String(name).toLowerCase()] || null },
+    text: async () => typeof payload === 'string' ? payload : JSON.stringify(payload),
+  };
+}
+
+test('flow REST discovery retries an aborted request before declaring a data gap', async () => {
+  let attempts = 0;
+  const retries = [];
+  const body = await fetchText('https://example.invalid/trades', 100, {
+    maxAttempts: 2,
+    sleep: async () => {},
+    onRetry: (retry) => retries.push(retry),
+    fetchImpl: async () => {
+      attempts += 1;
+      if (attempts === 1) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+      return response('[]');
+    },
+  });
+  assert.equal(body, '[]');
+  assert.equal(attempts, 2);
+  assert.equal(retries.length, 1);
+  assert.match(retries[0].error.message, /HTTP timeout/);
+});
+
+test('flow REST discovery fails explicitly after bounded retry exhaustion', async () => {
+  await assert.rejects(fetchText('https://example.invalid/trades', 100, {
+    maxAttempts: 2,
+    sleep: async () => {},
+    fetchImpl: async () => response({ error: 'busy' }, 503),
+  }), /HTTP 503/);
+});
 
 test('closed Flow socket drops a queued frame after WAL shutdown', () => {
   let appends = 0;
@@ -44,6 +82,12 @@ test('universe activity is anchored to latest API source time, not wall time', (
 test('global cursor advances only in API source time', () => {
   assert.equal(sourceCursorCutoff(0), 0);
   assert.equal(sourceCursorCutoff('1784381000'), 1784380998);
+});
+
+test('bounded initial history is distinct from a live cursor coverage gap', () => {
+  assert.equal(globalCoverageState(true, 0), 'BOOTSTRAP_TRUNCATED');
+  assert.equal(globalCoverageState(true, '1784381000'), 'GAP');
+  assert.equal(globalCoverageState(false, '1784381000'), 'COMPLETE');
 });
 
 test('bounded trade pagination stops at the causal cutoff and filters older rows', async () => {

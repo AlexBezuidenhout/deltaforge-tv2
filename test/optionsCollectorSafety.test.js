@@ -4,7 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { feeMetadata } = require('../borg/options/collector');
+const {
+  feeMetadata, isRetryableDbError, retryTransientDb,
+} = require('../borg/options/collector');
 
 test('option observer parses the current dynamic fee schedule and fails unknown fees closed', () => {
   assert.deepEqual(feeMetadata({
@@ -24,4 +26,24 @@ test('option observer has no live order or secret-key dependency', () => {
   assert.equal(source.includes('authenticated'), true); // explicit documentation that it is absent
   assert.match(source, /new RawWal\('options-decisions'/);
   assert.match(source, /this\.decisionWal\.append[\s\S]*options_shadow_mark/);
+  assert.match(source, /if \(this\.flushPromise\) return this\.flushPromise/);
+  assert.match(source, /persistenceErrors: this\.metrics\.persistenceErrors/);
+});
+
+test('option persistence retries transient PostgreSQL concurrency errors only', async () => {
+  let attempts = 0;
+  let retries = 0;
+  const value = await retryTransientDb(async () => {
+    attempts += 1;
+    if (attempts < 3) throw Object.assign(new Error('deadlock detected'), { code: '40P01' });
+    return 'stored';
+  }, { maxAttempts: 4, baseDelayMs: 0, onRetry: () => { retries += 1; } });
+  assert.equal(value, 'stored');
+  assert.equal(attempts, 3);
+  assert.equal(retries, 2);
+  assert.equal(isRetryableDbError({ code: '40001' }), true);
+  assert.equal(isRetryableDbError({ code: '23505', message: 'unique violation' }), false);
+  await assert.rejects(() => retryTransientDb(async () => {
+    throw Object.assign(new Error('bad column'), { code: '42703' });
+  }, { maxAttempts: 4, baseDelayMs: 0 }), /bad column/);
 });

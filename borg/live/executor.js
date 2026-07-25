@@ -14,7 +14,7 @@
  *      n=300 core read prints CONFIRM — cannot be stamped early).
  *  2. env LIVE_TRADING_ENABLED === '1'          (operator, per-run intent)
  *  3. env POLYMARKET_PRIVATE_KEY is set          (operator-supplied wallet)
- *  4. bot_settings.live_gla_enabled = true       (operator, DB switch)
+ *  4. bot_settings.live_gla_enabled = true       (required for live mode only)
  *  5. borg/live/KILL does not exist              (touch it to halt instantly)
  * Without gates 2–3 the process runs in DRY-RUN: it logs exactly what it
  * would place and places nothing. This file is NOT wired into launchd —
@@ -151,11 +151,18 @@ async function main() {
   }
   if (killed()) { log('KILL file present — exiting.'); return clearBeatAndExit(1); }
 
-  // Gate 4 — DB switch
+  // Gate 4 — DB switch. A systemd-enforced paper mirror must remain usable
+  // while the live switch is off; requiring a live-capital flag for dry-run
+  // observation caused the paper service to crash-loop. Live intent still
+  // fails closed unless both independent controls are enabled.
+  const liveTradingRequested = process.env.LIVE_TRADING_ENABLED === '1';
   const st = await dbRetry(() => pool.query(`SELECT live_gla_enabled FROM bot_settings WHERE user_id = 1`), 'gate-4 settings read');
-  if (st.rows[0]?.live_gla_enabled !== true) {
+  if (liveTradingRequested && st.rows[0]?.live_gla_enabled !== true) {
     log('REFUSING TO START: bot_settings.live_gla_enabled is not true.');
     return clearBeatAndExit(1);
+  }
+  if (!liveTradingRequested && st.rows[0]?.live_gla_enabled !== true) {
+    log('DB live switch is off — continuing in systemd-enforced paper mirror mode.');
   }
 
   // Gates 2–3 — live vs dry-run.
@@ -163,7 +170,9 @@ async function main() {
   // POLYMARKET_KEY_FILE (default ~/.deltaforge-live/wallet.json, written by
   // make-wallet.js) — file wins the fallback so the key never has to appear
   // in shell history.
-  let privateKey = process.env.POLYMARKET_PRIVATE_KEY || null;
+  // A paper-only service has no reason to read live credentials into memory.
+  // Load the key path only after the independent live-intent switch is on.
+  let privateKey = liveTradingRequested ? process.env.POLYMARKET_PRIVATE_KEY || null : null;
   let signerAddress = null;
   let funder = process.env.POLYMARKET_FUNDER_ADDRESS || null;
   // signatureType: 'EOA' = fresh standalone wallet; 'POLY_1271' = Polymarket
@@ -176,10 +185,10 @@ async function main() {
   // active-account.json is THE switchboard for which wallet trades live.
   // (polymarket-account.json is retired: its old-gen proxy is not controllable
   // by the exported key — see RUNBOOK "Which wallet".)
-  const keyFile = process.env.POLYMARKET_KEY_FILE
+  const keyFile = liveTradingRequested ? process.env.POLYMARKET_KEY_FILE
     || [path.join(home, '.deltaforge-live/active-account.json'),
-        path.join(home, '.deltaforge-live/wallet.json')].find((f) => fs.existsSync(f));
-  if (!privateKey && keyFile && fs.existsSync(keyFile)) {
+        path.join(home, '.deltaforge-live/wallet.json')].find((f) => fs.existsSync(f)) : null;
+  if (liveTradingRequested && !privateKey && keyFile && fs.existsSync(keyFile)) {
     try {
       const w = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
       privateKey = w.privateKey || null;
@@ -194,7 +203,7 @@ async function main() {
     log(`REFUSING TO START: signatureType ${sigType} (Polymarket proxy account) requires the proxy/funder address (POLYMARKET_FUNDER_ADDRESS or funderAddress in the key file).`);
     process.exit(1);
   }
-  const DRY = process.env.LIVE_TRADING_ENABLED !== '1' || !privateKey;
+  const DRY = !liveTradingRequested || !privateKey;
   // Reuse the repo's battle-tested CLOB path (v2 SDK init, signature-type
   // failover, geo-block relay, tick snapping, 5-token minimum) instead of
   // talking to the SDK directly.

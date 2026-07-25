@@ -36,12 +36,13 @@
           ],
           "rationale": "Polymarket alphabetically selects among multiple honorees and selects Other after the year-end deadline; Kalshi does not state the same fallbacks or source hierarchy."
         },
-        "subject": "Connor Storrie"
+        "subject": "Connor Storrie",
+        "hashProvenance": "Rebound 2026-07-19T19:10Z to the canonical rule hashes computed by the live discovery path (cv_rule_snapshots verified to contain the exact reviewed texts). Initial binding used a differently-shaped Gamma fetch; certifier correctly rejected it."
       },
-      "identitySnapshotHash": "1a229dda51ebd59902ea75b1a28baef24d1a06f8db3a79a513d399784ce8a236",
+      "identitySnapshotHash": "7ad734a80b9e5df3088f5b82e572a86a4fdec8cddc02ef4bb1c66daea3fa71ef",
       "ruleBinding": {
-        "snapshotHash": "1a229dda51ebd59902ea75b1a28baef24d1a06f8db3a79a513d399784ce8a236",
-        "polyRuleHash": "150f5a74ffbe3794a6748b198d382122e93d6ac3427e84b067c3f26591278e65",
+        "snapshotHash": "7ad734a80b9e5df3088f5b82e572a86a4fdec8cddc02ef4bb1c66daea3fa71ef",
+        "polyRuleHash": "50bd99779ffee5e512ee83fdca3aa85a5ac67907a6548448d10958cbb6f71fc2",
         "kalshiRuleHash": "c8863e42effce7a3e00690f74666ac90361450c2b240133187a29c7533c31b42"
       }
     },
@@ -77,12 +78,13 @@
           ],
           "rationale": "Polymarket alphabetically selects among multiple honorees and selects Other after the year-end deadline; Kalshi does not state the same fallbacks or source hierarchy."
         },
-        "subject": "Hudson Williams"
+        "subject": "Hudson Williams",
+        "hashProvenance": "Rebound 2026-07-19T19:10Z to the canonical rule hashes computed by the live discovery path (cv_rule_snapshots verified to contain the exact reviewed texts). Initial binding used a differently-shaped Gamma fetch; certifier correctly rejected it."
       },
-      "identitySnapshotHash": "689653b94d29bcfce290d0958c23f238152bccf06a693569a72ff27d1f85a25a",
+      "identitySnapshotHash": "6f1d605008422633498224dad36a720e5c08cdfede7db762f137a9edc7b068f0",
       "ruleBinding": {
-        "snapshotHash": "689653b94d29bcfce290d0958c23f238152bccf06a693569a72ff27d1f85a25a",
-        "polyRuleHash": "0d85ef70874a773b40d70cfe0532a9cd86d5d22c19dc4403b9bf83568c41ac3d",
+        "snapshotHash": "6f1d605008422633498224dad36a720e5c08cdfede7db762f137a9edc7b068f0",
+        "polyRuleHash": "ab78ff0af9a763bafc1db3b8c651e65e3ca26bfa168898d65c63e76635a4e837",
         "kalshiRuleHash": "66989405f55f2516208b19e86447a1394218671eba9bdfff8eca3964e7d4208d"
       }
     }

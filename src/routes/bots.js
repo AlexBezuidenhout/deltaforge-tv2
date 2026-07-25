@@ -444,7 +444,7 @@ router.get('/', authMiddleware, async (req, res) => {
         } : {}),
         subtitle: trial && !trialCollecting
           ? `${String(trial.status).replaceAll('_', ' ')} · ${trial.status_reason || 'frozen governance disposition'} · telemetry/control only · no live path`
-          : trial?.phase === 'eval' && ['H41_crossasset_dispersion_reversion', 'H43_resolution_boundary_buffer'].includes(row.strategy)
+          : trial?.phase === 'eval' && ['H43_resolution_boundary_buffer', 'H45_threshold_distance_velocity'].includes(row.strategy)
           ? `FROZEN FRESH EVAL · unchanged mechanism · discovery rows excluded · 300 independent markets + 14d · market/day clustered lower bounds · 2× costs · no live path${waitingForCurrentCohort ? ' · waiting for first qualifying signal' : ''}`
           : isMainV4
           ? `FRESH FORWARD PAPER SHADOW · 60-observation warmup · 10s/30s Binance/Coinbase/Chainlink consensus · max causal sigma · actual ask · 2× fees + one-tick hurdle · $${TARGET_STAKE_USD} max · no live path${waitingForCurrentCohort ? ' · waiting for first qualifying signal' : ''}`

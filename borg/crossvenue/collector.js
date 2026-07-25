@@ -13,6 +13,7 @@
 const crypto = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
+const { Worker } = require('node:worker_threads');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 
 const ClobMultiplex = require('../recon/clob-multiplex');
@@ -22,8 +23,8 @@ const { MakerLab } = require('./maker-lab');
 const { pool, migrateCrossVenue, insertRows, logEvent } = require('../recon/db');
 const { STARTING_BANKROLL_USD } = require('../research/capital-policy');
 const {
-  KALSHI, candidateId, discoverCrossVenue, fetchJson, isRejectedIdentity,
-  loadManualIdentityReviews, selectMonitoredCandidates,
+  KALSHI, applyPaperEvaluationPolicy, candidateId, fetchJson,
+  isRejectedIdentity, loadManualIdentityReviews, selectPaperMonitoredCandidates,
 } = require('./universe');
 const { compileCrossVenueRelation } = require('./payoff-relations');
 const {
@@ -35,12 +36,19 @@ const {
 const {
   appendHistory, cloneBooks, selectSynchronizedBooks,
 } = require('./synchronizer');
+const { CURRENT_CROSSVENUE_EXPERIMENT_ID } = require('./experiment');
 
 const RUN_ID = `crossvenue:${os.hostname()}:${new Date().toISOString()}:${process.pid}:${crypto.randomUUID().slice(0, 8)}`;
-const EXPERIMENT_ID = 'crossvenue-certified-convergence-v3';
+const EXPERIMENT_ID = CURRENT_CROSSVENUE_EXPERIMENT_ID;
 const REFRESH_MS = Math.max(300_000, Number(process.env.CROSSVENUE_REFRESH_MS || 900_000));
 const KALSHI_POLL_MS = Math.max(1000, Number(process.env.CROSSVENUE_KALSHI_POLL_MS || 2000));
-const MAX_MONITORED = Math.max(1, Math.min(60, Number(process.env.CROSSVENUE_MAX_MONITORED || 12)));
+const KALSHI_ORDERBOOK_BATCH_SIZE = 100;
+const DISCOVERY_TIMEOUT_MS = Math.max(60_000,
+  Number(process.env.CROSSVENUE_DISCOVERY_TIMEOUT_MS || 240_000));
+// Kalshi's default WebSocket subscription tier supports 200 market tickers.
+// Keep one collector below that observed/documented boundary; larger cohorts
+// require explicit feed sharding rather than silently truncating discovery.
+const MAX_MONITORED = Math.max(1, Math.min(200, Number(process.env.CROSSVENUE_MAX_MONITORED || 12)));
 const HOT_MONITORED = Math.max(1, Math.min(MAX_MONITORED, Number(process.env.CROSSVENUE_HOT_MONITORED || 6)));
 const BROAD_POLL_MS = Math.max(10_000, Number(process.env.CROSSVENUE_BROAD_POLL_MS || 30_000));
 const MAX_CANDIDATES = Math.max(MAX_MONITORED, Number(process.env.CROSSVENUE_MAX_CANDIDATES || 250));
@@ -62,6 +70,12 @@ const CAPITAL_PER_VENUE_USD = Math.max(1,
   Number(process.env.CROSSVENUE_CAPITAL_PER_VENUE_USD || TOTAL_CAPITAL_USD / 2));
 const MAX_OPTIMIZED_QUANTITY = Math.max(1,
   Number(process.env.CROSSVENUE_MAX_OPTIMIZED_QUANTITY || 10_000));
+const PAPER_SCORE_APPROVAL = String(process.env.CROSSVENUE_PAPER_SCORE_APPROVAL || 'false').toLowerCase() === 'true';
+const PAPER_SCORE_FLOOR = Math.max(0, Math.min(1,
+  Number(process.env.CROSSVENUE_PAPER_SCORE_FLOOR || 0.8)));
+const PAPER_APPROVED_AT = process.env.CROSSVENUE_PAPER_APPROVED_AT || null;
+const EXPLORATORY_MONITORED = Math.max(0, Math.min(MAX_MONITORED,
+  Number(process.env.CROSSVENUE_EXPLORATORY_MONITORED || 4)));
 
 const MATCH_COLUMNS = [
   'match_id', 'poly_condition_id', 'poly_gamma_id', 'poly_question',
@@ -70,9 +84,21 @@ const MATCH_COLUMNS = [
   'identity_approved', 'identity_snapshot_hash', 'identity_certification',
   'relation_type', 'relation_approved', 'relation_status',
   'relation_proof', 'relation_resolution_audit', 'state_evidence',
+  'paper_eval_approved', 'paper_eval_status', 'paper_eval_source',
+  'paper_eval_approved_at', 'paper_eval_score_at_approval', 'paper_eval_threshold',
   'approval_source', 'resolution_audit', 'mismatch_reasons',
   'end_delta_hours', 'monitored', 'active', 'metadata', 'refreshed_at',
 ];
+
+function chunkKalshiTickers(tickers, batchSize = KALSHI_ORDERBOOK_BATCH_SIZE) {
+  const size = Math.max(1, Math.min(KALSHI_ORDERBOOK_BATCH_SIZE, Number(batchSize) || 1));
+  const unique = [...new Set((tickers || []).map(String).filter(Boolean))];
+  const batches = [];
+  for (let offset = 0; offset < unique.length; offset += size) {
+    batches.push(unique.slice(offset, offset + size));
+  }
+  return batches;
+}
 const SNAPSHOT_COLUMNS = [
   'observed_at', 'match_id', 'trigger_venue', 'poly_book_at', 'kalshi_book_at',
   'poly_age_ms', 'kalshi_age_ms', 'pair_skew_ms',
@@ -87,7 +113,8 @@ const OPPORTUNITY_COLUMNS = [
   'opportunity_id', 'observed_at', 'match_id', 'episode_id', 'direction',
   'quantity', 'poly_outcome', 'kalshi_outcome', 'poly_vwap', 'kalshi_vwap',
   'poly_fee', 'kalshi_fee', 'total_cost', 'locked_profit_after_both_fills',
-  'stressed_profit', 'indicative_economic', 'economic', 'identity_approved',
+  'stressed_profit', 'indicative_economic', 'economic',
+  'paper_eval_approved', 'paper_trade_eligible', 'identity_approved',
   'relation_type', 'relation_approved', 'guaranteed_min_payout_per_share',
   'payoff_proof_hash', 'books_fresh', 'full_depth',
   'atomic', 'lockable_after_both_fills', 'status', 'data_quality_grade',
@@ -118,7 +145,8 @@ const BASIS_COLUMNS = [
   'poly_exit_fee', 'kalshi_exit_fee', 'entry_total_cost',
   'gross_liquidation_proceeds', 'net_liquidation_proceeds',
   'terminal_locked_profit', 'immediate_round_trip_pnl', 'indicative_entry_economic',
-  'entry_economic', 'identity_approved', 'relation_type', 'relation_approved',
+  'entry_economic', 'paper_eval_approved', 'paper_entry_eligible',
+  'identity_approved', 'relation_type', 'relation_approved',
   'guaranteed_min_payout_per_share', 'payoff_proof_hash',
   'books_fresh', 'full_entry_depth', 'full_exit_depth',
   'data_quality_grade', 'execution_fidelity_grade', 'book_signature',
@@ -216,12 +244,17 @@ class CrossVenueLab {
       },
     });
     this.flushing = false; this.refreshing = false; this.polling = false; this.stopping = false;
+    this.discoveryWorker = null;
     this.timers = [];
     this.metrics = {
-      polyMarkets: 0, kalshiMarkets: 0, candidates: 0, approvedMatches: 0,
+      polyMarkets: 0, polyEvents: 0, polyUniverseTruncated: false,
+      kalshiMarkets: 0, kalshiEvents: 0, kalshiUniverseTruncated: false,
+      candidates: 0, approvedMatches: 0,
+      paperApprovedMatches: 0, paperMonitoredMatches: 0, paperApprovalOverflow: 0,
       pendingCandidates: 0, reviewedRejected: 0, monitoredMatches: 0,
       snapshots: 0, evaluations: 0, economicLeads: 0,
-      lockableNonatomic: 0, basisSamples: 0, kalshiPolls: 0, kalshiBatchRequests: 0,
+      paperTradeLeads: 0, lockableNonatomic: 0, basisSamples: 0,
+      kalshiPolls: 0, kalshiBatchRequests: 0,
       kalshiErrors: 0, polyEvents: 0, diagnosticControls: 0,
       kalshiWsEvents: 0, kalshiWsFallbacks: 0,
       synchronizedSnapshots: 0, synchronizationRejects: 0,
@@ -285,7 +318,11 @@ class CrossVenueLab {
     await this.heartbeat('RUNNING');
     await logEvent('INFO', 'crossvenue_lab', 'paper-only Polymarket/Kalshi collector started', {
       runId: RUN_ID, candidates: this.metrics.candidates, monitored: this.matches.size,
-      approved: this.metrics.approvedMatches, walletLoaded: false, liveOrderPath: false,
+      approved: this.metrics.approvedMatches,
+      paperApproved: this.metrics.paperApprovedMatches,
+      paperMonitored: this.metrics.paperMonitoredMatches,
+      paperScoreFloor: PAPER_SCORE_FLOOR,
+      walletLoaded: false, liveOrderPath: false,
       kalshiTransport: this.kalshiFeed.transport(),
       kalshiWsConfigured: this.kalshiFeed.configured(),
       experimentId: EXPERIMENT_ID, maxPairSkewMs: MAX_PAIR_SKEW_MS,
@@ -468,7 +505,7 @@ class CrossVenueLab {
     if (!matchesResult.rows.length) return 0;
     const candidates = matchesResult.rows.map((row) => {
       const metadata = row.metadata || {}; const poly = metadata.poly || {}; const kalshi = metadata.kalshi || {};
-      return {
+      const candidate = {
         matchId: row.match_id, score: finite(row.match_score, 0),
         titleSimilarity: finite(row.title_similarity, 0), identityStatus: row.identity_status,
         identityApproved: row.identity_approved === true, approvalSource: row.approval_source,
@@ -486,6 +523,7 @@ class CrossVenueLab {
         relationResolutionAudit: row.relation_resolution_audit || null,
         stateEvidence: row.state_evidence || null,
         endDeltaHours: finite(row.end_delta_hours), ...(metadata.audit || {}),
+        structuredEvidence: metadata.structured || null,
         poly: {
           ...poly, conditionId: row.poly_condition_id, gammaId: row.poly_gamma_id,
           question: row.poly_question, yesToken: row.poly_yes_token, noToken: row.poly_no_token,
@@ -495,11 +533,43 @@ class CrossVenueLab {
           title: row.kalshi_title,
         },
       };
+      return applyPaperEvaluationPolicy(candidate, {
+        paperScoreApproval: PAPER_SCORE_APPROVAL,
+        paperScoreFloor: PAPER_SCORE_FLOOR,
+        paperApprovedAt: PAPER_APPROVED_AT || row.paper_eval_approved_at,
+      });
     });
-    const selection = selectMonitoredCandidates(candidates, MAX_MONITORED, DIAGNOSTIC_CONTROLS);
+    const selection = selectPaperMonitoredCandidates(candidates, {
+      maxMonitored: MAX_MONITORED,
+      exploratoryMonitored: EXPLORATORY_MONITORED,
+      rejectedControlLimit: DIAGNOSTIC_CONTROLS,
+      structuredMonitored: Number(process.env.CROSSVENUE_STRUCTURED_MONITORED || 8),
+    });
     const monitoredIds = selection.monitored.map((match) => match.matchId);
-    await pool.query('UPDATE cv_contract_matches SET monitored=(match_id=ANY($1::text[])) WHERE active=true',
-      [monitoredIds]);
+    const policyRows = candidates.map((match) => ({
+      match_id: match.matchId,
+      paper_eval_approved: match.paperEvalApproved,
+      paper_eval_status: match.paperEvalStatus,
+      paper_eval_source: match.paperEvalSource,
+      paper_eval_approved_at: match.paperEvalApprovedAt,
+      paper_eval_score_at_approval: match.paperEvalScoreAtApproval,
+      paper_eval_threshold: match.paperEvalThreshold,
+    }));
+    await pool.query(`WITH policy AS (
+      SELECT * FROM jsonb_to_recordset($2::jsonb) AS row(
+        match_id text,paper_eval_approved boolean,paper_eval_status text,
+        paper_eval_source text,paper_eval_approved_at timestamptz,
+        paper_eval_score_at_approval numeric,paper_eval_threshold numeric)
+    ) UPDATE cv_contract_matches AS target
+       SET monitored=(target.match_id=ANY($1::text[])),
+           paper_eval_approved=policy.paper_eval_approved,
+           paper_eval_status=policy.paper_eval_status,
+           paper_eval_source=policy.paper_eval_source,
+           paper_eval_approved_at=policy.paper_eval_approved_at,
+           paper_eval_score_at_approval=policy.paper_eval_score_at_approval,
+           paper_eval_threshold=policy.paper_eval_threshold
+      FROM policy WHERE target.match_id=policy.match_id AND target.active=true`,
+    [monitoredIds, json(policyRows)]);
     this.installMonitoredMatches(selection.monitored);
     const prior = priorRuntime.rows[0] || {};
     this.metrics.polyMarkets = Number(prior.poly_markets || 0);
@@ -509,27 +579,77 @@ class CrossVenueLab {
       !row.relationApproved && !isRejectedIdentity(row)).length;
     this.metrics.reviewedRejected = candidates.filter(isRejectedIdentity).length;
     this.metrics.approvedMatches = candidates.filter((row) => row.relationApproved).length;
+    this.metrics.paperApprovedMatches = candidates.filter((row) => row.paperEvalApproved).length;
+    this.metrics.paperMonitoredMatches = selection.monitored
+      .filter((row) => row.paperEvalApproved).length;
+    this.metrics.paperApprovalOverflow = selection.paperOverflow;
     this.metrics.monitoredMatches = selection.monitored.length;
     this.metrics.diagnosticControls = selection.diagnosticControls;
     await logEvent('INFO', 'crossvenue_lab', 'loaded cached cross-venue universe for fast startup', {
       candidates: candidates.length, monitored: selection.monitored.length,
+      paperApproved: this.metrics.paperApprovedMatches,
+      paperMonitored: this.metrics.paperMonitoredMatches,
+      paperApprovalOverflow: this.metrics.paperApprovalOverflow,
       diagnosticControls: selection.diagnosticControls,
     });
     return selection.monitored.length;
+  }
+
+  runDiscovery(options) {
+    if (this.discoveryWorker) return Promise.reject(new Error('cross-venue discovery worker already running'));
+    const worker = new Worker(path.join(__dirname, 'discovery-worker.js'), {
+      workerData: { options },
+    });
+    this.discoveryWorker = worker;
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        if (this.discoveryWorker === worker) this.discoveryWorker = null;
+        if (error) reject(error); else resolve(value);
+      };
+      const timeout = setTimeout(() => {
+        worker.terminate().catch(() => {});
+        finish(new Error(`cross-venue discovery exceeded ${DISCOVERY_TIMEOUT_MS}ms`));
+      }, DISCOVERY_TIMEOUT_MS);
+      worker.once('message', (message) => {
+        if (!message?.ok) {
+          const error = new Error(message?.error?.message || 'cross-venue discovery worker failed');
+          if (message?.error?.stack) error.stack = message.error.stack;
+          finish(error); return;
+        }
+        for (const warning of message.warnings || []) {
+          this.recordError(`kalshi_crypto_${warning.scope}`, new Error(warning.message));
+        }
+        finish(null, message.universe);
+      });
+      worker.once('error', (error) => finish(error));
+      worker.once('exit', (code) => {
+        if (!settled && code !== 0) finish(new Error(`cross-venue discovery worker exited ${code}`));
+      });
+    });
   }
 
   async refreshUniverse() {
     if (this.refreshing || this.stopping) return;
     this.refreshing = true;
     try {
-      const universe = await discoverCrossVenue({
+      const universe = await this.runDiscovery({
         kalshiPages: Number(process.env.CROSSVENUE_KALSHI_PAGES || 20),
+        kalshiEventPages: Number(process.env.CROSSVENUE_KALSHI_EVENT_PAGES || 100),
+        kalshiEventPaceMs: Number(process.env.CROSSVENUE_KALSHI_EVENT_PACE_MS || 250),
+        kalshiSeriesPaceMs: Number(process.env.CROSSVENUE_KALSHI_SERIES_PACE_MS || 500),
         gammaPages: Number(process.env.CROSSVENUE_GAMMA_PAGES || 20),
         gammaWindows: Number(process.env.CROSSVENUE_GAMMA_WINDOWS || 10),
         maxCandidates: MAX_CANDIDATES, maxMonitored: MAX_MONITORED,
         rejectedControlLimit: DIAGNOSTIC_CONTROLS,
+        exploratoryMonitored: EXPLORATORY_MONITORED,
         structuredMonitored: Number(process.env.CROSSVENUE_STRUCTURED_MONITORED || 8),
-        onCryptoError: (series, error) => this.recordError(`kalshi_crypto_${series}`, error),
+        paperScoreApproval: PAPER_SCORE_APPROVAL,
+        paperScoreFloor: PAPER_SCORE_FLOOR,
+        paperApprovedAt: PAPER_APPROVED_AT,
       });
       const monitored = new Set(universe.monitored.map((match) => match.matchId));
       await pool.query('UPDATE cv_contract_matches SET monitored=false,active=false');
@@ -558,6 +678,8 @@ class CrossVenueLab {
         match.relationProof ? json(match.relationProof) : null,
         match.relationResolutionAudit ? json(match.relationResolutionAudit) : null,
         match.stateEvidence ? json(match.stateEvidence) : null,
+        match.paperEvalApproved, match.paperEvalStatus, match.paperEvalSource,
+        match.paperEvalApprovedAt, match.paperEvalScoreAtApproval, match.paperEvalThreshold,
         match.approvalSource,
         match.resolutionAudit ? json(match.resolutionAudit) : null, json(match.mismatches),
         match.endDeltaHours, monitored.has(match.matchId), true,
@@ -573,6 +695,10 @@ class CrossVenueLab {
           },
           kalshi: {
             eventTicker: match.kalshi.eventTicker, seriesTicker: match.kalshi.seriesTicker,
+            eventTitle: match.kalshi.eventTitle, eventSubTitle: match.kalshi.eventSubTitle,
+            category: match.kalshi.category,
+            settlementSources: match.kalshi.settlementSources,
+            mutuallyExclusive: match.kalshi.mutuallyExclusive,
             subtitle: match.kalshi.subtitle, yesSubTitle: match.kalshi.yesSubTitle,
             noSubTitle: match.kalshi.noSubTitle, rulesPrimary: match.kalshi.rulesPrimary,
             rulesSecondary: match.kalshi.rulesSecondary, closeTime: match.kalshi.closeTime,
@@ -599,12 +725,24 @@ class CrossVenueLab {
         relation_status=EXCLUDED.relation_status,relation_proof=EXCLUDED.relation_proof,
         relation_resolution_audit=EXCLUDED.relation_resolution_audit,
         state_evidence=EXCLUDED.state_evidence,
+        paper_eval_approved=EXCLUDED.paper_eval_approved,
+        paper_eval_status=EXCLUDED.paper_eval_status,
+        paper_eval_source=EXCLUDED.paper_eval_source,
+        paper_eval_approved_at=EXCLUDED.paper_eval_approved_at,
+        paper_eval_score_at_approval=EXCLUDED.paper_eval_score_at_approval,
+        paper_eval_threshold=EXCLUDED.paper_eval_threshold,
         approval_source=EXCLUDED.approval_source,resolution_audit=EXCLUDED.resolution_audit,
         mismatch_reasons=EXCLUDED.mismatch_reasons,end_delta_hours=EXCLUDED.end_delta_hours,
         monitored=EXCLUDED.monitored,active=true,metadata=EXCLUDED.metadata,refreshed_at=EXCLUDED.refreshed_at`);
       this.installMonitoredMatches(universe.monitored);
       this.metrics.polyMarkets = universe.polyCount;
+      this.metrics.polyEvents = universe.polyEventCount;
+      this.metrics.polyUniverseTruncated = universe.polyUniverseTruncated;
+      this.metrics.polyUniverseSource = universe.polyUniverseSource;
       this.metrics.kalshiMarkets = universe.kalshiCount;
+      this.metrics.kalshiEvents = universe.kalshiEventCount;
+      this.metrics.kalshiUniverseTruncated = universe.kalshiUniverseTruncated;
+      this.metrics.kalshiUniverseSource = universe.kalshiUniverseSource;
       this.metrics.kalshiCryptoMarkets = universe.kalshiCryptoCount;
       this.metrics.structuredCandidates = universe.structuredCount;
       this.metrics.candidates = universe.candidates.length;
@@ -612,12 +750,26 @@ class CrossVenueLab {
       this.metrics.reviewedRejected = universe.reviewedRejectedCount;
       this.metrics.diagnosticControls = universe.diagnosticControls;
       this.metrics.approvedMatches = universe.candidates.filter((match) => match.relationApproved).length;
+      this.metrics.paperApprovedMatches = universe.candidates
+        .filter((match) => match.paperEvalApproved).length;
+      this.metrics.paperMonitoredMatches = universe.monitored
+        .filter((match) => match.paperEvalApproved).length;
+      this.metrics.paperApprovalOverflow = universe.paperOverflowCount;
       this.metrics.monitoredMatches = universe.monitored.length;
       await logEvent('INFO', 'crossvenue_lab', 'cross-venue universe refreshed', {
         polymarket: universe.polyCount, kalshi: universe.kalshiCount,
+        polyEvents: universe.polyEventCount,
+        polyUniverseTruncated: universe.polyUniverseTruncated,
+        polyUniverseSource: universe.polyUniverseSource,
+        kalshiEvents: universe.kalshiEventCount,
+        kalshiUniverseTruncated: universe.kalshiUniverseTruncated,
+        kalshiUniverseSource: universe.kalshiUniverseSource,
         candidates: universe.candidates.length, pending: universe.pendingCount,
         reviewedRejected: universe.reviewedRejectedCount, monitored: universe.monitored.length,
         diagnosticControls: universe.diagnosticControls, approved: this.metrics.approvedMatches,
+        paperApproved: this.metrics.paperApprovedMatches,
+        paperMonitored: this.metrics.paperMonitoredMatches,
+        paperApprovalOverflow: this.metrics.paperApprovalOverflow,
       });
     } finally { this.refreshing = false; }
   }
@@ -633,22 +785,28 @@ class CrossVenueLab {
   }
 
   async fetchKalshiBooks(tickers) {
-    const requestStartedAt = Date.now(); const receiveMonoNs = process.hrtime.bigint();
-    const url = new URL(`${KALSHI}/markets/orderbooks`);
-    for (const ticker of tickers) url.searchParams.append('tickers', ticker);
-    const result = await fetchJson(url);
-    const receivedAt = Date.now();
-    const provenance = this.kalshiWal.append(result.raw, {
-      channel: 'orderbooks_batch_rest', sourceMs: receivedAt,
-      receiveWallMs: receivedAt, receiveMonoNs: receiveMonoNs.toString(),
-    });
-    return new Map((result.payload?.orderbooks || []).map((payload) => [String(payload.ticker), {
-      books: normalizeKalshiBook(payload), receivedAt,
-      requestStartedAt, latencyMs: result.latencyMs,
-      walEventId: provenance.event_id,
-      sourceMs: null,
-      transport: 'public_batch_rest',
-    }]));
+    const batches = chunkKalshiTickers(tickers);
+    const responses = await Promise.all(batches.map(async (batch) => {
+      const requestStartedAt = Date.now(); const receiveMonoNs = process.hrtime.bigint();
+      const url = new URL(`${KALSHI}/markets/orderbooks`);
+      for (const ticker of batch) url.searchParams.append('tickers', ticker);
+      this.metrics.kalshiBatchRequests += 1;
+      const result = await fetchJson(url);
+      const receivedAt = Date.now();
+      const provenance = this.kalshiWal.append(result.raw, {
+        channel: 'orderbooks_batch_rest', sourceMs: receivedAt,
+        receiveWallMs: receivedAt, receiveMonoNs: receiveMonoNs.toString(),
+        batchSize: batch.length,
+      });
+      return (result.payload?.orderbooks || []).map((payload) => [String(payload.ticker), {
+        books: normalizeKalshiBook(payload), receivedAt,
+        requestStartedAt, latencyMs: result.latencyMs,
+        walEventId: provenance.event_id,
+        sourceMs: null,
+        transport: 'public_batch_rest',
+      }]);
+    }));
+    return new Map(responses.flat());
   }
 
   onKalshiWsBook(state) {
@@ -673,7 +831,6 @@ class CrossVenueLab {
       const tickers = [...new Set(selected.map((match) => match.kalshi.ticker))];
       if (!tickers.length) return;
       const states = await this.fetchKalshiBooks(tickers);
-      this.metrics.kalshiBatchRequests += 1;
       for (const ticker of tickers) {
         const state = states.get(ticker);
         if (!state) { this.metrics.kalshiErrors += 1; continue; }
@@ -785,7 +942,9 @@ class CrossVenueLab {
       quantity: Math.max(BASIS_QUANTITY, finite(match.poly.orderMinSize, 5)),
       polyBooks, kalshiBooks: kalshiState.books,
       polyFeeRate: match.poly.feeRate, polyFeeExponent: match.poly.feeExponent,
+      polyTick: match.poly.tickSize, kalshiTick: 0.01,
       kalshiFeeMultiplier: 1, identityApproved: match.identityApproved,
+      paperEvalApproved: match.paperEvalApproved,
       payoffRelation: match.relationProof, booksFresh,
     });
     for (const basis of basisRows) {
@@ -804,13 +963,22 @@ class CrossVenueLab {
         basis.polyExitFee, basis.kalshiExitFee, basis.entryTotalCost,
         basis.grossLiquidationProceeds, basis.netLiquidationProceeds,
         basis.terminalLockedProfit, basis.immediateRoundTripPnl,
-        basis.indicativeEntryEconomic, basis.entryEconomic, match.identityApproved,
+        basis.indicativeEntryEconomic, basis.entryEconomic,
+        match.paperEvalApproved, basis.paperEntryEligible, match.identityApproved,
         basis.relationType, basis.relationApproved, basis.guaranteedMinPayoutPerShare,
         basis.payoffProofHash, booksFresh, basis.fullEntryDepth, basis.fullExitDepth,
         quality, fidelity, bookSignature, EXPERIMENT_ID, synchronized.synchronized,
         json({ triggerVenue, kalshiTransport: kalshiState.transport || 'public_batch_rest',
           kalshiSourceMs: kalshiState.sourceMs, entryFills: basis.entryFills, exitFills: basis.exitFills,
           synchronizationReason: synchronized.reason, pairSkewMs,
+          paperStressProfit: basis.paperStressProfit,
+          paperEvaluation: {
+            approved: match.paperEvalApproved,
+            status: match.paperEvalStatus,
+            source: match.paperEvalSource,
+            threshold: match.paperEvalThreshold,
+            scoreAtApproval: match.paperEvalScoreAtApproval,
+          },
           identitySnapshotHash: match.identityCertification?.snapshotHash || null,
           payoutAssumption: basis.relationApproved
             ? 'DETERMINISTIC_PAYOFF_PROOF' : 'UNPROVEN_PARITY_CONTROL',
@@ -828,7 +996,8 @@ class CrossVenueLab {
       kalshiCapitalUsd: CAPITAL_PER_VENUE_USD,
       polyFeeRate: match.poly.feeRate, polyFeeExponent: match.poly.feeExponent,
       kalshiFeeMultiplier: 1, polyTick: match.poly.tickSize, kalshiTick: 0.01,
-      identityApproved: match.identityApproved, payoffRelation: match.relationProof, booksFresh,
+      identityApproved: match.identityApproved, paperEvalApproved: match.paperEvalApproved,
+      payoffRelation: match.relationProof, booksFresh,
     });
     const observedRelationDirections = new Set();
     for (const row of results) {
@@ -845,7 +1014,8 @@ class CrossVenueLab {
         opportunityId, iso(now), matchId, episodeId, row.direction, row.quantity,
         row.polyOutcome, row.kalshiOutcome, row.polyVwap, row.kalshiVwap,
         row.polyFee, row.kalshiFee, row.totalCost, row.lockedProfitAfterBothFills,
-        row.stressedProfit, row.indicativeEconomic, row.economic, match.identityApproved,
+        row.stressedProfit, row.indicativeEconomic, row.economic,
+        match.paperEvalApproved, row.paperTradeEligible, match.identityApproved,
         row.relationType, row.relationApproved, row.guaranteedMinPayoutPerShare,
         row.payoffProofHash, booksFresh, true,
         false, row.lockableAfterBothFills, row.status, quality, fidelity,
@@ -859,9 +1029,29 @@ class CrossVenueLab {
           relationStatus: match.relationStatus || 'PENDING_REVIEW',
           relationAudit: match.relationResolutionAudit || null,
           stateEvidence: match.stateEvidence || null,
+          paperEvaluation: {
+            approved: match.paperEvalApproved,
+            tradeEligible: row.paperTradeEligible,
+            status: match.paperEvalStatus,
+            source: match.paperEvalSource,
+            threshold: match.paperEvalThreshold,
+            scoreAtApproval: match.paperEvalScoreAtApproval,
+            assumption: 'UNPROVEN_$1_PARITY; PAPER_ONLY; NOT_TERMINAL_LOCK_EVIDENCE',
+          },
           experimentId: EXPERIMENT_ID,
           synchronizationReason: synchronized.reason, pairSkewMs,
-          identityCertification: match.identityCertification || null,
+          // Exact rule text and certification evidence are content-addressed
+          // once in cv_rule_snapshots/cv_contract_matches and are already in
+          // the append-before-process decision WAL. Repeating both venues'
+          // complete rule documents in every millisecond SQL observation made
+          // the dashboard table several gigabytes larger without adding
+          // information. Keep only the immutable join keys in the hot tier.
+          identityCertification: match.identityCertification ? {
+            valid: match.identityCertification.valid === true,
+            snapshotHash: match.identityCertification.snapshotHash || null,
+            activeFrom: match.identityCertification.activeFrom || null,
+            reasons: match.identityCertification.reasons || [],
+          } : null,
           diagnosticControl: ['REJECTED', 'MANUALLY_REJECTED'].includes(match.identityStatus),
           sizing: {
             method: row.sizingMethod, objective: row.optimizationObjective,
@@ -885,6 +1075,7 @@ class CrossVenueLab {
       ]);
       this.metrics.evaluations += 1;
       if (row.economic) this.metrics.economicLeads += 1;
+      if (row.paperTradeEligible) this.metrics.paperTradeLeads += 1;
       if (row.lockableAfterBothFills) this.metrics.lockableNonatomic += 1;
       if (booksFresh && match.relationApproved && row.relationApproved) {
         observedRelationDirections.add(row.direction);
@@ -938,9 +1129,9 @@ class CrossVenueLab {
     try {
       if (snapshots.length) await insertRows('cv_book_snapshots', SNAPSHOT_COLUMNS, snapshots);
       if (opportunities.length) await insertRows('cv_opportunities', OPPORTUNITY_COLUMNS, opportunities,
-        'ON CONFLICT (opportunity_id) DO NOTHING');
+        'ON CONFLICT (opportunity_id,observed_at) DO NOTHING');
       if (basis.length) await insertRows('cv_basis_samples', BASIS_COLUMNS, basis,
-        'ON CONFLICT (sample_id) DO NOTHING');
+        'ON CONFLICT (sample_id,observed_at) DO NOTHING');
       if (makerEpisodes.length) await insertRows('cv_maker_episodes', MAKER_EPISODE_COLUMNS,
         makerEpisodes, 'ON CONFLICT (episode_id) DO NOTHING');
       if (relationEpisodes.length) await insertRows(
@@ -992,6 +1183,8 @@ class CrossVenueLab {
     }, {});
     const metrics = {
       ...this.metrics, runId: RUN_ID, paperOnly: true, walletLoaded: false,
+      processStartedAt: new Date(this.startedAt).toISOString(),
+      collectionEpochId: process.env.BORG_COLLECTION_EPOCH_ID || 'crossvenue-unmarked',
       liveOrderPath: false, kalshiTransport: this.kalshiFeed.transport(),
       experimentId: EXPERIMENT_ID,
       kalshiFeed: this.kalshiFeed.health(), kalshiRestFallbackPollMs: KALSHI_POLL_MS,
@@ -1010,6 +1203,16 @@ class CrossVenueLab {
       relationEvents: this.relationEpisodes.size,
       relationLifecycle,
       diagnosticControlLimit: DIAGNOSTIC_CONTROLS,
+      paperEvaluationPolicy: {
+        enabled: PAPER_SCORE_APPROVAL,
+        scoreOperator: 'STRICTLY_GREATER_THAN',
+        scoreFloor: PAPER_SCORE_FLOOR,
+        approvedAt: PAPER_APPROVED_AT,
+        approvedMatches: this.metrics.paperApprovedMatches,
+        monitoredMatches: this.metrics.paperMonitoredMatches,
+        overflowMatches: this.metrics.paperApprovalOverflow,
+        semantics: 'PAPER_ASSUMED_PARITY_ONLY_NOT_IDENTITY_OR_PAYOFF_CERTIFICATION',
+      },
       jurisdictionBlock: 'DUBLIN_HOST_DO_NOT_TRADE_KALSHI',
       wal: {
         kalshi: this.kalshiWal.health(), polymarket: this.polyWal.health(),
@@ -1038,6 +1241,10 @@ class CrossVenueLab {
     this.stopping = true; this.timers.forEach(clearInterval);
     for (const pending of this.pendingEvaluations.values()) clearTimeout(pending.timer);
     this.pendingEvaluations.clear();
+    if (this.discoveryWorker) {
+      await this.discoveryWorker.terminate().catch(() => {});
+      this.discoveryWorker = null;
+    }
     this.makerLab.drain(Date.now());
     await this.flush().catch(() => {}); await this.heartbeat('STOPPED').catch(() => {});
     await pool.query('UPDATE cv_runtime SET stopped_at=now(),status=$2 WHERE run_id=$1', [RUN_ID, 'STOPPED']).catch(() => {});
@@ -1063,6 +1270,7 @@ if (require.main === module) main().catch(async (error) => {
 module.exports = {
   BASIS_QUANTITY, BROAD_POLL_MS, CAPITAL_PER_VENUE_USD, CrossVenueLab,
   DIAGNOSTIC_CONTROLS, HOT_MONITORED, KALSHI_POLL_MS, MAX_MONITORED,
+  DISCOVERY_TIMEOUT_MS, KALSHI_ORDERBOOK_BATCH_SIZE, chunkKalshiTickers,
   POLY_FEED_STALE_MS, QUANTITIES, RUN_ID, TOTAL_CAPITAL_USD,
   BOOK_HISTORY_MS, EXPERIMENT_ID, MAX_PAIR_SKEW_MS, SYNC_HOLDBACK_MS,
 };

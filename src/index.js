@@ -5,10 +5,16 @@ const helmet = require('helmet');
 const { pool, initDB } = require('./models/db');
 const BotManager = require('./bot/BotManager');
 const { isAuthDisabled, isRegistrationAllowed } = require('./middleware/auth');
+const {
+  classifyHeartbeats,
+  heartbeatPolicies,
+} = require('./monitoring/heartbeatPolicy');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
+const INSTANCE_ID = String(process.env.DELTAFORGE_INSTANCE_ID || `app-${PORT}`);
+const BOT_RUNNER_ENABLED = String(process.env.BOT_RUNNER_ENABLED || 'true').toLowerCase() === 'true';
 
 // --- Trust proxy (Railway sits behind a load balancer) ---
 app.set('trust proxy', 1);
@@ -50,7 +56,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 
 // --- Bot Manager (no global) ---
-const botManager = new BotManager();
+const botManager = new BotManager({ runnerEnabled: BOT_RUNNER_ENABLED, instanceId: INSTANCE_ID });
 app.locals.botManager = botManager;
 
 // --- Routes ---
@@ -70,6 +76,7 @@ let _dbReady = false;
 app.get('/api/health', async (req, res) => {
   const { dbHealth, pool } = require('./models/db');
   let dbSizeMb = null, dbWritable = false, heartbeats = {};
+  let heartbeatCheckFailed = false;
   try {
     const r = await pool.query(
       "SELECT pg_database_size(current_database())/1048576 AS mb");
@@ -80,34 +87,51 @@ app.get('/api/health', async (req, res) => {
     dbWritable = true;
   } catch (e) { /* dbWritable stays false */ }
   try {
-    // Component heartbeats: bots + scorer from system_heartbeats, the BORG
-    // collector from its own borg_events heartbeat stream.
-    // Per-component staleness thresholds: the scorer is a 5-min one-shot
-    // (launchd StartInterval=300), so 120s would false-red it on most polls;
-    // 660s = two missed runs.
-    const STALE_AFTER = { main_bot: 120, george_bot: 120, borg_scorer: 660, borg_collector: 120, gla_live: 120 };
-    const hb = await pool.query(`
-      SELECT component, ROUND(EXTRACT(EPOCH FROM now() - beat_at))::int AS age_sec, NULL AS msg
-      FROM system_heartbeats
-      UNION ALL
-      SELECT 'borg_collector',
-             ROUND(EXTRACT(EPOCH FROM now() - MAX(ts)))::int,
-             (SELECT message FROM borg_events WHERE source='heartbeat' ORDER BY id DESC LIMIT 1)
-      FROM borg_events WHERE source='heartbeat'`);
-    for (const row of hb.rows) {
-      const limit = STALE_AFTER[row.component] ?? 120;
-      // A collector heartbeat that says "STALE: binance>10s" means the process
-      // is alive but a feed is dead (the 2026-07-12 7h blind spot) — red it.
-      const feedDegraded = row.component === 'borg_collector' && row.msg != null && row.msg !== 'ok';
-      heartbeats[row.component] = {
-        ageSec: row.age_sec,
-        stale: row.age_sec == null || row.age_sec > limit || feedDegraded,
-        ...(feedDegraded ? { feedStatus: row.msg } : {}),
-      };
-    }
-  } catch (e) { /* tables may not exist yet */ }
+    // Explicit policy prevents a stopped historical experiment from degrading
+    // the fleet and gives five-minute jobs enough time to miss two complete
+    // schedules before alarming. Required components are materialized even
+    // when their heartbeat row is missing, closing the old false-green gap.
+    const [hb, settingsResult] = await Promise.all([
+      pool.query(`
+        SELECT component, ROUND(EXTRACT(EPOCH FROM now() - beat_at))::int AS age_sec,
+               NULL::text AS msg
+          FROM system_heartbeats
+        UNION ALL
+        SELECT 'borg_collector',
+               ROUND(EXTRACT(EPOCH FROM now() - MAX(ts)))::int,
+               (SELECT message FROM borg_events
+                 WHERE source='heartbeat' ORDER BY id DESC LIMIT 1)
+          FROM borg_events WHERE source='heartbeat'
+        UNION ALL
+        SELECT 'polymarket_flow',
+               ROUND(EXTRACT(EPOCH FROM now() - MAX(ts)))::int,
+               (SELECT message FROM borg_events
+                 WHERE source='flow_heartbeat' ORDER BY id DESC LIMIT 1)
+          FROM borg_events WHERE source='flow_heartbeat'`),
+      pool.query(`
+        SELECT is_active,george_is_active,live_gla_enabled,live_h53_enabled,
+               live_flow_boundary_enabled
+          FROM bot_settings ORDER BY user_id LIMIT 1`),
+    ]);
+    const settings = settingsResult.rows[0] || {};
+    const policy = heartbeatPolicies(settings, {
+      researchRequired: INSTANCE_ID === 'tv2',
+      runnerRequired: BOT_RUNNER_ENABLED,
+      pairedMakerRequired: process.env.BORG_PAIRED_MAKER_REQUIRED,
+    });
+    heartbeats = classifyHeartbeats(hb.rows, policy);
+  } catch (e) {
+    heartbeatCheckFailed = true;
+  }
   const staleComponents = Object.entries(heartbeats).filter(([, v]) => v.stale).map(([k]) => k);
-  const degraded = !dbWritable || dbHealth.writeErrors > 0;
+  const staleDetails = staleComponents.map((component) => ({
+    component,
+    ageSec: heartbeats[component].ageSec,
+    maxAgeSec: heartbeats[component].maxAgeSec,
+    reason: heartbeats[component].reason,
+  }));
+  const degraded = !dbWritable || dbHealth.writeErrors > 0
+    || heartbeatCheckFailed || staleComponents.length > 0;
   res.status(degraded ? 503 : 200).json({
     status: degraded ? 'degraded' : 'ok',
     db: _dbReady ? 'ready' : 'initializing',
@@ -117,11 +141,18 @@ app.get('/api/health', async (req, res) => {
     readErrors: dbHealth.readErrors,
     lastDbErrorAt: dbHealth.lastErrorAt,
     recentDbErrors: dbHealth.recentErrors.slice(-5),
+    heartbeatCheck: heartbeatCheckFailed ? 'failed' : 'ok',
     heartbeats,
     staleComponents,
+    staleDetails,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     activeBots: botManager.getActiveCount(),
+    runtime: {
+      instanceId: INSTANCE_ID,
+      botRunnerEnabled: BOT_RUNNER_ENABLED,
+      ownsBotRunnerLock: botManager.ownsRunnerLock === true,
+    },
     authDisabled: isAuthDisabled(),
     registrationAllowed: isRegistrationAllowed(),
   });
@@ -206,6 +237,7 @@ const startServer = async () => {
     // Start HTTP server immediately so Railway healthcheck passes
     const server = app.listen(PORT, HOST, () => {
       console.log(`[Server] PolyBot backend running on ${HOST}:${PORT}`);
+      console.log(`[Server] Instance: ${INSTANCE_ID}; bot runner: ${BOT_RUNNER_ENABLED ? 'enabled' : 'dashboard-only'}`);
       console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`[Server] CORS origins: ${allowedOrigins.join(', ')}`);
     });
@@ -236,8 +268,39 @@ const startServer = async () => {
     const directUrl = process.env.DATABASE_URL_DIRECT
       || (process.env.DATABASE_URL || '').replace('-pooler', '');
     let botsStarted = false;
+    let acquiringBotLock = false;
+    let botLockClient = null;
+    let botLockHeartbeat = null;
+    botManager.ownsRunnerLock = false;
+
+    const loseBotRunnerLock = async (reason) => {
+      if (!botsStarted && !botLockClient) return;
+      console.error(`[Server] ⛔ Bot-runner ownership lost (${reason}); stopping local evaluators`);
+      botsStarted = false;
+      botManager.ownsRunnerLock = false;
+      if (botLockHeartbeat) clearInterval(botLockHeartbeat);
+      botLockHeartbeat = null;
+      const client = botLockClient;
+      botLockClient = null;
+      await botManager.stopAll().catch((error) => {
+        console.error('[Server] Failed to stop evaluators after lock loss:', error.message);
+      });
+      try { await client?.end(); } catch (_) {}
+    };
+
+    const recordBotRunnerOwnership = async () => {
+      if (!botLockClient || !botsStarted) return;
+      await botLockClient.query(`
+        INSERT INTO system_heartbeats(component,beat_at,meta)
+        VALUES ('bot_runner_owner',now(),$1::jsonb)
+        ON CONFLICT (component) DO UPDATE SET beat_at=now(),meta=EXCLUDED.meta
+      `, [JSON.stringify({ instanceId: INSTANCE_ID, port: Number(PORT), pid: process.pid,
+        runnerEnabled: BOT_RUNNER_ENABLED, ownsLock: true })]);
+    };
+
     const tryAcquireBotLock = async () => {
-      if (botsStarted) return;
+      if (!BOT_RUNNER_ENABLED || botsStarted || acquiringBotLock) return;
+      acquiringBotLock = true;
       const client = new Client({
         connectionString: directUrl,
         ssl: directUrl ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true' } : false,
@@ -248,26 +311,41 @@ const startServer = async () => {
           "SELECT pg_try_advisory_lock(hashtext('deltaforge-bot-runner')) AS got");
         if (rows[0].got) {
           botsStarted = true;
-          console.log('[Server] Bot-runner advisory lock acquired — this instance runs the bots');
+          botManager.ownsRunnerLock = true;
+          botLockClient = client;
+          console.log(`[Server] Bot-runner advisory lock acquired — ${INSTANCE_ID} runs the bots`);
+          client.on('error', (error) => {
+            loseBotRunnerLock(`database session error: ${error.message}`).catch(() => {});
+          });
+          await recordBotRunnerOwnership();
           setTimeout(autoRestartBots, 3000);
-          // Keep the lock connection alive; never block shutdown.
-          setInterval(() => client.query('SELECT 1').catch(() => {}), 60000).unref();
+          // The advisory lock is session-scoped. If its owning connection
+          // fails, stop the evaluators rather than continuing without
+          // exclusivity; the retry loop can safely reacquire later.
+          botLockHeartbeat = setInterval(() => {
+            recordBotRunnerOwnership().catch((error) => {
+              loseBotRunnerLock(`heartbeat failed: ${error.message}`).catch(() => {});
+            });
+          }, 30000);
+          botLockHeartbeat.unref();
         } else {
           await client.end();
-          console.error('[Server] ⛔ Another instance holds the bot-runner lock — standing by (retry in 60s)');
+          console.error(`[Server] ⛔ ${INSTANCE_ID} does not own the bot-runner lock — standing by`);
         }
       } catch (lockErr) {
         try { await client.end(); } catch (_) {}
-        if (!botsStarted) {
-          console.error('[Server] Advisory lock check failed:', lockErr.message,
-            '— starting bots anyway (fail-open, DB unique indexes are the backstop)');
-          botsStarted = true;
-          setTimeout(autoRestartBots, 3000);
-        }
+        console.error('[Server] Advisory lock check failed:', lockErr.message,
+          '— evaluators remain stopped (fail-closed)');
+      } finally {
+        acquiringBotLock = false;
       }
     };
-    await tryAcquireBotLock();
-    setInterval(tryAcquireBotLock, 60000).unref();
+    if (BOT_RUNNER_ENABLED) {
+      await tryAcquireBotLock();
+      setInterval(tryAcquireBotLock, 60000).unref();
+    } else {
+      console.log(`[Server] ${INSTANCE_ID} is dashboard-only; bot auto-start and manual starts are disabled`);
+    }
 
     // --- Graceful Shutdown ---
     const shutdown = async (signal) => {
@@ -277,6 +355,10 @@ const startServer = async () => {
       try {
         console.log('[Server] Stopping all bot instances...');
         await botManager.stopAll();
+        if (botLockHeartbeat) clearInterval(botLockHeartbeat);
+        try { await botLockClient?.end(); } catch (_) {}
+        botLockClient = null;
+        botManager.ownsRunnerLock = false;
         console.log('[Server] All bots stopped.');
       } catch (err) {
         console.error('[Server] Error stopping bots:', err.message);

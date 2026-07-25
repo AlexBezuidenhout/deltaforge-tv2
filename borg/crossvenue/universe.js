@@ -14,24 +14,52 @@ const { SERIES: SPORT_SERIES, buildStructuredSportsPairs } = require('./sports-s
 const KALSHI = 'https://api.elections.kalshi.com/trade-api/v2';
 const MATCH_FILE = path.join(__dirname, 'matches.json');
 
-async function fetchJson(url, options = {}, timeoutMs = 20_000) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  const started = Date.now();
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    const body = await response.text();
-    if (!response.ok) throw new Error(`${url}: HTTP ${response.status} ${body.slice(0, 160)}`);
-    return { payload: JSON.parse(body), raw: body, latencyMs: Date.now() - started };
-  } finally { clearTimeout(timeout); }
+async function fetchJson(url, options = {}, timeoutMs = 20_000, retryOptions = {}) {
+  const maxAttempts = Math.max(1, Math.min(6, Number(retryOptions.maxAttempts || 4)));
+  const baseDelayMs = Math.max(1, Number(retryOptions.baseDelayMs || 500));
+  let lastError;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const started = Date.now();
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      const body = await response.text();
+      if (!response.ok) {
+        const error = new Error(`${url}: HTTP ${response.status} ${body.slice(0, 160)}`);
+        error.status = response.status;
+        const retryAfter = response.headers?.get?.('retry-after');
+        const retrySeconds = parseFloat(retryAfter);
+        error.retryAfterMs = Number.isFinite(retrySeconds) ? Math.max(0, retrySeconds * 1000) : null;
+        throw error;
+      }
+      return { payload: JSON.parse(body), raw: body, latencyMs: Date.now() - started };
+    } catch (error) {
+      lastError = error;
+      const retryable = error?.status === 429 || error?.status >= 500 || error?.status == null;
+      if (!retryable || attempt + 1 >= maxAttempts) throw error;
+      const exponential = baseDelayMs * (2 ** attempt);
+      const delayMs = Math.min(10_000, error.retryAfterMs ?? exponential);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    } finally { clearTimeout(timeout); }
+  }
+  throw lastError;
 }
 
-function normalizeKalshiMarket(raw) {
+function normalizeKalshiMarket(raw, event = null) {
   if (!raw?.ticker || raw?.market_type !== 'binary') return null;
   return {
     ticker: String(raw.ticker),
-    eventTicker: raw.event_ticker ? String(raw.event_ticker) : null,
-    seriesTicker: String(raw.ticker).split('-')[0] || null,
+    eventTicker: raw.event_ticker ? String(raw.event_ticker)
+      : event?.event_ticker ? String(event.event_ticker) : null,
+    seriesTicker: event?.series_ticker ? String(event.series_ticker)
+      : String(raw.ticker).split('-')[0] || null,
+    eventTitle: event?.title || null,
+    eventSubTitle: event?.sub_title || null,
+    category: event?.category || null,
+    settlementSources: Array.isArray(event?.settlement_sources)
+      ? event.settlement_sources : [],
+    mutuallyExclusive: event?.mutually_exclusive === true,
     title: raw.title || null,
     subtitle: raw.subtitle || null,
     yesSubTitle: raw.yes_sub_title || null,
@@ -97,6 +125,57 @@ async function fetchKalshiUniverse(options = {}) {
     cursor = payload.cursor;
     if (!cursor || (payload.markets || []).length < limit) break;
   }
+  return rows;
+}
+
+/**
+ * Fetch the complete open Kalshi universe by event, retaining event context.
+ * The legacy /markets sweep is ordered such that a fixed page cap can omit
+ * tens of thousands of active markets. /events with nested markets is capped
+ * at 200 events per page and exposes the canonical event title/category needed
+ * for cross-venue identity discovery.
+ */
+async function fetchKalshiEventUniverse(options = {}) {
+  const maxPages = Math.max(1, Math.min(250, Number(options.maxPages || 100)));
+  const limit = Math.max(1, Math.min(200, Number(options.limit || 200)));
+  const paceMs = Math.max(0, Number(options.paceMs ?? 100));
+  const statuses = Array.isArray(options.statuses) && options.statuses.length
+    ? options.statuses : ['open'];
+  const rows = []; const seen = new Set();
+  let eventCount = 0; let pageCount = 0; let truncated = false;
+  for (const status of statuses) {
+    let cursor = null;
+    for (let page = 0; page < maxPages; page += 1) {
+      const url = new URL(`${KALSHI}/events`);
+      url.searchParams.set('status', status);
+      url.searchParams.set('with_nested_markets', 'true');
+      url.searchParams.set('limit', String(limit));
+      if (cursor) url.searchParams.set('cursor', cursor);
+      const { payload } = await fetchJson(url);
+      const events = Array.isArray(payload.events) ? payload.events : [];
+      pageCount += 1;
+      eventCount += events.length;
+      for (const event of events) {
+        for (const raw of event.markets || []) {
+          const marketStatus = String(raw.status || '').toLowerCase();
+          if (status === 'open' && marketStatus && !['active', 'open'].includes(marketStatus)) continue;
+          if (raw.result) continue;
+          const market = normalizeKalshiMarket(raw, event);
+          if (!market || seen.has(market.ticker)) continue;
+          seen.add(market.ticker);
+          rows.push(market);
+        }
+      }
+      options.onPage?.({ status, page: page + 1, events: eventCount, markets: rows.length });
+      cursor = payload.cursor || null;
+      if (!cursor || events.length < limit) break;
+      if (page + 1 >= maxPages) truncated = true;
+      if (paceMs) await new Promise((resolve) => setTimeout(resolve, paceMs));
+    }
+  }
+  Object.defineProperty(rows, 'scan', {
+    value: { pageCount, eventCount, truncated }, enumerable: false,
+  });
   return rows;
 }
 
@@ -174,8 +253,11 @@ async function fetchPolyUniverseCompact(options = {}) {
   const maxWindows = Math.max(1, Number(options.maxWindows || 10));
   const concurrency = Math.max(1, Math.min(10, Number(options.concurrency || 6)));
   const compact = new Map(); let endDateMin = null;
+  let eventCount = 0; let pageCount = 0; let windowsScanned = 0;
+  let complete = false; let truncated = false;
   for (let window = 0; window < maxWindows; window += 1) {
-    let reachedEnd = false; let windowCount = 0; let lastEndMs = null;
+    windowsScanned += 1;
+    let reachedEnd = false; let eventsInWindow = 0; let lastEndMs = null;
     for (let start = 0; start < maxPages; start += concurrency) {
       const pages = Array.from({ length: Math.min(concurrency, maxPages - start) }, (_, index) => start + index);
       const batches = await Promise.all(pages.map(async (page) => {
@@ -186,8 +268,10 @@ async function fetchPolyUniverseCompact(options = {}) {
         })) url.searchParams.set(key, value);
         return (await fetchJson(url)).payload;
       }));
+      pageCount += batches.length;
       for (const events of batches) {
-        windowCount += events.length;
+        eventCount += events.length;
+        eventsInWindow += events.length;
         if (events.length < pageSize) reachedEnd = true;
         for (const event of events) {
           const endMs = Date.parse(event.endDate);
@@ -208,10 +292,20 @@ async function fetchPolyUniverseCompact(options = {}) {
       }
       if (reachedEnd) break;
     }
-    if (reachedEnd || windowCount < maxPages * pageSize || !Number.isFinite(lastEndMs)) break;
+    if (reachedEnd || eventsInWindow < maxPages * pageSize) { complete = true; break; }
+    if (!Number.isFinite(lastEndMs)) { truncated = true; break; }
+    if (window + 1 >= maxWindows) { truncated = true; break; }
     endDateMin = new Date(lastEndMs + 1).toISOString();
   }
-  return [...compact.values()];
+  const rows = [...compact.values()];
+  Object.defineProperty(rows, 'scan', {
+    value: {
+      source: 'gamma_events_end_date_windows', pageCount, eventCount,
+      windowCount: windowsScanned, truncated: truncated || !complete,
+    },
+    enumerable: false,
+  });
+  return rows;
 }
 
 function parseManualIdentityReviews(parsed) {
@@ -286,6 +380,81 @@ function selectMonitoredCandidates(candidates, maxMonitored, rejectedControlLimi
   return { monitored: [...primary, ...controls], diagnosticControls: controls.length };
 }
 
+/**
+ * Operator-approved paper enrollment is deliberately weaker than a payoff
+ * relation approval. It may widen live-data collection and arm a convergence
+ * simulation, but it can never set identityApproved/relationApproved or turn
+ * an assumed $1 parity into a certified terminal lock.
+ */
+function applyPaperEvaluationPolicy(candidate, options = {}) {
+  const floor = Math.max(0, Math.min(1, finite(options.paperScoreFloor, 0.8)));
+  const approved = options.paperScoreApproval === true
+    && !isRejectedIdentity(candidate)
+    && finite(candidate?.score, 0) > floor;
+  const approvedAt = Number.isFinite(Date.parse(options.paperApprovedAt || ''))
+    ? new Date(options.paperApprovedAt).toISOString() : null;
+  return {
+    ...candidate,
+    paperEvalApproved: approved,
+    paperEvalStatus: approved ? 'OPERATOR_APPROVED_PAPER_ONLY'
+      : isRejectedIdentity(candidate) ? 'IDENTITY_REJECTED' : 'NOT_APPROVED',
+    paperEvalSource: approved ? 'operator_score_threshold' : null,
+    paperEvalApprovedAt: approved ? approvedAt : null,
+    paperEvalScoreAtApproval: approved ? finite(candidate.score, 0) : null,
+    paperEvalThreshold: floor,
+  };
+}
+
+function selectPaperMonitoredCandidates(candidates, options = {}) {
+  const maxMonitored = Math.max(1, Number(options.maxMonitored || 1));
+  const exploratoryLimit = Math.max(0, Number(options.exploratoryMonitored || 0));
+  const rejectedControlLimit = Math.max(0, Number(options.rejectedControlLimit || 0));
+  const structuredLimit = Math.max(0, Math.min(maxMonitored,
+    Number(options.structuredMonitored ?? Math.ceil(maxMonitored / 2))));
+  const required = candidates.filter((row) => row.relationApproved || row.paperEvalApproved)
+    .sort((left, right) => Number(right.relationApproved) - Number(left.relationApproved)
+      || Number(right.paperEvalApproved) - Number(left.paperEvalApproved)
+      || finite(right.score, 0) - finite(left.score, 0));
+  const requiredIds = new Set(required.map((row) => row.matchId));
+
+  // Preserve the original family-balanced reserve for exploratory rows. A
+  // frozen paper approval bypasses this reserve because the operator asked for
+  // every member of that cohort to be observed.
+  const byDeadline = (left, right) => Date.parse(left.structuredEvidence?.deadline || 0)
+    - Date.parse(right.structuredEvidence?.deadline || 0);
+  const structuredRows = candidates.filter((row) =>
+    row.identityStatus === 'STRUCTURED_CANDIDATE' && !requiredIds.has(row.matchId));
+  const sportsRows = structuredRows.filter((row) =>
+    row.structuredEvidence?.version === 'crossvenue-sports-structured-v1').sort(byDeadline);
+  const cryptoRows = structuredRows.filter((row) =>
+    row.structuredEvidence?.version !== 'crossvenue-sports-structured-v1').sort(byDeadline);
+  const sportsQuota = Math.min(sportsRows.length, Math.ceil(structuredLimit / 2));
+  const structuredChosen = new Set([
+    ...sportsRows.slice(0, sportsQuota),
+    ...cryptoRows.slice(0, structuredLimit - sportsQuota),
+  ].map((row) => row.matchId));
+  const optionalPool = candidates.filter((row) => !requiredIds.has(row.matchId)
+    && (row.identityStatus !== 'STRUCTURED_CANDIDATE' || structuredChosen.has(row.matchId)));
+  const optionalSlots = Math.max(0, Math.min(
+    exploratoryLimit,
+    maxMonitored - Math.min(maxMonitored, required.length),
+  ));
+  const optional = optionalSlots > 0
+    ? selectMonitoredCandidates(optionalPool, optionalSlots, rejectedControlLimit)
+    : { monitored: [], diagnosticControls: 0 };
+  const monitored = [...required.slice(0, maxMonitored), ...optional.monitored]
+    .slice(0, maxMonitored);
+  const paperApproved = candidates.filter((row) => row.paperEvalApproved).length;
+  const paperMonitored = monitored.filter((row) => row.paperEvalApproved).length;
+  return {
+    monitored,
+    diagnosticControls: optional.diagnosticControls,
+    paperApproved,
+    paperMonitored,
+    paperOverflow: Math.max(0, paperApproved - paperMonitored),
+  };
+}
+
 function applyFamilyRejection(candidate, review, reviewSet) {
   if (!review) return candidate;
   const reasons = [...new Set([...(candidate.mismatches || []), ...review.reasonCodes])];
@@ -325,7 +494,9 @@ function buildCandidates(polyMarkets, kalshiMarkets, options = {}) {
   const candidates = new Map();
   for (const kalshi of kalshiMarkets) {
     const counts = new Map();
-    for (const token of tokens(`${kalshi.title || ''} ${kalshi.yesSubTitle || ''}`)) {
+    for (const token of tokens([
+      kalshi.title, kalshi.eventTitle, kalshi.eventSubTitle, kalshi.yesSubTitle,
+    ].filter(Boolean).join(' '))) {
       const bucket = tokenIndex.get(token) || [];
       // Very common words are poor identifiers and create quadratic work.
       if (bucket.length > 1000) continue;
@@ -477,22 +648,45 @@ function buildCandidates(polyMarkets, kalshiMarkets, options = {}) {
 }
 
 async function discoverCrossVenue(options = {}) {
-  const [poly, kalshiBroad, kalshiCrypto, kalshiSports] = await Promise.all([
-    fetchPolyUniverseCompact({
-      maxPages: Number(options.gammaPages || 20),
-      maxWindows: Number(options.gammaWindows || 10),
-      concurrency: Number(options.gammaConcurrency || 6),
-    }),
-    fetchKalshiUniverse({ maxPages: Number(options.kalshiPages || 20) }),
+  const polyPromise = fetchPolyUniverseCompact({
+    maxPages: Number(options.gammaPages || 20),
+    maxWindows: Number(options.gammaWindows || 10),
+    concurrency: Number(options.gammaConcurrency || 6),
+  }).then((value) => ({ value }), (error) => ({ error }));
+  const kalshiEventPromise = fetchKalshiEventUniverse({
+    maxPages: Number(options.kalshiEventPages || 100),
+    paceMs: Number(options.kalshiEventPaceMs ?? 250),
+    onPage: options.onKalshiEventPage,
+  }).catch(async (error) => {
+    options.onCryptoError?.('full_event_universe', error);
+    const fallback = await fetchKalshiUniverse({ maxPages: Number(options.kalshiPages || 20) });
+    Object.defineProperty(fallback, 'scan', {
+      value: { pageCount: null, eventCount: null, truncated: true, source: 'markets_fallback' },
+      enumerable: false,
+    });
+    return fallback;
+  });
+  // The event scan and two targeted series scans share one public Kalshi rate
+  // budget. Complete the exhaustive open-event pass first, then run the two
+  // small unopened-window supplements at a conservative combined pace.
+  const kalshiBroad = await kalshiEventPromise;
+  const [polyResult, kalshiCrypto, kalshiSports] = await Promise.all([
+    polyPromise,
     fetchKalshiCryptoUniverse({
       horizonMs: Number(options.cryptoHorizonMs || 3 * 3600_000),
+      paceMs: Number(options.kalshiSeriesPaceMs ?? 500),
       onError: options.onCryptoError,
     }),
     fetchKalshiSportsUniverse({
       horizonMs: Number(options.sportsHorizonMs || 48 * 3600_000),
+      paceMs: Number(options.kalshiSeriesPaceMs ?? 500),
       onError: options.onCryptoError,
     }),
   ]);
+  if (polyResult.error) throw polyResult.error;
+  const poly = polyResult.value;
+  const polyScan = { source: 'gamma_events_end_date_windows', ...(poly.scan || {}) };
+  const kalshiScan = { source: 'events_with_nested_markets', ...(kalshiBroad.scan || {}) };
   const kalshiByTicker = new Map(kalshiBroad.map((market) => [market.ticker, market]));
   for (const market of [...kalshiCrypto, ...kalshiSports]) kalshiByTicker.set(market.ticker, market);
   // Manually reviewed pairs must always have both legs present: the broad
@@ -525,36 +719,26 @@ async function discoverCrossVenue(options = {}) {
     }
   }
   const kalshi = [...kalshiByTicker.values()];
-  const candidates = buildCandidates(poly, kalshi, options);
+  const candidates = buildCandidates(poly, kalshi, options)
+    .map((row) => applyPaperEvaluationPolicy(row, options));
   const maxMonitored = Math.max(1, Number(options.maxMonitored || 6));
   const eligible = candidates.filter((row) => !isRejectedIdentity(row));
-  // Structured crypto pairs would otherwise flood every monitored slot with
-  // future windows (the fifteen-minute ladders alone yield dozens per
-  // horizon). Cap them to a reserve, nearest deadline first, so text-matched
-  // pairs keep the remaining sockets.
-  const structuredLimit = Math.max(0, Math.min(maxMonitored,
-    Number(options.structuredMonitored ?? Math.ceil(maxMonitored / 2))));
-  const byDeadline = (left, right) => Date.parse(left.structuredEvidence?.deadline || 0)
-    - Date.parse(right.structuredEvidence?.deadline || 0);
-  const structuredRows = candidates.filter((row) => row.identityStatus === 'STRUCTURED_CANDIDATE');
-  // Split the reserve between structured families so the fast-churning
-  // crypto ladders cannot crowd out the (rarer, deeper) game pairs.
-  const sportsRows = structuredRows.filter((row) =>
-    row.structuredEvidence?.version === 'crossvenue-sports-structured-v1').sort(byDeadline);
-  const cryptoRows = structuredRows.filter((row) =>
-    row.structuredEvidence?.version !== 'crossvenue-sports-structured-v1').sort(byDeadline);
-  const sportsQuota = Math.min(sportsRows.length, Math.ceil(structuredLimit / 2));
-  const structuredChosen = new Set([
-    ...sportsRows.slice(0, sportsQuota),
-    ...cryptoRows.slice(0, structuredLimit - sportsQuota),
-  ].map((row) => row.matchId));
-  const monitorPool = candidates.filter((row) =>
-    row.identityStatus !== 'STRUCTURED_CANDIDATE' || structuredChosen.has(row.matchId));
-  const selection = selectMonitoredCandidates(
-    monitorPool, maxMonitored, Number(options.rejectedControlLimit || 0),
-  );
+  const selection = selectPaperMonitoredCandidates(candidates, {
+    maxMonitored,
+    exploratoryMonitored: Number(options.exploratoryMonitored || 0),
+    rejectedControlLimit: Number(options.rejectedControlLimit || 0),
+    structuredMonitored: Number(options.structuredMonitored ?? Math.ceil(maxMonitored / 2)),
+  });
   return {
     polyCount: poly.length, kalshiCount: kalshi.length,
+    polyEventCount: polyScan.eventCount,
+    polyEventPages: polyScan.pageCount,
+    polyUniverseTruncated: polyScan.truncated === true,
+    polyUniverseSource: polyScan.source,
+    kalshiEventCount: kalshiScan.eventCount,
+    kalshiEventPages: kalshiScan.pageCount,
+    kalshiUniverseTruncated: kalshiScan.truncated === true,
+    kalshiUniverseSource: kalshiScan.source,
     kalshiCryptoCount: kalshiCrypto.length,
     structuredCount: candidates.filter((row) => row.identityStatus === 'STRUCTURED_CANDIDATE').length,
     candidates,
@@ -562,14 +746,18 @@ async function discoverCrossVenue(options = {}) {
     reviewedRejectedCount: candidates.filter(isRejectedIdentity).length,
     monitored: selection.monitored,
     diagnosticControls: selection.diagnosticControls,
+    paperApprovedCount: selection.paperApproved,
+    paperMonitoredCount: selection.paperMonitored,
+    paperOverflowCount: selection.paperOverflow,
   };
 }
 
 module.exports = {
   KALSHI, MATCH_FILE, buildCandidates, candidateId, discoverCrossVenue,
-  fetchJson, fetchKalshiCryptoUniverse, fetchKalshiSeriesUniverse,
+  fetchJson, fetchKalshiCryptoUniverse, fetchKalshiEventUniverse, fetchKalshiSeriesUniverse,
   fetchKalshiSportsUniverse, fetchKalshiUniverse,
   fetchPolyUniverseCompact, isRejectedIdentity,
   loadManualIdentityReviews, loadManualMatches, normalizeKalshiMarket, normalizePolyMarket,
   parseManualIdentityReviews, selectMonitoredCandidates,
+  applyPaperEvaluationPolicy, selectPaperMonitoredCandidates,
 };

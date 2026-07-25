@@ -4,10 +4,11 @@
 /**
  * Dedicated verified raw-tape archiver for the VPS hot tier.
  *
- * Scoring and archiving are deliberately separate jobs: a large CLOB backlog
- * must not delay resolution scoring. Every exact database row is gzip-written,
- * fsynced, hash-verified and only then deleted. Off-host retention remains a
- * separate fail-closed step governed by its receipt.
+ * Scoring and archiving are deliberately separate jobs. Every non-WAL database
+ * row is gzip-written, fsynced, hash-verified and only then deleted. High-rate
+ * CLOB projections are already represented by append-before-process WAL and
+ * are retained with daily partitions, avoiding a duplicate-archive disk
+ * deadlock. Off-host retention remains fail-closed behind its receipt.
  */
 const path = require('node:path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
@@ -59,16 +60,10 @@ async function main() {
     }
     const safety = await safeArchiveCutoff(pool);
     const defaultMax = positiveInt(process.env.BORG_ARCHIVE_DEFAULT_MAX_BATCHES, 4);
-    const clobMax = positiveInt(process.env.BORG_ARCHIVE_CLOB_MAX_BATCHES, 24);
     const maxRuntimeMs = positiveInt(process.env.BORG_ARCHIVE_MAX_RUNTIME_MS, 120000);
     const state = await archiveAndPrune(pool, safety.cutoff, {
       deadlineAt: startedAt + maxRuntimeMs,
       maxBatchesPerTable: defaultMax,
-      maxBatchesByTable: {
-        borg_clob_touch: clobMax,
-        borg_clob_events: Math.max(defaultMax, Math.ceil(clobMax / 3)),
-      },
-      tableOrder: ['borg_clob_touch', 'borg_clob_events'],
     });
     const archivedRows = state.results.reduce((sum, row) => sum + row.rows, 0);
     const files = state.results.reduce((sum, row) => sum + row.files, 0);

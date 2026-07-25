@@ -243,6 +243,19 @@ refresh_tokens      JWT refresh token rotation (7-day expiry)
 claude_analyses     stored AI analysis history with trade_count and PnL snapshot
 ```
 
+### Cross-venue paper approval cohorts
+
+The Polymarket/Kalshi collector supports an operator-approved score cohort via
+`CROSSVENUE_PAPER_SCORE_APPROVAL=true` and `CROSSVENUE_PAPER_SCORE_FLOOR=0.80`.
+The comparison is strict (`score > floor`) and rejected identities are always
+excluded. This approval only enrolls pairs in paper observation and
+convergence simulation. The match score is a discovery-ranking heuristic, not
+an estimated probability of identical settlement rules, so it never sets
+`identity_approved`, `relation_approved`, `economic`, or
+`lockable_after_both_fills`. Paper entries require synchronized executable
+depth and positive economics after entry fees, a second fee stress, and one
+adverse tick per leg. Rule-certified payoff evidence remains a separate cohort.
+
 ---
 
 ## Environment Variables (Railway)

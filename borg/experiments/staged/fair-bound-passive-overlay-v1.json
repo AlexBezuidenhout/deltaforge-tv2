@@ -1,0 +1,71 @@
+{
+  "experiment_id": "fair-bound-passive-overlay-v1",
+  "manifest_format": "borg-experiment-v1",
+  "status": "staged_not_collecting",
+  "frozen_at": null,
+  "evidence_started_at": null,
+  "phase": "eval",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "certified_fair_bound_passive_overlay",
+  "strategy_version": "fair-bound-passive-overlay-v1",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "hypothesis": "A post-only bid backed by an independently certified lower fair-value bound may retain a small neglected-market residual after queue delay, exit fees, one adverse tick and observed post-fill toxicity. Generic market making without a fair-value bound is excluded.",
+  "accepted_fair_sources": [
+    "resolver-boundary residual from the unchanged H43 rule or a separately frozen resolver arm",
+    "content-addressed deterministic payoff proof with current rule certification",
+    "exact-expiry or bounded total-variance options surface with a complete bid/ask IV envelope",
+    "content-addressed cross-venue payoff relation with synchronized books"
+  ],
+  "selection": {
+    "capture_panel": "neglected-capacity-panel-v1",
+    "panel_is_frozen_per_collection_epoch": true,
+    "historical_pnl_or_toxicity_used_to_select_panel": false,
+    "candidate_condition": "the taker route does not clear its conservative hurdle, but a non-crossing post-only price leaves a positive lower-bound residual after all registered stresses",
+    "excluded": [
+      "generic two-sided quoting",
+      "directional bids based only on midpoint, last trade, imbalance or volume",
+      "reward estimates without reconstructible score share",
+      "scheduled catalyst windows without a category-specific fair feed",
+      "unknown fees, tick size, minimum size, rules or resolver"
+    ]
+  },
+  "execution": {
+    "order_type": "counterfactual post-only GTD",
+    "queue_model": "back of displayed queue plus one venue-minimum order; cancellations never improve simulated priority",
+    "partial_fills": true,
+    "quote_lifetime_seconds": 30,
+    "latency_profiles_ms": [100, 250, 500],
+    "markouts_seconds": [1, 5, 30],
+    "terminal_scoring": true,
+    "costs": "two times current fees, one adverse tick on unwind, full displayed-depth walk and a full failure-risk reserve",
+    "rewards": "zero unless authenticated attribution and competitor score share are reconstructible",
+    "maximum_observed_capacity_usd": 100,
+    "target_order_usd": 10
+  },
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "independent_unit": "first eligible fair-source signal per condition and UTC day",
+    "require_both_chronological_halves_positive_at_2x_costs": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "require_positive_at_latency_ms": [100, 250, 500],
+    "require_positive_shared_500usd_capacity": true,
+    "require_no_single_event_category_asset_or_day_dominance": true,
+    "multiple_testing": "Holm correction across fair source, category, side and latency profile",
+    "null_outcome": "No eligible quotes or negative post-fill markout is a valid rejection; thresholds must not be retuned on this cohort."
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "fair_bound_passive_overlay_v1",
+      "family": "certified_fair_bound_passive_overlay",
+      "arm": "back_of_queue_2x_cost",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "terminal_and_30s_net_pnl_2x_after_queue_and_failure_reserve"
+    }
+  ]
+}

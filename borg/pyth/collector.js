@@ -24,9 +24,9 @@ const {
 } = require('./strategy');
 const { discoverPythUniverse, fetchJson, parseArray } = require('./universe');
 
-const EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v1';
+const EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v2';
 const CHECKPOINTS = Object.freeze([300, 120, 60, 30, 10]);
-const LATENCY_PROFILES_MS = Object.freeze([20, 50, 100, 250, 500]);
+const LATENCY_PROFILES_MS = Object.freeze([100, 250, 500]);
 const MARKOUT_HORIZONS_SEC = Object.freeze([1, 5, 30]);
 const REFRESH_MS = Math.max(60_000, Number(process.env.PYTH_UNIVERSE_REFRESH_MS || 300_000));
 // Full-rate ticks are immutable in the WAL. PostgreSQL is deliberately a
@@ -210,7 +210,18 @@ class PythBoundaryObserver {
     this.targetByToken = new Map(feedActive.flatMap((market) => [
       [market.upToken, market], [market.downToken, market],
     ]));
-    this.rtds.setSymbols([...new Set(feedActive.map((market) => market.symbol))]);
+    // The RTDS socket has an observed 15-subscription ceiling. Put markets in
+    // their resolver window first, then the nearest upcoming windows; PythRtds
+    // applies the hard bound before opening a clean subscription.
+    const prioritizedFeeds = [...feedActive].sort((left, right) => {
+      const leftOpen = left.startMs <= now && left.endMs > now ? 0 : 1;
+      const rightOpen = right.startMs <= now && right.endMs > now ? 0 : 1;
+      return leftOpen - rightOpen
+        || Math.abs(left.startMs - now) - Math.abs(right.startMs - now)
+        || left.endMs - right.endMs
+        || left.symbol.localeCompare(right.symbol);
+    });
+    this.rtds.setSymbols([...new Set(prioritizedFeeds.map((market) => market.symbol))]);
     this.clob.subscribe([...this.targetByToken.keys()]);
     await logEvent('INFO', 'pyth', `certified universe: ${active.length} markets, ${this.rtds.symbols.size} symbols`, {
       runId: this.runId, experimentId: EXPERIMENT_ID,
@@ -283,7 +294,10 @@ class PythBoundaryObserver {
       walEventId: tick.walEventId, carriedForward: !!tick.carriedForward,
       historical: !!tick.historical, valid, invalidReason, ruleHash: market.ruleHash,
       detail: { sourceAgeMs, providerToLocalMs: tick.providerReceivedMs == null ? null
-        : tick.receiveWallMs - tick.providerReceivedMs, policy: 'CURRENT_RESOLVER_SIDE_NO_FAIR_VALUE_CLAIM' },
+        : tick.receiveWallMs - tick.providerReceivedMs,
+        policy: 'MARKET_PRIOR_RESIDUAL_CALIBRATION_PROBE',
+        fairLowerBound: null, promotionEligible: false,
+        ineligibleReason: 'NO_FROZEN_OUT_OF_SAMPLE_FAIR_LOWER_BOUND' },
     };
     this.decisionWal.append(JSON.stringify({ type: 'pyth_signal', ...signal }), {
       channel: 'paper-signal', receiveWallMs: tick.receiveWallMs,
@@ -326,6 +340,15 @@ class PythBoundaryObserver {
         intendedDelayMs: latencyMs, actualDelayMs: now - signal.observedAt,
         schedulingSlippageMs: now - intended, fills: result.fills || [],
         budgetUsd: TARGET_BUDGET_USD, atomic: false, orderSubmitted: false,
+        marketPrior: book ? {
+          bestBid: finite(book.bids?.[0]?.[0]),
+          bestAsk: finite(book.asks?.[0]?.[0]),
+          midpoint: finite(book.bids?.[0]?.[0]) != null && finite(book.asks?.[0]?.[0]) != null
+            ? (finite(book.bids[0][0]) + finite(book.asks[0][0])) / 2 : null,
+        } : null,
+        fairLowerBound: null,
+        promotionEligible: false,
+        ineligibleReason: 'NO_FROZEN_OUT_OF_SAMPLE_FAIR_LOWER_BOUND',
       },
     };
     this.decisionWal.append(JSON.stringify({ type: 'pyth_arrival', ...row }), {
@@ -547,9 +570,15 @@ class PythBoundaryObserver {
       walletLoaded: false, liveOrderPath: false, markets: active.length,
       symbols: this.rtds.symbols.size, polyTokens: this.targetByToken.size,
       lastTickAt: this.lastTickAt || null, lastUsableTickAt: this.lastUsableTickAt || null,
-      signals: this.metrics.signals, feedState, marketsInWindow: inWindow.length,
+      signals: this.metrics.signals, refreshErrors: this.metrics.refreshErrors,
+      feedState, marketsInWindow: inWindow.length,
       nextWindowStartAt: Number.isFinite(nextWindowStartAt) ? nextWindowStartAt : null,
       unsupportedSymbols, transportConnected: transport.connected,
+      rtds: transport,
+      wal: {
+        pyth: this.pythWal.health(), polymarket: this.clobWal.health(),
+        decisions: this.decisionWal.health(),
+      },
     })]);
   }
 

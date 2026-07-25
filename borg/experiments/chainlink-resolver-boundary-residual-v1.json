@@ -1,0 +1,48 @@
+{
+  "experiment_id": "chainlink-resolver-boundary-residual-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-21T14:22:12.875Z",
+  "evidence_started_at": "2026-07-21T14:22:12.875Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "resolver_source_boundary_residual",
+  "strategy_version": "chainlink-market-prior-residual-v1",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "hypothesis": "Near expiry, a certified Chainlink resolver state may contain a residual relative to the executable Polymarket quote after external-venue price is removed.",
+  "model_contract": {
+    "prior": "contemporaneous Polymarket quote",
+    "forecast": "resolver-source residual only; no standalone Binance direction forecast",
+    "fair_lower_bound": "must be estimated out of sample with market/day clustering; unavailable is fail-closed",
+    "entry_rule": "fair lower bound - executable ask - doubled fees - slippage must be strictly positive",
+    "current_mode": "blocked_until_exact_data_streams_boundary_then_measurement_only_until_a_frozen_lower_bound_model_exists"
+  },
+  "data": {
+    "resolver": "Polymarket RTDS Chainlink Data Streams",
+    "boundary": "exact market-published Chainlink Data Streams price-to-beat required; the legacy chainlink_open push-feed control is explicitly ineligible",
+    "checkpoints_seconds": [300, 120, 60, 30, 10],
+    "latency_profiles_ms": [100, 250, 500],
+    "source": "append-before-process RTDS and CLOB WAL plus borg_book_snaps hot projection",
+    "current_status": "BLOCKED_NO_CERTIFIED_DATA_STREAMS_PRICE_TO_BEAT_CAPTURE"
+  },
+  "strategy_bindings": [{
+    "strategy": "resolver_boundary_chainlink_residual_v1",
+    "family": "resolver_source_boundary_residual",
+    "arm": "market_prior_measurement",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "terminal_net_pnl_2x_lower_bound_only"
+  }],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "require_positive_at_latency_ms": [100, 250, 500],
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "multiple_testing": "Holm across resolver source, checkpoint, side and latency",
+    "null_outcome": "The resolver residual may be zero after the market quote is used as prior."
+  }
+}

@@ -34,6 +34,7 @@ const {
 } = require('../research/execution-kernel');
 
 const GRID = { '05x': 0.5, '1x': 1, '2x': 2 };
+const PROMOTION_LATENCIES_MS = Object.freeze([100, 250, 500]);
 const SCHEDULED = process.argv.includes('--scheduled');
 const RETENTION_LOCK = 'deltaforge-raw-retention-v1';
 
@@ -41,12 +42,14 @@ async function ensureSchema() {
   const { rows } = await pool.query(`
     SELECT to_regclass('borg_shadow_orders') IS NOT NULL AS orders_ready,
            to_regclass('borg_shadow_scores') IS NOT NULL AS scores_ready,
+           to_regclass('borg_shadow_latency_scores') IS NOT NULL AS latency_scores_ready,
            EXISTS (
              SELECT 1 FROM information_schema.columns
               WHERE table_name='borg_shadow_scores' AND column_name='simulator_version'
            ) AS score_contract_ready`);
   const state = rows[0] || {};
-  if (!state.orders_ready || !state.scores_ready || !state.score_contract_ready) await migrate();
+  if (!state.orders_ready || !state.scores_ready || !state.latency_scores_ready
+      || !state.score_contract_ready) await migrate();
 }
 
 async function heartbeat(meta = {}) {
@@ -241,6 +244,40 @@ function pnl(o, fill, outcome) {
   return { gross, at };
 }
 
+async function persistLatencyCounterfactuals(o) {
+  if (o.order_kind !== 'taker') return 0;
+  let inserted = 0;
+  for (const latencyMs of PROMOTION_LATENCIES_MS) {
+    const fill = await scoreEventTakerFill(o, latencyMs);
+    const dataQualityGrade = fill.detail?.data_quality_grade || 'F';
+    const executionFidelityGrade = fill.detail?.execution_fidelity_grade || 'F';
+    let gross = 0; let pnl1x = 0; let pnl2x = 0;
+    if (fill.filled) {
+      const scored = pnl(o, fill, o.outcome);
+      gross = scored.gross;
+      pnl1x = scored.at['1x'];
+      pnl2x = scored.at['2x'];
+    }
+    const { rowCount } = await pool.query(`
+      INSERT INTO borg_shadow_latency_scores
+        (order_id,latency_ms,filled,fill_ts,fill_price,fill_size,
+         pnl_gross,pnl_1x,pnl_2x,data_quality_grade,
+         execution_fidelity_grade,detail)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
+      ON CONFLICT (order_id,latency_ms) DO NOTHING
+    `, [o.id, latencyMs, fill.filled === true, fill.fillTs || null,
+      fill.fillPrice || null, fill.fillSize || null, gross, pnl1x, pnl2x,
+      dataQualityGrade, executionFidelityGrade, JSON.stringify({
+        counterfactualOnly: true,
+        changesSignal: false,
+        latencyMs,
+        ...(fill.detail || {}),
+      })]);
+    inserted += rowCount;
+  }
+  return inserted;
+}
+
 function bootstrapCI(xs, n = 10000) {
   if (xs.length < 2) return [null, null];
   const means = new Array(n);
@@ -411,6 +448,11 @@ async function main() {
           fee_model: o.order_kind === 'taker' ? FEE_MODEL_VERSION : 'maker_zero_no_rebate' }),
         dataQualityGrade, executionFidelityGrade, fidelityLevel, SIMULATOR_VERSION, FEE_MODEL_VERSION];
     }
+    // Freeze all desk-required latency counterfactuals before raw CLOB rows
+    // leave the 24-hour SQL hot tier. Do this before the primary score insert:
+    // a transient failure then leaves the order eligible for a complete retry.
+    // These rows never feed back into the signal, primary fill or order path.
+    await persistLatencyCounterfactuals(o);
     await pool.query(
       `INSERT INTO borg_shadow_scores (order_id, strategy, phase, market_id, filled, fill_ts, fill_price,
          fill_size, fair_5s, fair_30s, outcome, pnl_gross, pnl_05x, pnl_1x, pnl_2x, detail,
@@ -473,4 +515,14 @@ if (require.main === module) main().catch(async (err) => {
   process.exit(1);
 });
 
-module.exports = { ensureSchema, heartbeat, pruneRawFeed, pruneShadowOrderHygiene };
+module.exports = {
+  PROMOTION_LATENCIES_MS,
+  ensureSchema,
+  heartbeat,
+  persistLatencyCounterfactuals,
+  pnl,
+  pruneRawFeed,
+  pruneShadowOrderHygiene,
+  scoreEventTakerFill,
+  scoreLatencyTakerFill,
+};

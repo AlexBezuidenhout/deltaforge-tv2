@@ -34,22 +34,78 @@ const POSITIVE_SAMPLE_MS = Math.max(25, Number(process.env.STRUCTURAL_POSITIVE_S
 const EVENT_PAGES = Math.max(1, Math.min(20, Number(process.env.STRUCTURAL_EVENT_PAGES || 20)));
 const SPORTS_EVENT_PAGES = Math.max(1, Math.min(10,
   Number(process.env.STRUCTURAL_SPORTS_EVENT_PAGES || 5)));
+const GAMMA_CONCURRENCY = Math.max(1, Math.min(10,
+  Number(process.env.STRUCTURAL_GAMMA_CONCURRENCY || 4)));
+const GAMMA_TIMEOUT_MS = Math.max(5_000,
+  Number(process.env.STRUCTURAL_GAMMA_TIMEOUT_MS || 30_000));
+const GAMMA_MAX_ATTEMPTS = Math.max(1, Math.min(6,
+  Number(process.env.STRUCTURAL_GAMMA_MAX_ATTEMPTS || 4)));
 const LATENCY_PROFILES_MS = String(process.env.STRUCTURAL_LATENCY_PROFILES_MS || '20,50,100,250,500')
   .split(',').map(Number).filter((value) => Number.isInteger(value) && value >= 0 && value <= 5000);
+const PROCESS_STARTED_AT = new Date().toISOString();
+const RUN_ID = `structural:${os.hostname()}:${PROCESS_STARTED_AT}:${process.pid}`;
 
-async function fetchEventPage(params) {
-  const url = new URL(`${GAMMA}/events`);
-  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) throw new Error(`Gamma HTTP ${response.status}`);
-    return await response.json();
-  } finally { clearTimeout(timeout); }
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchEvents() {
+async function concurrentMap(items, width, worker) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await worker(items[index], index);
+    }
+  }));
+  return results;
+}
+
+async function fetchEventPage(params, options = {}) {
+  const url = new URL(`${GAMMA}/events`);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  const fetchImpl = options.fetchImpl || fetch;
+  const sleep = options.sleep || wait;
+  const timeoutMs = Math.max(1, Number(options.timeoutMs || GAMMA_TIMEOUT_MS));
+  const maxAttempts = Math.max(1, Math.min(6,
+    Number(options.maxAttempts || GAMMA_MAX_ATTEMPTS)));
+  const baseDelayMs = Math.max(1, Number(options.baseDelayMs || 500));
+  let lastError = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(url, { signal: controller.signal });
+      const body = await response.text();
+      if (!response.ok) {
+        const error = new Error(`Gamma HTTP ${response.status}: ${body.slice(0, 160)}`);
+        error.status = response.status;
+        const retrySeconds = parseFloat(response.headers?.get?.('retry-after'));
+        error.retryAfterMs = Number.isFinite(retrySeconds)
+          ? Math.max(0, retrySeconds * 1000) : null;
+        throw error;
+      }
+      return JSON.parse(body);
+    } catch (error) {
+      const timedOut = error?.name === 'AbortError';
+      lastError = timedOut
+        ? Object.assign(new Error(`Gamma request timed out after ${timeoutMs}ms: ${url}`), {
+          code: 'ETIMEDOUT',
+        })
+        : error;
+      const retryable = timedOut || error?.status === 429
+        || error?.status >= 500 || error?.status == null;
+      if (!retryable || attempt + 1 >= maxAttempts) throw lastError;
+      const retryDelayMs = Math.min(10_000,
+        error?.retryAfterMs ?? baseDelayMs * (2 ** attempt));
+      await sleep(retryDelayMs);
+    } finally { clearTimeout(timeout); }
+  }
+  throw lastError;
+}
+
+async function fetchEvents(options = {}) {
   const now = Date.now();
   const common = {
     active: 'true', closed: 'false', limit: '100',
@@ -57,26 +113,31 @@ async function fetchEvents() {
     end_date_max: new Date(now + 365 * 86_400_000).toISOString(),
   };
   const requests = [];
-  for (let page = 0; page < EVENT_PAGES; page += 1) {
+  const eventPages = Math.max(1, Math.min(20, Number(options.eventPages || EVENT_PAGES)));
+  const sportsEventPages = Math.max(1, Math.min(10,
+    Number(options.sportsEventPages || SPORTS_EVENT_PAGES)));
+  for (let page = 0; page < eventPages; page += 1) {
     const offset = String(page * 100);
-    requests.push(fetchEventPage({ ...common, offset, order: 'endDate', ascending: 'true' }));
-    requests.push(fetchEventPage({
+    requests.push({ ...common, offset, order: 'endDate', ascending: 'true' });
+    requests.push({
       active: 'true', closed: 'false', limit: '100', offset,
       order: 'volume24hr', ascending: 'false',
-    }));
+    });
   }
   // Explicit sports universe: broad ranking alone can crowd short-lived game
   // ladders out with political/crypto volume. Tag 1 is Polymarket's Sports
   // taxonomy. End-time and volume panels are both frozen infrastructure views.
-  for (let page = 0; page < SPORTS_EVENT_PAGES; page += 1) {
+  for (let page = 0; page < sportsEventPages; page += 1) {
     const offset = String(page * 100);
-    requests.push(fetchEventPage({ ...common, tag_id: '1', offset, order: 'endDate', ascending: 'true' }));
-    requests.push(fetchEventPage({
+    requests.push({ ...common, tag_id: '1', offset, order: 'endDate', ascending: 'true' });
+    requests.push({
       active: 'true', closed: 'false', tag_id: '1', limit: '100', offset,
       order: 'volume24hr', ascending: 'false',
-    }));
+    });
   }
-  const pages = await Promise.all(requests);
+  const pages = await concurrentMap(requests,
+    Math.max(1, Math.min(10, Number(options.concurrency || GAMMA_CONCURRENCY))),
+    (params) => fetchEventPage(params, options));
   return [...new Map(pages.flat().map((event) => [String(event.id || event.slug), event])).values()];
 }
 
@@ -153,7 +214,6 @@ async function persistCandidates(catalog, panel) {
     item.ruleHash, item.eventId, item.gammaId, item.conditionId,
     JSON.stringify(item.document),
   ]), 'ON CONFLICT (rule_hash) DO NOTHING');
-  await pool.query('UPDATE borg_structural_candidates SET active=false WHERE active=true');
   const active = new Set(panel.map((candidate) => candidate.candidateId));
   const now = new Date();
   const rows = catalog.map((candidate) => [
@@ -179,6 +239,14 @@ async function persistCandidates(catalog, panel) {
       rule_certified=EXCLUDED.rule_certified,legs=EXCLUDED.legs,
       universe_id=EXCLUDED.universe_id,universe_class=EXCLUDED.universe_class,
       active=EXCLUDED.active,refreshed_at=EXCLUDED.refreshed_at`);
+  // Retire the previous panel only after the replacement catalog is durable.
+  // A slow or failed 20k-row refresh must not expose a false all-inactive gap.
+  await pool.query(`
+    UPDATE borg_structural_candidates
+       SET active=false
+     WHERE active=true
+       AND NOT (candidate_id=ANY($1::text[]))
+  `, [[...active]]);
 }
 
 async function main() {
@@ -194,6 +262,10 @@ async function main() {
   let tokenMarket = new Map();
   const buffer = [];
   const lastStored = new Map();
+  let successfulFlushes = 0;
+  let persistenceErrors = 0;
+  let lastPersistedAt = null;
+  let lastPersistenceErrorAt = null;
 
   const clob = new ClobMultiplex((token) => tokenMarket.get(String(token)) || null, {
     shardCount: Number(process.env.STRUCTURAL_CLOB_SHARDS || 2),
@@ -267,6 +339,9 @@ async function main() {
         maxCandidates: MAX_CANDIDATES, maxTokens: MAX_TOKENS,
         maxCatalogCandidates: MAX_CATALOG_CANDIDATES,
         sportsEventPages: SPORTS_EVENT_PAGES,
+        gammaConcurrency: GAMMA_CONCURRENCY,
+        gammaTimeoutMs: GAMMA_TIMEOUT_MS,
+        gammaMaxAttempts: GAMMA_MAX_ATTEMPTS,
         panelByType: Object.fromEntries([...candidates.values()].reduce((map, candidate) => {
           map.set(candidate.structureType, (map.get(candidate.structureType) || 0) + 1); return map;
         }, new Map())),
@@ -290,7 +365,7 @@ async function main() {
             pass_stale, pass_quotes, pass_fees_2x, pass_fok, pass_capacity,
             pass_orphan_risk, orphan_loss_stress_usd, economic_candidate, qualified, detail)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33::jsonb)
-          ON CONFLICT (dedup_key) DO NOTHING
+          ON CONFLICT (dedup_key,evaluated_at) DO NOTHING
         `, [
           item.dedupKey, item.evaluatedAt, item.candidateId, item.triggerToken,
           item.triggerSourceMs == null ? null : new Date(item.triggerSourceMs),
@@ -305,8 +380,12 @@ async function main() {
           item.economicCandidate, item.qualified, JSON.stringify(item),
         ]);
       }
+      successfulFlushes += 1;
+      lastPersistedAt = new Date().toISOString();
     } catch (error) {
       buffer.unshift(...rows);
+      persistenceErrors += 1;
+      lastPersistenceErrorAt = new Date().toISOString();
       await logEvent('ERROR', 'structural_scanner', `async persistence failed; WAL retained: ${error.message}`);
     }
   };
@@ -322,10 +401,16 @@ async function main() {
       INSERT INTO system_heartbeats (component, beat_at, meta)
       VALUES ('structural_scanner',now(),$1::jsonb)
       ON CONFLICT (component) DO UPDATE SET beat_at=now(), meta=EXCLUDED.meta
-    `, [JSON.stringify({ pid: process.pid, host: os.hostname(), candidates: candidates.size,
+    `, [JSON.stringify({ pid: process.pid, host: os.hostname(), runId: RUN_ID,
+      processStartedAt: PROCESS_STARTED_AT,
+      collectionEpochId: process.env.BORG_COLLECTION_EPOCH_ID || 'structural-unmarked',
+      candidates: candidates.size,
       catalogCandidates: catalogSize, tokens: byToken.size, queued: buffer.length,
+      successfulFlushes, persistenceErrors, lastPersistedAt, lastPersistenceErrorAt,
       paperOnly: true, walletLoaded: false, allMarket: true, sportsTagId: 1,
       sportsEventPages: SPORTS_EVENT_PAGES, universeVersion: STRUCTURAL_UNIVERSE_VERSION,
+      gammaConcurrency: GAMMA_CONCURRENCY, gammaTimeoutMs: GAMMA_TIMEOUT_MS,
+      gammaMaxAttempts: GAMMA_MAX_ATTEMPTS,
       latencyProfilesMs: LATENCY_PROFILES_MS })]).catch(() => {}), 10_000),
   ];
 
@@ -348,4 +433,4 @@ if (require.main === module) main().catch(async (error) => {
   process.exit(1);
 });
 
-module.exports = { boundedCatalog, boundedPanel, fetchEvents };
+module.exports = { boundedCatalog, boundedPanel, concurrentMap, fetchEventPage, fetchEvents };

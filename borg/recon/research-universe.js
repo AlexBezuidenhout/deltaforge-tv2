@@ -92,6 +92,21 @@ function directionMarketType(slug) {
   return 'direction_1h';
 }
 
+function resolutionSource(event, market, type) {
+  if (type === 'direction_1h') return 'binance_1h_candle';
+  if (type === 'direction_15m') return 'chainlink_rtds_15m';
+  const text = `${event?.description || ''} ${market?.description || ''} ${
+    event?.resolutionSource || ''} ${market?.resolutionSource || ''}`.toLowerCase();
+  if (/\bbinance\b/.test(text)) {
+    if (/\b1\s*(?:hour|hr)\b/.test(text)) return 'binance_1h_close';
+    if (/\b1\s*(?:minute|min)\b/.test(text)) return 'binance_1m_close';
+    return 'binance_close';
+  }
+  if (/\bchainlink\b/.test(text)) return 'chainlink';
+  if (/\bcoinbase\b/.test(text)) return 'coinbase';
+  return 'unknown';
+}
+
 function marketRecord(event, market, requestedType) {
   const asset = assetFromTitle(event?.title);
   const end = new Date(market?.endDate || event?.endDate);
@@ -136,9 +151,7 @@ function marketRecord(event, market, requestedType) {
     strike,
     lower_bound: bounds?.lower ?? null,
     upper_bound: bounds?.upper ?? null,
-    resolution_source: type === 'direction_1h' ? 'binance_1h_candle'
-      : type === 'direction_15m' ? 'chainlink_rtds_15m'
-      : 'binance_1m_close',
+    resolution_source: resolutionSource(event, market, type),
     accepting_orders: market?.acceptingOrders !== false && market?.closed !== true,
     raw: { ...market, _event: {
       id: event?.id, slug: event?.slug, title: event?.title,
@@ -254,5 +267,6 @@ module.exports = {
   marketRecord,
   numericLabel,
   rangeLabel,
+  resolutionSource,
   selectResearchMarkets,
 };

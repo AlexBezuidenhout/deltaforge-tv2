@@ -1,5 +1,5 @@
 [Unit]
-Description=BORG all-market L2 and passive-making laboratory (paper only)
+Description=BORG neglected-market L2 capture laboratory (paper only; strategies disabled)
 Wants=network-online.target
 Requires=postgresql.service
 After=network-online.target postgresql.service
@@ -10,14 +10,12 @@ User=deltaforge
 Group=deltaforge
 WorkingDirectory=/opt/deltaforge/tv2/current
 EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
 Environment=NODE_ENV=production
 Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
 Environment=BORG_WAL_MIN_FREE_GB=20
-Environment=BORG_COLLECTION_EPOCH_ID=dublin-local-pg-2026-07-16-v1
-Environment=BORG_COLLECTION_EPOCH_START=2026-07-16T13:28:05.289Z
-Environment=BORG_COLLECTION_LOCATION=dublin-ie
 Environment=BORG_CODE_VERSION=dublin-runtime-v3
-Environment=ALLMARKET_MAX_MARKETS=10
+Environment=ALLMARKET_MAX_MARKETS=20
 Environment=ALLMARKET_GAMMA_PAGES=20
 Environment=ALLMARKET_GAMMA_WINDOWS=10
 Environment=ALLMARKET_PERSIST_MARKETS=5000
@@ -28,6 +26,8 @@ Environment=ALLMARKET_MAX_CAPITAL_PER_MARKET=50
 Environment=ALLMARKET_CATALYST_GUARD_HOURS=6
 Environment=ALLMARKET_NO_FAIR_FEED_GUARD_HOURS=24
 Environment=ALLMARKET_FAIR_FEED_CATEGORIES=
+Environment=ALLMARKET_PANEL_MODE=neglected
+Environment=ALLMARKET_STRATEGY_SIGNALS_ENABLED=false
 ExecStart=/usr/local/bin/node borg/allmarket/collector.js
 Restart=always
 RestartSec=3

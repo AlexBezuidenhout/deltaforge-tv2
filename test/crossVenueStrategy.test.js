@@ -10,8 +10,8 @@ const {
   optimizePair,
 } = require('../borg/crossvenue/strategy');
 const {
-  buildCandidates, loadManualIdentityReviews, parseManualIdentityReviews,
-  selectMonitoredCandidates,
+  buildCandidates, fetchJson, loadManualIdentityReviews, parseManualIdentityReviews,
+  normalizeKalshiMarket, selectMonitoredCandidates,
 } = require('../borg/crossvenue/universe');
 const { summarizeConvergence } = require('../borg/crossvenue/convergence');
 const { KalshiReadOnlyFeed, signHandshake } = require('../borg/crossvenue/kalshi-ws');
@@ -27,6 +27,9 @@ const {
 const {
   certifyIdentityBinding, ruleDocuments,
 } = require('../borg/crossvenue/identity-certifier');
+const {
+  chunkKalshiTickers, KALSHI_ORDERBOOK_BATCH_SIZE,
+} = require('../borg/crossvenue/collector');
 
 test('cross-venue identity approval is bound to immutable rule hashes', () => {
   const poly = {
@@ -96,6 +99,47 @@ test('contract discovery never turns text similarity into automatic approval', (
   assert.ok(audit.score >= 0.8);
   assert.equal(audit.identityStatus, 'STRONG_CANDIDATE');
   assert.equal('identityApproved' in audit, false);
+});
+
+test('Kalshi event context survives compact normalization for full-universe matching', () => {
+  const market = normalizeKalshiMarket({
+    ticker: 'KXEXAMPLE-26-ALICE', event_ticker: 'KXEXAMPLE-26', market_type: 'binary',
+    title: 'Will Alice win?', yes_sub_title: 'Alice', no_sub_title: 'Alice',
+    rules_primary: 'If Alice wins, this resolves Yes.', status: 'active',
+  }, {
+    event_ticker: 'KXEXAMPLE-26', series_ticker: 'KXEXAMPLE',
+    title: 'Who will win the example election?', sub_title: 'In 2026',
+    category: 'Elections', mutually_exclusive: true,
+    settlement_sources: [{ name: 'Official results', url: 'https://example.gov/results' }],
+  });
+  assert.equal(market.eventTitle, 'Who will win the example election?');
+  assert.equal(market.eventSubTitle, 'In 2026');
+  assert.equal(market.category, 'Elections');
+  assert.equal(market.mutuallyExclusive, true);
+  assert.equal(market.settlementSources[0].url, 'https://example.gov/results');
+});
+
+test('public-universe requests retry a rate limit without treating it as empty coverage', async () => {
+  const originalFetch = global.fetch;
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    if (calls === 1) return {
+      ok: false, status: 429, headers: { get: () => '0' },
+      text: async () => '{"error":"too many requests"}',
+    };
+    return {
+      ok: true, status: 200, headers: { get: () => null },
+      text: async () => '{"events":[],"cursor":null}',
+    };
+  };
+  try {
+    const result = await fetchJson('https://example.test/events', {}, 1000, {
+      maxAttempts: 2, baseDelayMs: 1,
+    });
+    assert.equal(calls, 2);
+    assert.deepEqual(result.payload, { events: [], cursor: null });
+  } finally { global.fetch = originalFetch; }
 });
 
 test('different thresholds are rejected even when titles otherwise overlap', () => {
@@ -346,6 +390,27 @@ test('cross-venue economics are lockable only after manual identity approval', (
   assert.equal(approved.find((row) => row.direction === 'POLY_YES+KALSHI_NO').lockableAfterBothFills, true);
 });
 
+test('score-approved pairs can emit stressed paper entries without becoming proved locks', () => {
+  const rows = evaluatePair({
+    quantities: [10], paperEvalApproved: true, booksFresh: true,
+    polyTick: 0.01, kalshiTick: 0.01,
+    polyBooks: {
+      YES: { asks: [[0.40, 100]], bids: [[0.39, 100]] },
+      NO: { asks: [[0.62, 100]], bids: [[0.61, 100]] },
+    },
+    kalshiBooks: {
+      YES: { asks: [[0.63, 100]], bids: [[0.62, 100]] },
+      NO: { asks: [[0.52, 100]], bids: [[0.51, 100]] },
+    },
+  });
+  const paper = rows.find((row) => row.direction === 'POLY_YES+KALSHI_NO');
+  assert.equal(paper.paperTradeEligible, true);
+  assert.equal(paper.status, 'PAPER_ASSUMED_PARITY_STRESSED_EDGE');
+  assert.equal(paper.economic, false);
+  assert.equal(paper.relationApproved, false);
+  assert.equal(paper.lockableAfterBothFills, false);
+});
+
 test('state-conditioned implication compiles only the mathematically safe bundle', () => {
   const relation = compileCrossVenueRelation({
     id: 'speech-implication', polyConditionId: 'poly-id', kalshiTicker: 'kalshi-id',
@@ -519,6 +584,71 @@ test('convergence report measures first profitable liquidation and right-censors
   assert.equal(report.approvedEvidence.horizons.find((row) => row.label === '5m').probability, 0.5);
 });
 
+test('convergence reports score-approved paper assumptions separately from proved evidence', () => {
+  const base = Date.parse('2026-07-01T00:00:00Z');
+  const sample = (minutes, net) => ({
+    observed_at: new Date(base + minutes * 60_000), match_id: 'paper-pair',
+    direction: 'POLY_NO+KALSHI_YES', quantity: '5', entry_total_cost: '4.5',
+    net_liquidation_proceeds: String(net), terminal_locked_profit: '0.5',
+    immediate_round_trip_pnl: String(net - 4.5), entry_economic: false,
+    paper_eval_approved: true, paper_entry_eligible: true,
+    identity_approved: false, relation_approved: false, books_fresh: true,
+    full_entry_depth: true, full_exit_depth: true,
+    data_quality_grade: 'B', execution_fidelity_grade: 'B',
+  });
+  const report = summarizeConvergence([sample(0, 4.3), sample(5, 4.6)]);
+  assert.equal(report.approvedEvidence.episodes, 0);
+  assert.equal(report.paperEvaluation.episodes, 1);
+  assert.equal(report.paperEvaluation.observedProfitableExits, 1);
+  assert.equal(report.unapprovedDiagnostic.episodes, 0);
+});
+
+test('cross-venue inference counts only the first episode per pair direction and UTC day', () => {
+  const base = Date.parse('2026-07-01T00:00:00Z');
+  const sample = (minutes, eligible, net) => ({
+    observed_at: new Date(base + minutes * 60_000), match_id: 'serial-pair',
+    direction: 'POLY_NO+KALSHI_YES', quantity: '5', entry_total_cost: '4.5',
+    net_liquidation_proceeds: String(net), terminal_locked_profit: '0.5',
+    entry_economic: false, paper_eval_approved: true,
+    paper_entry_eligible: eligible, relation_approved: false,
+    books_fresh: true, full_entry_depth: true, full_exit_depth: true,
+    data_quality_grade: 'B', execution_fidelity_grade: 'B',
+  });
+  const report = summarizeConvergence([
+    sample(0, true, 4.3), sample(5, true, 4.6),
+    sample(10, false, 4.3),
+    sample(15, true, 4.3), sample(20, true, 4.6),
+  ]);
+  assert.equal(report.paperEvaluation.rawEpisodes, 2);
+  assert.equal(report.paperEvaluation.episodes, 1);
+  assert.equal(report.paperEvaluation.repeatedSamePairDirectionDay, 1);
+  assert.equal(report.paperEvaluation.independentPairDirectionDays, 1);
+  assert.equal(report.paperEvaluation.spanDays, 0);
+});
+
+test('cross-venue readiness uses the qualifying cohort span rather than diagnostic history', () => {
+  const base = Date.parse('2026-07-01T00:00:00Z');
+  const row = (index, approved, paperApproved) => ({
+    observed_at: new Date(base + index * 86_400_000),
+    match_id: `pair-${index}`, direction: 'POLY_NO+KALSHI_YES', quantity: '5',
+    entry_total_cost: '4.5', net_liquidation_proceeds: '4.3',
+    terminal_locked_profit: '0.5', entry_economic: approved,
+    relation_approved: approved, paper_eval_approved: paperApproved,
+    paper_entry_eligible: paperApproved, books_fresh: true,
+    full_entry_depth: true, full_exit_depth: true,
+    data_quality_grade: 'B', execution_fidelity_grade: 'B',
+  });
+  const rows = Array.from({ length: 300 }, (_, index) => row(index, false, true));
+  rows.push(...Array.from({ length: 300 }, (_, index) => ({
+    ...row(index / 1000, true, false), match_id: `approved-${index}`,
+  })));
+  const report = summarizeConvergence(rows);
+  assert.equal(report.approvedEvidence.independentPairDirectionDays, 300);
+  assert.ok(report.coverage.spanDays > 14);
+  assert.ok(report.approvedEvidence.spanDays < 1);
+  assert.equal(report.evidenceReady, false);
+});
+
 test('cross-venue collector has no wallet, private key, or live-order dependency', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'borg', 'crossvenue', 'collector.js'), 'utf8');
   assert.doesNotMatch(source, /createAndPostOrder|ClobClient|PRIVATE_KEY|Wallet\s*\(/);
@@ -536,4 +666,22 @@ test('cross-venue collector batches public Kalshi orderbook requests', () => {
   assert.match(source, /markets\/orderbooks/);
   assert.match(source, /searchParams\.append\('tickers', ticker\)/);
   assert.match(source, /orderbooks_batch_rest/);
+  const tickers = Array.from({ length: 205 }, (_, index) => `KX-${index}`);
+  const batches = chunkKalshiTickers([...tickers, tickers[0]]);
+  assert.equal(KALSHI_ORDERBOOK_BATCH_SIZE, 100);
+  assert.deepEqual(batches.map((batch) => batch.length), [100, 100, 5]);
+  assert.equal(new Set(batches.flat()).size, 205);
+});
+
+test('full-universe discovery runs outside the live collector event loop', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'borg', 'crossvenue', 'collector.js'), 'utf8');
+  assert.match(source, /new Worker\(path\.join\(__dirname, 'discovery-worker\.js'\)/);
+  assert.match(source, /await this\.runDiscovery\(/);
+  assert.doesNotMatch(source, /await discoverCrossVenue\(/);
+});
+
+test('cross-venue CLI convergence report retains the paper cohort flags', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'crossvenue-backtest.js'), 'utf8');
+  assert.match(source, /entry_economic,paper_eval_approved,paper_entry_eligible/);
+  assert.match(source, /summarizeConvergence\(basis\.rows\)/);
 });

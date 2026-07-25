@@ -21,10 +21,12 @@ const gunzip = promisify(zlib.gunzip);
 const fsp = fs.promises;
 
 const TABLES = Object.freeze({
-  borg_clob_events: { key: 'id', keyType: 'bigint', time: 'ts' },
-  borg_clob_touch: { key: 'id', keyType: 'bigint', time: 'ts' },
+  // CLOB events/touches and one-second book projections are intentionally
+  // absent. Their source frames are already append-before-process WAL data;
+  // daily PostgreSQL partitions provide the bounded query tier. Archiving
+  // those rows again created a circular disk failure in which duplicate gzip
+  // output consumed the reserve needed to run the archiver.
   borg_taker_trades: { key: 'id', keyType: 'bigint', time: 'ts' },
-  borg_book_snaps: { key: 'id', keyType: 'bigint', time: 'ts' },
   borg_binance_1s: { key: 'symbol_ts', keyType: 'composite', time: 'ts' },
   borg_coinbase_1s: { key: 'product_ts', keyType: 'composite', time: 'ts' },
   borg_rtds_ticks: { key: 'id', keyType: 'bigint', time: 'received_at' },

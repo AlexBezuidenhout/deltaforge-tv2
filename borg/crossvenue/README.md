@@ -5,6 +5,15 @@ signer, exchange trading client, private key, or order-submission path.
 
 ## What it tests
 
+Universe discovery scans Kalshi's cursor-paginated open **events** with nested
+binary markets rather than stopping after a fixed `/markets` page cap. Event
+titles, categories and settlement sources are retained for matching. The
+dashboard reports whether that scan completed or fell back to a truncated
+legacy sweep. Candidate generation is indexed by informative tokens, so this
+is a roughly linear retrieval pass rather than a 66,000-by-37,000 brute-force
+comparison. Run `node scripts/crossvenue-universe-rescan.js` for a read-only
+coverage audit. Neither a high score nor shared wording proves equal payoff.
+
 For a manually resolution-audited binary pair, the two possible locks are:
 
 ```text
@@ -65,6 +74,14 @@ bias. It reports 1m/5m/30m/1h/6h/24h/7d/30d Kaplan-Meier probabilities.
 Only manually approved contract identities belong in the evidence cohort;
 unapproved text matches remain a diagnostic row.
 
+If entry asks plus fees already sum to less than the guaranteed common payout,
+the position is a terminal lock after both legs fill and no convergence is
+required. If that sum is at least the payout, buying opposite directions is
+not an arbitrage: profit then depends on later convergence and enough bid depth
+to exit both legs after four total fees. The convergence cohort therefore
+measures basis risk, time-to-capital-release and right-censoring separately
+from certified terminal locks.
+
 Collection is tiered for this slower-capital hypothesis. If read-only Kalshi
 credentials are installed, every monitored ticker uses the authenticated
 `orderbook_delta` WebSocket: raw snapshots/deltas enter the WAL first, sequence
@@ -85,8 +102,9 @@ enter the approved evidence cohort.
 
 Open `http://localhost:3004`, then select **⇄ Cross-Venue**.
 
-- **Candidates / Approved** shows text-matched pairs versus pairs whose full
-  rules have been manually audited.
+- **Paper >80 / Proved** shows score-approved paper pairs versus pairs whose
+  full rules and terminal payoff mapping have been manually audited. The line
+  underneath reports total discovered and total monitored counts.
 - **Contract-identity review queue** shows the exact two labels, time delta and
   mismatch flags. Similarity scores are discovery aids only.
 - **Recent paper opportunities** shows executable VWAPs, both fees, raw locked

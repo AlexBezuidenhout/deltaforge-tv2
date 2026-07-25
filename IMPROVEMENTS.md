@@ -423,3 +423,176 @@ PnL in both halves, an adjusted market-clustered lower CI above zero, and
 non-negative adverse-selection marks. The expected result may be measured edge
 approximately zero. Any parameter change creates a new strategy ID and resets
 the evidence clock.
+
+---
+
+## #27 Institutional evidence platform v2 — 2026-07-21
+
+**Mechanism:** a strategy cannot be evaluated from a tape that silently stops
+when disk, WAL, WebSocket or database pressure rises. The VPS now uses a local
+append-before-process WAL, verified gzip-NDJSON database drainage, an off-host
+immutable mirror, an incremental Parquet research projection and a bounded
+local PostgreSQL hot tier. The Mac mirror ignores mutable archive state and
+issues a remote deletion receipt only after a clean immutable traversal.
+
+**Risk:** iCloud is a convenient off-host copy, not an institutional object
+store with immutable retention guarantees. Raw gzip/WAL objects remain the
+authority; Parquet can always be regenerated. A stale receipt fails closed and
+temporarily increases VPS use rather than deleting unmirrored data.
+
+**Config/disable:** `BORG_ARCHIVE_DIR`, `BORG_WAL_DIR`, the `*_SQL_HOT_HOURS`
+variables, `DELTAFORGE_VPS_RAW_RETENTION_HOURS` and
+`DELTAFORGE_PARQUET_MAX_FILES_PER_PULL`. The new evidence epoch refuses to
+start below 30 GiB free.
+
+**Evaluate:** the first epoch must accumulate 24 continuous hours with health
+samples no more than 120 seconds apart, zero failed samples, zero collector/WAL
+errors, zero reported sequence gaps, fresh required heartbeats and non-empty
+all-market/flow/cross-venue coverage. Run
+`node scripts/evidence-epoch-status.js`; no strategy may promote while it says
+`PENDING_24H` or `FAILED`.
+
+## #28 Frozen research fleet and four-program allocation
+
+**Mechanism:** producing variants until one line is positive is selection, not
+alpha. Governance v4 parks the failed fleet and prevents old definitions from
+promotion. All-market and Flow continue as high-fidelity data lanes with signal
+generation disabled; paired maker and old canaries are stopped. Engineering is
+concentrated on resolver-boundary residuals, certified payoff identities,
+rule-aware cross-venue convergence and exact/bounded Deribit surfaces.
+
+**Risk:** fewer strategies means fewer exciting dashboard rows. That is the
+intended consequence of preserving statistical power. H43's small discovery
+gain can still disappear; the Chainlink and CF arms may remain blocked; a
+cross-venue spread can be negative after rule mismatch, leg risk and capital
+duration; and options residuals can be swallowed by binary gamma and resolver
+basis.
+
+**Config/disable:** `ALLMARKET_STRATEGY_SIGNALS_ENABLED=false`,
+`FLOW_STRATEGY_SIGNALS_ENABLED=false`, and
+`BORG_INCLUDE_PARKED_CONTROLS=false`. Each research product has its own frozen
+manifest and paper-only contract. H43's rule and parameters were not changed.
+
+**Evaluate:** do not pool the products. Resolver arms require at least 300 fresh
+independent markets and 14 days; cross-venue and options require at least 300
+and 30 days. Report certified terminal locks separately from similar-contract
+convergence. A missing exact resolver source is a blocked experiment, not an
+excuse to substitute a convenient proxy.
+
+## #29 Desk-wide promotion policy and shared $500 capacity
+
+**Mechanism:** `scripts/promotion-report.js` now evaluates every collecting
+confirmatory arm with doubled fees/slippage, both chronological halves,
+market/day clustered uncertainty, Holm family-wise correction, A/B data and
+execution grades, 100/250/500 ms latency profiles, leave-largest-contributor
+tests, and a single chronological $500 bankroll shared across strategies.
+Legacy manifests cannot weaken these desk-wide gates.
+
+**Risk:** the standard is intentionally difficult to pass and can conclude that
+measured edge is approximately zero. A positive paper result still does not
+prove exchange authentication, rejection or fill parity.
+
+**Config/disable:** this is a research-governance invariant rather than a
+trading threshold. Changing it requires a documented policy version, not a
+runtime toggle.
+
+**Evaluate:** every gate must pass before human review. Then run exactly 50
+authenticated live fills at $1–$2, exclude those fills from paper evidence, and
+reconcile submitted limit, actual fill, partial/non-fill rate, rejection,
+fees and realised PnL. Scale to $5–$10 only if that canary remains consistent.
+For multi-leg trades, reserve second-leg and emergency-unwind capital inside
+the same $500 envelope. Failure is the default conclusion; no automatic live
+promotion exists.
+
+## #30 Transactional evidence-epoch activation
+
+**Mechanism:** cohort boundaries are now operational transactions. The launcher
+drains old collectors and cohort timers before timestamping, starts every
+approved collector under the new immutable epoch, runs the scorer and verified
+archiver immediately, and waits for a completely green unrecorded preflight.
+Only then is the first health sample written. Heartbeats from an earlier epoch,
+shutdown errors, real coverage gaps and protocol-only controls cannot leak into
+the successor cohort.
+
+**Risk:** fail-closed startup can leave collectors running under an invalid
+epoch if a required feed never becomes healthy; it deliberately does not
+pretend that interval is clean. Starting a replacement epoch discards that
+interval from promotion evidence but does not delete its raw data.
+
+**Config/disable:** `BORG_EPOCH_WARMUP_TIMEOUT_SEC` defaults to 240 seconds,
+`BORG_EPOCH_MIN_FREE_GIB` defaults to 30, and
+`BORG_INCLUDE_PARKED_CONTROLS=false`. `PROTOCOL_COMPLETION_ONLY` is a parked
+disposition. These controls affect paper research and evidence accounting, not
+any live-order call site.
+
+**Evaluate:** `money-finding-2026-07-21-v8` must retain PASS samples no more
+than 120 seconds apart for 24 continuous hours, with no failed sample, error,
+coverage/sequence gap, stale source, WAL/archive failure or disk-reserve
+breach. A successful 24-hour burn-in only validates the measuring instrument;
+each strategy must still satisfy its 300-market, 14/30-day, doubled-cost,
+clustered-confidence and shared-capacity gates.
+
+v5 failed honestly after structural Gamma timeouts; v6 was rejected when
+archive startup raced the CLOB writer; v7 failed on a single-attempt Flow REST
+timeout. None is relabelled or used for promotion. Gamma and Flow discovery now
+use bounded retries, and the epoch launcher seeds verified archival before
+starting hot writers.
+
+## #31 Neglected-capacity opportunity standard and frozen capture panel
+
+**Mechanism:** every structural, cross-venue and options candidate is now
+comparable under one cash identity: lower-bound payout minus executable
+principal, doubled fees, slippage stress and a full failure-risk reserve. The
+report also charges capital duration and refuses to call a non-atomic bundle a
+certified pre-trade lock. A staged all-market panel covers multi-contract event
+graphs, small-inventory reward books, obscure contracts and liquid controls;
+membership is PnL-independent, content-hashed and frozen by collection epoch.
+
+**Risk:** a full failure reserve can be too conservative for a well-controlled
+multi-leg state machine, while a smaller expected reserve would require a
+forward estimate of fill/failure probability that does not yet exist. The
+panel can also discover no opportunities. Generic and paired maker history is
+decisively negative and remains a control; only a fair-bound passive overlay is
+staged for a future epoch.
+
+**Config/disable:** `ALLMARKET_PANEL_MODE=legacy` remains the active default.
+`ALLMARKET_PANEL_MODE=neglected` requires a marked collection epoch and loads
+the immutable `neglected-capacity-panel-v1` membership from
+`am_panel_memberships`. Strategy signals remain independently disabled with
+`ALLMARKET_STRATEGY_SIGNALS_ENABLED=false`.
+
+**Evaluate:** run `npm run research:neglected-edge`. At the implementation
+snapshot it reported zero paper-test-eligible candidate economics and zero
+certified locks. H43 remained the only positive lead, but its execution-grade
+coverage was incomplete. Do not activate the staged panel or
+`fair-bound-passive-overlay-v1` inside the running v8 epoch; begin a new epoch
+after the 24-hour platform burn-in and scale capture from 20 to at most 60
+markets only when sequence, WAL, CPU and persistence checks remain clean.
+
+## #32 Focused five-lane paper programme
+
+**Mechanism:** the research fleet is now concentrated on unchanged H43
+resolver-boundary transfer, deterministic certified payoff graphs, rule-aware
+Polymarket/Kalshi relations, Deribit options-implied binary residuals and a
+capture-only fair-bound passive overlay. The all-market socket subscribes to a
+content-hashed 20-market neglected-capacity panel selected without PnL or
+toxicity. Generic maker and paired-complete-set controls remain retired.
+
+**Risk:** broader capture consumes disk/CPU and may still discover no certified
+bound. A cross-venue relation is non-atomic, an options bound retains binary
+gamma/resolver risk, and H43 remains underpowered. Dashboard visibility must
+not be confused with a live-trading promotion.
+
+**Config/disable:** the VPS unit sets `ALLMARKET_PANEL_MODE=neglected`,
+`ALLMARKET_MAX_MARKETS=20` and
+`ALLMARKET_STRATEGY_SIGNALS_ENABLED=false`. Restoring `legacy` changes the
+capture population and requires a new evidence epoch. Enabling strategy
+signals is explicitly outside this programme. Options persistence uses one
+in-flight deterministic flush with four bounded transient-DB attempts.
+
+**Evaluate:** `money-finding-2026-07-21-v10` began at
+`2026-07-21T22:25:22.489Z`. Require 24 clean infrastructure hours before using
+any row as promotion evidence. Then apply the frozen per-lane 300-market and
+14/30-day rules. Fair-bound making remains staged until an independently
+certified A/B lower bound maps to a live token and clears doubled fees, one
+adverse tick, queue delay and full failure reserve.

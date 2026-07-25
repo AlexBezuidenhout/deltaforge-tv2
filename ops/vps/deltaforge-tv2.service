@@ -12,6 +12,8 @@ WorkingDirectory=/opt/deltaforge/tv2/current
 EnvironmentFile=/etc/deltaforge/tv2.env
 Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
+Environment=DELTAFORGE_INSTANCE_ID=tv2
+Environment=BOT_RUNNER_ENABLED=true
 ExecStart=/usr/local/bin/node src/index.js
 Restart=always
 RestartSec=5

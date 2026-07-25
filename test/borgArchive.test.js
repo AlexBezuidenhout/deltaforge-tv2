@@ -30,7 +30,7 @@ test('scheduled archive bounds each table without deleting unarchived backlog', 
 
   const result = await archiveTable(
     pool,
-    'borg_clob_events',
+    'borg_taker_trades',
     new Date('2026-07-16T01:00:00.000Z'),
     { archiveDir, minFreeGb: 0, batchSize: 2, maxBatches: 2 },
   );
@@ -72,7 +72,7 @@ test('bigint tape archives in indexed append order while retaining the timestamp
 
   await archiveTable(
     pool,
-    'borg_clob_touch',
+    'borg_taker_trades',
     new Date('2026-07-16T01:00:00.000Z'),
     { minFreeGb: 0, batchSize: 5000, maxBatches: 1 },
   );

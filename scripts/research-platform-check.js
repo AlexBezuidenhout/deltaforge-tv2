@@ -68,6 +68,13 @@ function defaultWalRoot() {
   return path.join(os.homedir(), '.deltaforge-wal', 'borg');
 }
 
+function defaultArchiveRoot() {
+  if (process.env.BORG_ARCHIVE_DIR) return process.env.BORG_ARCHIVE_DIR;
+  const systemRoot = '/var/lib/deltaforge/archive/borg-raw';
+  if (fs.existsSync(systemRoot)) return systemRoot;
+  return path.join(os.homedir(), '.deltaforge-archive', 'borg-raw');
+}
+
 function percentile(values, p) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -166,7 +173,7 @@ async function main() {
     warnings.push(`off-host archive receipt is ${Math.round(ageSeconds(receiptMtime) / 60)}m old`);
   }
 
-  const archiveDir = process.env.BORG_ARCHIVE_DIR || path.join(os.homedir(), '.deltaforge-archive', 'borg-raw');
+  const archiveDir = defaultArchiveRoot();
   const archiveStateFile = path.join(archiveDir, 'archive-state.json');
   let archiveState = null;
   try { archiveState = JSON.parse(fs.readFileSync(archiveStateFile, 'utf8')); } catch (_) {}
@@ -242,7 +249,10 @@ async function main() {
     checks.feedAgeSeconds = Object.fromEntries(Object.entries(freshness[0]).map(([key, value]) => [key, ageSeconds(value)]));
     for (const [source, age] of Object.entries(checks.feedAgeSeconds)) {
       if (age == null || age > 90) critical.push(`${source} feed/heartbeat is ${age == null ? 'missing' : `${Math.round(age)}s old`}`);
-      else if (age > 30) warnings.push(`${source} is ${Math.round(age)}s old`);
+      // The primary collector intentionally emits its aggregate heartbeat once
+      // per minute; market-data lanes are event driven. Warn at the expected
+      // cadence plus jitter without weakening the shared 90-second hard fail.
+      else if (age > (source === 'heartbeat' ? 75 : 30)) warnings.push(`${source} is ${Math.round(age)}s old`);
     }
 
     const { rows: quality } = await pool.query(`

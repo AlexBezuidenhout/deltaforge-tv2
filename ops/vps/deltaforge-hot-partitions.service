@@ -1,0 +1,19 @@
+[Unit]
+Description=Maintain DeltaForge daily PostgreSQL hot-tier partitions
+Requires=postgresql.service
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=NODE_ENV=production
+ExecStart=/usr/local/bin/node scripts/hot-tier-partitions.js --ensure --drop-old
+TimeoutStartSec=10min
+Nice=10
+IOSchedulingClass=idle
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

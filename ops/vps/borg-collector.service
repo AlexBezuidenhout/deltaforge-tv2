@@ -10,18 +10,14 @@ User=deltaforge
 Group=deltaforge
 WorkingDirectory=/opt/deltaforge/tv2/current
 EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
 Environment=NODE_ENV=production
 Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
 Environment=BORG_ARCHIVE_DIR=/var/lib/deltaforge/archive/borg-raw
 Environment=BORG_WAL_MIN_FREE_GB=20
 Environment=BORG_ARCHIVE_MIN_FREE_GB=20
-Environment=BORG_COLLECTION_EPOCH_ID=dublin-local-pg-2026-07-16-v1
-Environment=BORG_COLLECTION_EPOCH_START=2026-07-16T13:28:05.289Z
-Environment=BORG_COLLECTION_LOCATION=dublin-ie
-Environment=BORG_COLLECTION_CODE_VERSION=dublin-local-pg-cutover-v1
 Environment=BORG_CODE_VERSION=dublin-runtime-v3
 Environment=BORG_COLLECTION_BENCHMARK_FILE=/opt/deltaforge/tv2/current/borg/benchmarks/dublin-vps-2026-07-15.json
-Environment="BORG_COLLECTION_EPOCH_REASON=Cutover from remote Neon US-east PostgreSQL to the VPS-local durable hot tier; prior epoch ended at the consistent-dump pause"
 ExecStart=/usr/local/bin/node borg/recon/collector.js
 Restart=always
 RestartSec=3

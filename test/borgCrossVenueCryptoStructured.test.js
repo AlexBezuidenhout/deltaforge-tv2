@@ -5,7 +5,10 @@ const assert = require('node:assert/strict');
 const {
   buildStructuredPairs, canonicalKalshiStrike, parseKalshiCrypto, parsePolyCrypto,
 } = require('../borg/crossvenue/crypto-structured');
-const { buildCandidates, selectMonitoredCandidates } = require('../borg/crossvenue/universe');
+const {
+  applyPaperEvaluationPolicy, buildCandidates, selectMonitoredCandidates,
+  selectPaperMonitoredCandidates,
+} = require('../borg/crossvenue/universe');
 
 const DEADLINE = '2026-07-19T17:00:00Z';
 
@@ -96,4 +99,42 @@ test('monitored selection still admits structured candidates as non-rejected row
   const candidates = buildCandidates([polyThreshold()], [kalshiThreshold()], { maxCandidates: 50 });
   const selection = selectMonitoredCandidates(candidates, 6, 0);
   assert.ok(selection.monitored.some((row) => row.identityStatus === 'STRUCTURED_CANDIDATE'));
+});
+
+test('score policy approves only non-rejected rows strictly above 80% for paper evaluation', () => {
+  const options = {
+    paperScoreApproval: true, paperScoreFloor: 0.8,
+    paperApprovedAt: '2026-07-19T21:14:45Z',
+  };
+  const approved = applyPaperEvaluationPolicy({
+    matchId: 'approved', score: '0.800001', identityStatus: 'STRUCTURED_CANDIDATE',
+    identityApproved: false, relationApproved: false,
+  }, options);
+  assert.equal(approved.paperEvalApproved, true);
+  assert.equal(approved.paperEvalStatus, 'OPERATOR_APPROVED_PAPER_ONLY');
+  assert.equal(approved.identityApproved, false);
+  assert.equal(approved.relationApproved, false);
+  assert.equal(approved.paperEvalApprovedAt, '2026-07-19T21:14:45.000Z');
+  assert.equal(applyPaperEvaluationPolicy({
+    matchId: 'floor', score: 0.8, identityStatus: 'CANDIDATE',
+  }, options).paperEvalApproved, false);
+  assert.equal(applyPaperEvaluationPolicy({
+    matchId: 'rejected', score: 0.99, identityStatus: 'REJECTED',
+  }, options).paperEvalApproved, false);
+});
+
+test('paper monitoring prioritizes the complete approved cohort over exploratory reserves', () => {
+  const candidates = Array.from({ length: 12 }, (_, index) => ({
+    matchId: `paper-${index}`, score: 0.99 - index / 100,
+    identityStatus: 'STRUCTURED_CANDIDATE', paperEvalApproved: true,
+    relationApproved: false,
+  })).concat([{
+    matchId: 'exploratory', score: 0.79, identityStatus: 'CANDIDATE',
+    paperEvalApproved: false, relationApproved: false,
+  }]);
+  const selection = selectPaperMonitoredCandidates(candidates, {
+    maxMonitored: 13, exploratoryMonitored: 1, structuredMonitored: 0,
+  });
+  assert.equal(selection.monitored.filter((row) => row.paperEvalApproved).length, 12);
+  assert.ok(selection.monitored.some((row) => row.matchId === 'exploratory'));
 });

@@ -53,6 +53,16 @@ test('experiment registry resolves frozen cadence arms and legacy research famil
   assert.equal(h43.primaryMetric, 'net_pnl_2x_clustered_by_market_day');
   assert.equal(h43.minIndependentMarkets, 300);
 
+  const h45 = registry.resolve('H45_threshold_distance_velocity');
+  assert.equal(h45.experimentId, 'research-h45-forward-v1');
+  assert.equal(h45.phase, 'eval');
+  assert.equal(h45.arm, 'unchanged_30s_velocity');
+  assert.equal(h45.minIndependentMarkets, 300);
+
+  const crossVenue = registry.resolve('crossvenue_rule_aware_convergence_v5');
+  assert.equal(crossVenue.experimentId, 'crossvenue-rule-aware-convergence-v5');
+  assert.equal(crossVenue.phase, 'eval');
+
   const h26 = registry.resolve('H26_nested_threshold_bundle');
   assert.equal(h26.experimentId, 'research-daily-structural-universe-v2');
   assert.equal(h26.phase, 'pilot');

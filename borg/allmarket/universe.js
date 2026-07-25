@@ -1,5 +1,7 @@
 'use strict';
 
+const crypto = require('node:crypto');
+
 const CLOB = 'https://clob.polymarket.com';
 const GAMMA = 'https://gamma-api.polymarket.com';
 
@@ -274,6 +276,116 @@ function selectRealtimePanel(markets, options = {}) {
   return selected;
 }
 
+const NEGLECTED_PANEL_VERSION = 'neglected-capacity-panel-v1';
+
+function neglectedPanelHash(markets) {
+  const identity = (Array.isArray(markets) ? markets : [])
+    .map((market) => String(market.conditionId))
+    .sort()
+    .join('\n');
+  return crypto.createHash('sha256').update(
+    `${NEGLECTED_PANEL_VERSION}\n${identity}`,
+  ).digest('hex');
+}
+
+/**
+ * PnL-independent capture panel for the neglected-capacity programme.
+ *
+ * This is a data-selection policy, not a trading policy. It deliberately does
+ * not accept historical toxicity, realized PnL, model score or win rate. The
+ * strata cover the mechanisms we need to falsify: multi-contract event graphs,
+ * reward-bearing small-inventory books, obscure low-activity contracts and a
+ * liquid control group. A panel is frozen by collection epoch in PostgreSQL by
+ * the collector so a restart cannot cherry-pick a new cohort.
+ */
+function selectNeglectedPanel(markets, options = {}) {
+  const nowMs = Number(options.nowMs || Date.now());
+  const maxMarkets = Math.max(8, Number(options.maxMarkets || 60));
+  const maxCapitalPerMarket = Math.max(1, Number(options.maxCapitalPerMarket || 100));
+  const guardHours = Math.max(0, Number(options.catalystGuardHours ?? 6));
+  const noFairFeedGuardHours = Math.max(guardHours, Number(options.noFairFeedGuardHours ?? 24));
+  const fairFeedCategories = new Set(options.fairFeedCategories || []);
+  const catalystCategories = new Set(['sports', 'politics', 'finance', 'weather']);
+  const eventSizes = new Map();
+  for (const market of Array.isArray(markets) ? markets : []) {
+    if (market?.eventId) eventSizes.set(
+      String(market.eventId), (eventSizes.get(String(market.eventId)) || 0) + 1,
+    );
+  }
+  const eligible = (Array.isArray(markets) ? markets : []).filter((market) => {
+    const prices = market.prices.filter((value) => value > 0 && value < 1);
+    const worstPrice = prices.length ? Math.max(...prices, ...prices.map((value) => 1 - value)) : 0.5;
+    const minimumShares = Math.max(market.orderMinSize || 5, market.rewardsMinSize || 0);
+    const minimumCapital = minimumShares * worstPrice;
+    const effectiveGuard = catalystCategories.has(market.category) && !fairFeedCategories.has(market.category)
+      ? noFairFeedGuardHours : guardHours;
+    return market.active && !market.closed && market.acceptingOrders
+      && market.tokenIds.length === 2 && minimumCapital <= maxCapitalPerMarket
+      && !isCatalystGuarded(market, nowMs, effectiveGuard);
+  }).map((market) => ({
+    ...market,
+    eventGroupSize: market.eventId ? eventSizes.get(String(market.eventId)) || 1 : 1,
+    minimumCaptureCapital: Math.max(market.orderMinSize || 5, market.rewardsMinSize || 0)
+      * Math.max(0.5, ...market.prices.filter((value) => value > 0 && value < 1)),
+  }));
+
+  const selected = [];
+  const used = new Set();
+  const take = (rows, quota, reason) => {
+    for (const market of rows) {
+      if (selected.length >= maxMarkets || quota <= 0) break;
+      if (used.has(market.conditionId)) continue;
+      used.add(market.conditionId);
+      selected.push({ ...market, selectionReason: reason, selectionScore: maxMarkets - selected.length });
+      quota -= 1;
+    }
+  };
+  const quota = (share) => Math.max(1, Math.floor(maxMarkets * share));
+  const stableId = (left, right) => left.conditionId.localeCompare(right.conditionId);
+
+  take(eligible.filter((market) => market.eventGroupSize >= 2)
+    .sort((left, right) => right.eventGroupSize - left.eventGroupSize
+      || left.minimumCaptureCapital - right.minimumCaptureCapital || stableId(left, right)),
+  quota(0.30), 'neglected:multi_contract_event_graph');
+  take(eligible.filter((market) => market.rewardsDailyRate > 0)
+    .sort((left, right) => (right.rewardsDailyRate / Math.max(1, right.rewardsMinSize || 1))
+      - (left.rewardsDailyRate / Math.max(1, left.rewardsMinSize || 1))
+      || left.minimumCaptureCapital - right.minimumCaptureCapital || stableId(left, right)),
+  quota(0.20), 'neglected:reward_small_inventory');
+  take(eligible.filter((market) => market.volume24h > 0 && market.liquidity > 0)
+    .sort((left, right) => left.volume24h - right.volume24h
+      || left.liquidity - right.liquidity || stableId(left, right)),
+  quota(0.25), 'neglected:obscure_low_activity');
+  take(eligible.filter((market) => market.volume24h > 0)
+    .sort((left, right) => right.volume24h - left.volume24h
+      || right.liquidity - left.liquidity || stableId(left, right)),
+  quota(0.15), 'neglected:liquid_control');
+
+  const remaining = eligible.filter((market) => !used.has(market.conditionId));
+  const categories = [...new Set(remaining.map((market) => market.category))].sort();
+  const groups = new Map(categories.map((category) => [category, remaining
+    .filter((market) => market.category === category)
+    .sort((left, right) => left.minimumCaptureCapital - right.minimumCaptureCapital
+      || stableId(left, right))]));
+  while (selected.length < maxMarkets) {
+    let advanced = false;
+    for (const category of categories) {
+      const next = groups.get(category).shift();
+      if (!next) continue;
+      used.add(next.conditionId);
+      selected.push({
+        ...next,
+        selectionReason: `neglected:category_balance:${category}`,
+        selectionScore: maxMarkets - selected.length,
+      });
+      advanced = true;
+      if (selected.length >= maxMarkets) break;
+    }
+    if (!advanced) break;
+  }
+  return selected;
+}
+
 module.exports = {
   CLOB,
   GAMMA,
@@ -287,7 +399,10 @@ module.exports = {
   inferCategory,
   isCatalystGuarded,
   normalizeMarket,
+  NEGLECTED_PANEL_VERSION,
+  neglectedPanelHash,
   parseArray,
   rewardDensity,
+  selectNeglectedPanel,
   selectRealtimePanel,
 };

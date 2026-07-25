@@ -23,7 +23,13 @@ const {
 } = require('../recon/db');
 const { syncExperimentRegistry } = require('../research/experiment-registry');
 const capital = require('../research/capital-policy');
-const { discoverUniverse, selectRealtimePanel } = require('./universe');
+const {
+  NEGLECTED_PANEL_VERSION,
+  discoverUniverse,
+  neglectedPanelHash,
+  selectNeglectedPanel,
+  selectRealtimePanel,
+} = require('./universe');
 const {
   advanceQueue, clampPrice, costConfirmedTaker, createQueueState,
   dataQuality, evaluateL2Predictor, finite, makerQuote, markoutPnl,
@@ -39,7 +45,14 @@ const MAX_CAPITAL_PER_MARKET = Math.max(5, Number(process.env.ALLMARKET_MAX_CAPI
 const CATALYST_GUARD_HOURS = Math.max(0, Number(process.env.ALLMARKET_CATALYST_GUARD_HOURS || 6));
 const NO_FAIR_FEED_GUARD_HOURS = Math.max(CATALYST_GUARD_HOURS,
   Number(process.env.ALLMARKET_NO_FAIR_FEED_GUARD_HOURS || 24));
-const REFRESH_MS = Math.max(60_000, Number(process.env.ALLMARKET_REFRESH_MS || 300_000));
+const PANEL_MODE = String(process.env.ALLMARKET_PANEL_MODE || 'legacy').toLowerCase();
+// A neglected panel is frozen for the evidence epoch. Rebuilding the complete
+// 80k+ Gamma universe every five minutes adds API load without changing panel
+// membership; thirty minutes is sufficient metadata refresh cadence.
+const REFRESH_MS = Math.max(60_000, Number(process.env.ALLMARKET_REFRESH_MS
+  || (PANEL_MODE === 'neglected' ? 1_800_000 : 300_000)));
+const UNIVERSE_MAX_STALE_MS = Math.max(REFRESH_MS * 3,
+  Number(process.env.ALLMARKET_UNIVERSE_MAX_STALE_MS || 7_200_000));
 const STALE_MS = Math.max(100, Number(process.env.ALLMARKET_STALE_MS || 750));
 const MAKER_QUOTE_LIFETIME_MS = Math.max(1000, Number(process.env.ALLMARKET_MAKER_QUOTE_LIFETIME_MS || 30_000));
 const PERSIST_LIMIT = Math.max(10_000, Number(process.env.ALLMARKET_PERSIST_LIMIT || 100_000));
@@ -49,6 +62,8 @@ const PERSIST_MARKETS = Math.max(MAX_MARKETS, Number(process.env.ALLMARKET_PERSI
 // token per interval. Strategy evaluation remains event-driven and unchanged.
 const SQL_TOUCH_MIN_INTERVAL_MS = Math.max(20,
   Number(process.env.ALLMARKET_SQL_TOUCH_MIN_INTERVAL_MS || 100));
+const STRATEGY_SIGNALS_ENABLED = process.env.ALLMARKET_STRATEGY_SIGNALS_ENABLED !== 'false';
+const COLLECTION_EPOCH_ID = process.env.BORG_COLLECTION_EPOCH_ID || 'allmarket-unmarked';
 
 const TOUCH_COLUMNS = [
   'observed_at', 'source_ts', 'condition_id', 'asset_id', 'outcome',
@@ -153,6 +168,29 @@ function percentile(values, probability) {
   return sorted[Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * probability))];
 }
 
+function isTransientUniverseError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const name = String(error?.name || '').toUpperCase();
+  const message = String(error?.message || error || '').toLowerCase();
+  return name === 'ABORTERROR'
+    || ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN', 'ENETUNREACH'].includes(code)
+    || /(?:operation was aborted|timed? ?out|fetch failed|socket hang up)/.test(message);
+}
+
+function universeRefreshSeverity({
+  error, selectedMarkets, consecutiveTimeouts, lastSuccessAt, now = Date.now(),
+  maxStaleMs = UNIVERSE_MAX_STALE_MS,
+}) {
+  const lastSuccessMs = Number(lastSuccessAt);
+  const staleMs = Number.isFinite(lastSuccessMs) ? Math.max(0, now - lastSuccessMs) : Infinity;
+  return isTransientUniverseError(error)
+    && Number(selectedMarkets) > 0
+    && Number(consecutiveTimeouts) < 3
+    && staleMs <= maxStaleMs
+    ? 'WARN'
+    : 'ERROR';
+}
+
 class AllMarketLab {
   constructor() {
     this.startedAt = Date.now();
@@ -164,6 +202,8 @@ class AllMarketLab {
     this.lastSqlTouchAt = new Map();
     this.lastSequence = new Map();
     this.pendingMarkouts = new Map();
+    this.panelHash = null;
+    this.panelMembershipCount = 0;
     this.reactionSamplesUs = [];
     this.buffers = { touches: [], intents: [], scores: [], inventory: [] };
     this.flushing = false;
@@ -174,6 +214,9 @@ class AllMarketLab {
       events: 0, discardedStale: 0, discardedSequence: 0, decisions: 0,
       fills: 0, partialFills: 0, persistenceDrops: 0, predictorTriggers: 0,
       costConfirmed: 0, lastEventAt: null, lastDecisionAt: null,
+      lastUniverseRefreshAt: null, lastUniverseRefreshAttemptAt: null,
+      universeRefreshTimeouts: 0, consecutiveUniverseRefreshTimeouts: 0,
+      universeRefreshFailures: 0,
       reactionUsMax: 0, reactionUsSum: 0, reactionCount: 0,
       universeScanned: 0, universePersisted: 0,
       sqlTouchesPersisted: 0, sqlTouchesSampledOut: 0,
@@ -213,7 +256,8 @@ class AllMarketLab {
       setInterval(() => this.flush().catch((error) => this.recordError('flush', error)), 250),
       setInterval(() => this.scoreMarkouts(), 20),
       setInterval(() => this.expireQuotes(), 250),
-      setInterval(() => this.refreshUniverse().catch((error) => this.recordError('universe', error)), REFRESH_MS),
+      setInterval(() => this.refreshUniverse()
+        .catch((error) => this.recordUniverseRefreshFailure(error)), REFRESH_MS),
       setInterval(() => this.clob.checkStale(), 10_000),
       setInterval(() => this.heartbeat().catch(() => {}), 10_000),
     ];
@@ -221,11 +265,38 @@ class AllMarketLab {
     await logEvent('INFO', 'allmarket_lab', 'paper-only all-market engine started', {
       runId: RUN_ID, markets: this.markets.size, tokens: this.tokenMeta.size,
       latencyProfilesMs: LATENCY_PROFILES_MS, walletLoaded: false, liveOrderPath: false,
+      strategySignalsEnabled: STRATEGY_SIGNALS_ENABLED,
+      panelMode: PANEL_MODE, panelHash: this.panelHash,
     });
   }
 
   recordError(scope, error) {
     logEvent('ERROR', 'allmarket_lab', `${scope}: ${error.message}`).catch(() => {});
+  }
+
+  recordUniverseRefreshFailure(error) {
+    const transient = isTransientUniverseError(error);
+    if (transient) {
+      this.metrics.universeRefreshTimeouts += 1;
+      this.metrics.consecutiveUniverseRefreshTimeouts += 1;
+    } else {
+      this.metrics.universeRefreshFailures += 1;
+    }
+    const level = universeRefreshSeverity({
+      error,
+      selectedMarkets: this.markets.size,
+      consecutiveTimeouts: this.metrics.consecutiveUniverseRefreshTimeouts,
+      lastSuccessAt: this.metrics.lastUniverseRefreshAt,
+      maxStaleMs: UNIVERSE_MAX_STALE_MS,
+    });
+    return logEvent(level, 'allmarket_lab', `universe refresh retained current panel: ${error.message}`, {
+      transient,
+      selectedMarkets: this.markets.size,
+      consecutiveTimeouts: this.metrics.consecutiveUniverseRefreshTimeouts,
+      lastSuccessAt: this.metrics.lastUniverseRefreshAt
+        ? new Date(this.metrics.lastUniverseRefreshAt).toISOString() : null,
+      maxStaleMs: UNIVERSE_MAX_STALE_MS,
+    });
   }
 
   sequenceAccepted(event) {
@@ -274,9 +345,10 @@ class AllMarketLab {
 
     if (event.eventType !== 'last_trade_price') {
       this.captureTouch(event, meta, sourceAge, grade, reaction);
+      if (!STRATEGY_SIGNALS_ENABLED) return;
       this.refreshMakerQuote(event, meta, grade);
       if (grade !== 'F' && sourceAge <= STALE_MS) this.triggerPredictor(event, meta, grade);
-    } else {
+    } else if (STRATEGY_SIGNALS_ENABLED) {
       this.advanceMakerFill(event, meta);
     }
   }
@@ -599,9 +671,61 @@ class AllMarketLab {
     return new Map(rows.map((row) => [String(row.condition_id), finite(row.toxicity, 0)]));
   }
 
+  async frozenNeglectedPanel(universe) {
+    if (!COLLECTION_EPOCH_ID || COLLECTION_EPOCH_ID.endsWith('-unmarked')) {
+      throw new Error('neglected panel mode requires a marked BORG_COLLECTION_EPOCH_ID');
+    }
+    const existing = await pool.query(`
+      SELECT panel_hash,condition_id,panel_rank,selection_reason,metadata
+        FROM am_panel_memberships
+       WHERE collection_epoch_id=$1 AND panel_version=$2
+       ORDER BY panel_rank`, [COLLECTION_EPOCH_ID, NEGLECTED_PANEL_VERSION]);
+    const universeById = new Map(universe.map((market) => [market.conditionId, market]));
+    if (existing.rows.length) {
+      const hashes = new Set(existing.rows.map((row) => String(row.panel_hash)));
+      if (hashes.size !== 1) throw new Error('frozen neglected panel has inconsistent hashes');
+      this.panelHash = [...hashes][0];
+      this.panelMembershipCount = existing.rows.length;
+      return existing.rows.map((row) => {
+        const market = universeById.get(String(row.condition_id));
+        return market ? {
+          ...market,
+          selectionReason: row.selection_reason,
+          selectionScore: MAX_MARKETS - Number(row.panel_rank),
+        } : null;
+      }).filter(Boolean);
+    }
+
+    const selected = selectNeglectedPanel(universe, {
+      maxMarkets: MAX_MARKETS,
+      maxCapitalPerMarket: MAX_CAPITAL_PER_MARKET,
+      catalystGuardHours: CATALYST_GUARD_HOURS,
+      noFairFeedGuardHours: NO_FAIR_FEED_GUARD_HOURS,
+      fairFeedCategories: String(process.env.ALLMARKET_FAIR_FEED_CATEGORIES || '').split(',').filter(Boolean),
+    });
+    const hash = neglectedPanelHash(selected);
+    await insertRows('am_panel_memberships', [
+      'collection_epoch_id', 'panel_version', 'panel_hash', 'condition_id',
+      'panel_rank', 'selection_reason', 'metadata',
+    ], selected.map((market, index) => [
+      COLLECTION_EPOCH_ID, NEGLECTED_PANEL_VERSION, hash, market.conditionId,
+      index, market.selectionReason, json({
+        category: market.category,
+        eventId: market.eventId,
+        eventGroupSize: market.eventGroupSize,
+        minimumCaptureCapital: market.minimumCaptureCapital,
+        pnlIndependentSelection: true,
+      }),
+    ]), 'ON CONFLICT (collection_epoch_id,panel_version,condition_id) DO NOTHING');
+    this.panelHash = hash;
+    this.panelMembershipCount = selected.length;
+    return selected;
+  }
+
   async refreshUniverse() {
     if (this.refreshing || this.stopping) return;
     this.refreshing = true;
+    this.metrics.lastUniverseRefreshAttemptAt = Date.now();
     try {
       const [universe, toxicity] = await Promise.all([
         discoverUniverse({
@@ -611,15 +735,17 @@ class AllMarketLab {
           gammaPages: Number(process.env.ALLMARKET_GAMMA_PAGES || 20),
           gammaWindows: Number(process.env.ALLMARKET_GAMMA_WINDOWS || 10),
         }),
-        this.loadToxicity(),
+        PANEL_MODE === 'neglected' ? Promise.resolve(new Map()) : this.loadToxicity(),
       ]);
-      const panel = selectRealtimePanel(universe, {
-        maxMarkets: MAX_MARKETS, maxCapitalPerMarket: MAX_CAPITAL_PER_MARKET,
-        catalystGuardHours: CATALYST_GUARD_HOURS,
-        noFairFeedGuardHours: NO_FAIR_FEED_GUARD_HOURS,
-        fairFeedCategories: String(process.env.ALLMARKET_FAIR_FEED_CATEGORIES || '').split(',').filter(Boolean),
-        toxicity,
-      });
+      const panel = PANEL_MODE === 'neglected'
+        ? await this.frozenNeglectedPanel(universe)
+        : selectRealtimePanel(universe, {
+          maxMarkets: MAX_MARKETS, maxCapitalPerMarket: MAX_CAPITAL_PER_MARKET,
+          catalystGuardHours: CATALYST_GUARD_HOURS,
+          noFairFeedGuardHours: NO_FAIR_FEED_GUARD_HOURS,
+          fairFeedCategories: String(process.env.ALLMARKET_FAIR_FEED_CATEGORIES || '').split(',').filter(Boolean),
+          toxicity,
+        });
       this.metrics.universeScanned = universe.length;
       const selected = new Set(panel.map((market) => market.conditionId));
       const persistedUniverse = [...universe].sort((left, right) =>
@@ -671,9 +797,15 @@ class AllMarketLab {
         if (!this.tokenMeta.has(assetId)) this.cancelQuote(quote, 'UNIVERSE_ROTATION');
       }
       this.clob.subscribe([...this.tokenMeta.keys()]);
+      this.metrics.lastUniverseRefreshAt = Date.now();
+      this.metrics.consecutiveUniverseRefreshTimeouts = 0;
       await logEvent('INFO', 'allmarket_lab', 'universe refreshed', {
         scanned: universe.length, selected: panel.length, tokens: this.tokenMeta.size,
         categories: [...new Set(panel.map((market) => market.category))],
+        panelMode: PANEL_MODE,
+        panelVersion: PANEL_MODE === 'neglected' ? NEGLECTED_PANEL_VERSION : null,
+        panelHash: this.panelHash,
+        frozenMemberships: this.panelMembershipCount,
       });
     } finally { this.refreshing = false; }
   }
@@ -712,13 +844,22 @@ class AllMarketLab {
     const reactionP95Us = percentile(this.reactionSamplesUs, 0.95);
     const meta = {
       runId: RUN_ID, pid: process.pid, host: os.hostname(), paperOnly: true,
+      processStartedAt: new Date(this.startedAt).toISOString(),
       walletLoaded: false, liveOrderPath: false, selectedMarkets: this.markets.size,
       subscribedTokens: this.tokenMeta.size, openQuotes: this.openQuotes.size,
       pendingMarkouts: this.pendingMarkouts.size, latencyProfilesMs: LATENCY_PROFILES_MS,
+      strategySignalsEnabled: STRATEGY_SIGNALS_ENABLED,
+      collectionEpochId: COLLECTION_EPOCH_ID,
+      panelMode: PANEL_MODE,
+      panelVersion: PANEL_MODE === 'neglected' ? NEGLECTED_PANEL_VERSION : null,
+      panelHash: this.panelHash,
+      panelMembershipCount: this.panelMembershipCount,
       reactionUsMean: meanReactionUs, reactionUsMax: this.metrics.reactionUsMax,
       reactionUsP50: reactionP50Us, reactionUsP95: reactionP95Us,
       reactionTargetMet: reactionP95Us == null ? null : reactionP95Us <= 50_000,
       sqlTouchMinIntervalMs: SQL_TOUCH_MIN_INTERVAL_MS,
+      universeRefreshMs: REFRESH_MS,
+      universeMaxStaleMs: UNIVERSE_MAX_STALE_MS,
       wal: { market: this.marketWal.health(), decisions: this.decisionWal.health() },
       ...this.metrics,
     };
@@ -769,5 +910,6 @@ if (require.main === module) main().catch(async (error) => {
 });
 
 module.exports = {
-  AllMarketLab, LATENCY_PROFILES_MS, RUN_ID, coalesceScoreRows, lastRowsByKey,
+  AllMarketLab, LATENCY_PROFILES_MS, RUN_ID, coalesceScoreRows,
+  isTransientUniverseError, lastRowsByKey, universeRefreshSeverity,
 };

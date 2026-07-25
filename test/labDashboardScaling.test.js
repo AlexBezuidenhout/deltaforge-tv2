@@ -25,10 +25,20 @@ test('Flow status remains a constant-time heartbeat report', () => {
   assert.match(status, /counter_window:\s*'collector_run'/);
 });
 
+test('BORG status is cached, single-connection and bounded to a recent gap sample', () => {
+  const source = fs.readFileSync(path.join(root, 'src', 'routes', 'borg.js'), 'utf8');
+  const status = routeBlock(source, '/status', '/shadow/summary');
+
+  assert.match(status, /dashboardReports\.get\(cacheKey,\s*10_000/);
+  assert.match(status, /const client = await pool\.connect\(\)/);
+  assert.match(status, /ORDER BY id DESC LIMIT 10000/);
+  assert.doesNotMatch(status, /now\(\)\s*-\s*interval\s*'24 hours'/i);
+});
+
 test('Lab refreshers cannot overlap their own pending requests', () => {
   const source = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 
-  for (const lab of ['flow', 'bookLab', 'crossVenue']) {
+  for (const lab of ['borg', 'flow', 'bookLab', 'crossVenue', 'dashboard']) {
     const title = lab[0].toUpperCase() + lab.slice(1);
     assert.match(source, new RegExp(`if \\(_${lab}Loading\\) return;`));
     assert.match(source, new RegExp(`try \\{ await load${title}Once\\(\\); \\} finally \\{ _${lab}Loading = false; \\}`));

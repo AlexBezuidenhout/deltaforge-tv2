@@ -10,7 +10,7 @@ if (!process.env.DATABASE_URL && fs.existsSync(serviceEnv)) {
 }
 const { Pool } = require('pg');
 const { summarizeConvergence } = require('../borg/crossvenue/convergence');
-const EXPERIMENT_ID = 'crossvenue-certified-convergence-v3';
+const { CURRENT_CROSSVENUE_EXPERIMENT_ID } = require('../borg/crossvenue/experiment');
 
 function arg(name, fallback) {
   const prefix = `--${name}=`;
@@ -20,6 +20,7 @@ function arg(name, fallback) {
 
 async function main() {
   const days = Math.max(1, Math.min(365, parseInt(arg('days', '30'), 10) || 30));
+  const experimentId = arg('experiment', CURRENT_CROSSVENUE_EXPERIMENT_ID);
   const jsonOutput = process.argv.includes('--json');
   if (!process.env.DATABASE_URL) {
     throw new Error(`DATABASE_URL is missing; set it in .env or ${serviceEnv}`);
@@ -43,7 +44,7 @@ async function main() {
                          percentile_cont(0.95) WITHIN GROUP (ORDER BY pair_skew_ms)::float p95_pair_skew_ms
                     FROM cv_book_snapshots
                    WHERE observed_at>=now()-($1||' days')::interval
-                     AND experiment_id=$2 AND synchronized=true`, [days, EXPERIMENT_ID]),
+                     AND experiment_id=$2 AND synchronized=true`, [days, experimentId]),
       pool.query(`SELECT count(*)::int candidates,
                          count(*) FILTER (WHERE identity_approved)::int approved,
                          count(*) FILTER (WHERE relation_approved)::int approved_relations,
@@ -67,7 +68,7 @@ async function main() {
                          sum(best_raw) FILTER (WHERE approved)::float approved_raw_upper_bound,
                          sum(best_stressed) FILTER (WHERE approved)::float approved_stressed_upper_bound,
                          avg(EXTRACT(EPOCH FROM (last_at-first_at)))::float mean_duration_sec
-                    FROM per_episode`, [days, EXPERIMENT_ID]),
+                    FROM per_episode`, [days, experimentId]),
       pool.query(`SELECT direction,count(*)::int observations,
                          count(DISTINCT episode_id) FILTER (WHERE economic AND relation_approved)::int economic_episodes,
                          count(DISTINCT episode_id) FILTER (WHERE lockable_after_both_fills)::int lockable_episodes,
@@ -79,17 +80,18 @@ async function main() {
                     FROM cv_opportunities WHERE observed_at>=now()-($1||' days')::interval
                      AND experiment_id=$2 AND synchronized=true
                      AND detail->>'model'='DETERMINISTIC_PAYOFF_RELATION_V1'
-                   GROUP BY direction ORDER BY direction`, [days, EXPERIMENT_ID]),
+                   GROUP BY direction ORDER BY direction`, [days, experimentId]),
       pool.query(`SELECT observed_at,match_id,direction,quantity::float,
                          entry_total_cost::float,net_liquidation_proceeds::float,
                          terminal_locked_profit::float,immediate_round_trip_pnl::float,
-                         entry_economic,identity_approved,relation_approved,relation_type,books_fresh,
+                         entry_economic,paper_eval_approved,paper_entry_eligible,
+                         identity_approved,relation_approved,relation_type,books_fresh,
                          full_entry_depth,full_exit_depth,
                          data_quality_grade,execution_fidelity_grade
                     FROM cv_basis_samples
                    WHERE observed_at>=now()-($1||' days')::interval
                      AND experiment_id=$2 AND synchronized=true
-                   ORDER BY match_id,direction,quantity,observed_at`, [days, EXPERIMENT_ID]),
+                   ORDER BY match_id,direction,quantity,observed_at`, [days, experimentId]),
       pool.query(`SELECT observed_at,match_id,episode_id,direction,quantity::float,
                          locked_profit_after_both_fills::float raw_profit,
                          stressed_profit::float,books_fresh,data_quality_grade,
@@ -98,7 +100,7 @@ async function main() {
                    WHERE observed_at>=now()-($1||' days')::interval
                      AND match_id=ANY($2::text[])
                      AND experiment_id=$3 AND synchronized=true
-                   ORDER BY observed_at`, [days, relationIds, EXPERIMENT_ID]),
+                   ORDER BY observed_at`, [days, relationIds, experimentId]),
       pool.query(`SELECT episode_id,match_id,relation_id,direction,state_active_from,
                          first_observed_at,last_observed_at,first_economic_at,last_economic_at,
                          disappeared_at,closed_at,lifecycle_status,observations::int,
@@ -111,7 +113,7 @@ async function main() {
                     FROM cv_relation_episodes
                    WHERE first_observed_at>=now()-($1||' days')::interval
                      AND experiment_id=$2
-                   ORDER BY first_observed_at`, [days, EXPERIMENT_ID]),
+                   ORDER BY first_observed_at`, [days, experimentId]),
     ]);
     const convergence = summarizeConvergence(basis.rows);
     const relationByMatch = new Map(relationDefinitions.map((row) => [row.matchId, row.relation]));
@@ -145,7 +147,7 @@ async function main() {
     }));
     const report = {
       generatedAt: new Date().toISOString(), requestedDays: days,
-      engineCohort: EXPERIMENT_ID,
+      engineCohort: experimentId,
       capitalModel: {
         startingUsd: 500, perVenueUsd: 250,
         sizing: 'equal payout shares optimized over executable depth and bankroll',

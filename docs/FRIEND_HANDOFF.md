@@ -1,8 +1,6 @@
 # DeltaForge collaborator handoff
 
-Snapshot date: 19 July 2026. Source baseline:
-`22c999701b1ef9a76a4d026a1c47f4b64175fd0e`. Individual research reports retain
-their stated evidence cutoffs. This is a research platform, not a claim of a
+Snapshot date: 17 July 2026. This is a research platform, not a claim of a
 profitable production trading system. The live dashboards expose current paper,
 shadow and collector state. No wallet key, exchange credential, database URL,
 VPS login or live-order authorization is included in the repository.

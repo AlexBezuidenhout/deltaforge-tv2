@@ -23,6 +23,10 @@ function finite(value, fallback = null) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function flag(value) {
+  return value === true || value === 1 || value === '1' || value === 'true';
+}
+
 function normalizeSample(row) {
   const observedAt = new Date(row.observed_at ?? row.observedAt).getTime();
   return {
@@ -34,13 +38,15 @@ function normalizeSample(row) {
     netLiquidationProceeds: finite(row.net_liquidation_proceeds ?? row.netLiquidationProceeds),
     terminalLockedProfit: finite(row.terminal_locked_profit ?? row.terminalLockedProfit),
     immediateRoundTripPnl: finite(row.immediate_round_trip_pnl ?? row.immediateRoundTripPnl),
-    entryEconomic: Boolean(row.entry_economic ?? row.entryEconomic),
-    identityApproved: Boolean(row.identity_approved ?? row.identityApproved),
-    relationApproved: Boolean(row.relation_approved ?? row.relationApproved
+    entryEconomic: flag(row.entry_economic ?? row.entryEconomic),
+    paperEvalApproved: flag(row.paper_eval_approved ?? row.paperEvalApproved),
+    paperEntryEligible: flag(row.paper_entry_eligible ?? row.paperEntryEligible),
+    identityApproved: flag(row.identity_approved ?? row.identityApproved),
+    relationApproved: flag(row.relation_approved ?? row.relationApproved
       ?? row.identity_approved ?? row.identityApproved),
-    booksFresh: Boolean(row.books_fresh ?? row.booksFresh),
-    fullEntryDepth: Boolean(row.full_entry_depth ?? row.fullEntryDepth),
-    fullExitDepth: Boolean(row.full_exit_depth ?? row.fullExitDepth),
+    booksFresh: flag(row.books_fresh ?? row.booksFresh),
+    fullEntryDepth: flag(row.full_entry_depth ?? row.fullEntryDepth),
+    fullExitDepth: flag(row.full_exit_depth ?? row.fullExitDepth),
     quality: String(row.data_quality_grade ?? row.dataQualityGrade ?? 'F'),
     fidelity: String(row.execution_fidelity_grade ?? row.executionFidelityGrade ?? 'F'),
   };
@@ -89,7 +95,7 @@ function buildConvergenceEpisodes(rawRows, { maxHorizonMs = HORIZONS_MS.at(-1) }
     for (let i = 0; i < samples.length; i += 1) {
       const entry = samples[i];
       if (!eligibleEntrySample(entry)) continue;
-      if (!entry.entryEconomic) { armed = true; continue; }
+      if (!entry.entryEconomic && !entry.paperEntryEligible) { armed = true; continue; }
       if (!armed) continue;
       armed = false;
 
@@ -116,6 +122,8 @@ function buildConvergenceEpisodes(rawRows, { maxHorizonMs = HORIZONS_MS.at(-1) }
         terminalLockedProfit: entry.terminalLockedProfit,
         identityApproved: entry.identityApproved,
         relationApproved: entry.relationApproved,
+        paperEvalApproved: entry.paperEvalApproved,
+        paperEntryEligible: entry.paperEntryEligible,
         event: eventAt != null,
         durationMs: eventAt == null ? observedDurationMs : eventAt - entry.observedAt,
         eventAt: eventAt == null ? null : new Date(eventAt).toISOString(),
@@ -125,6 +133,27 @@ function buildConvergenceEpisodes(rawRows, { maxHorizonMs = HORIZONS_MS.at(-1) }
     }
   }
   return episodes.sort((a, b) => Date.parse(a.entryAt) - Date.parse(b.entryAt));
+}
+
+function pairDirectionDayKey(episode) {
+  const at = new Date(episode?.entryAt);
+  if (!episode?.matchId || !episode?.direction || Number.isNaN(at.getTime())) return null;
+  return `${episode.matchId}:${episode.direction}:${at.toISOString().slice(0, 10)}`;
+}
+
+/**
+ * Repeated quote regimes from one pair on one day share venue, rule and event
+ * risk. Keep the first prospectively eligible episode only; later re-entries
+ * remain useful diagnostics but cannot manufacture independent sample size.
+ */
+function firstEpisodePerPairDirectionDay(episodes) {
+  const first = new Map();
+  for (const episode of [...(episodes || [])]
+    .sort((left, right) => Date.parse(left.entryAt) - Date.parse(right.entryAt))) {
+    const key = pairDirectionDayKey(episode);
+    if (key && !first.has(key)) first.set(key, episode);
+  }
+  return [...first.values()];
 }
 
 function kmAt(episodes, horizonMs) {
@@ -149,19 +178,31 @@ function kmAt(episodes, horizonMs) {
 }
 
 function summarizeCohort(episodes) {
+  const independent = firstEpisodePerPairDirectionDay(episodes);
+  const firstAt = independent.length ? independent[0].entryAt : null;
+  const lastAt = independent.length ? independent.at(-1).entryAt : null;
+  const spanDays = firstAt && lastAt
+    ? (Date.parse(lastAt) - Date.parse(firstAt)) / 86_400_000
+    : 0;
   const horizons = HORIZONS_MS.map((horizonMs) => ({
-    label: HORIZON_LABELS.get(horizonMs), horizonMs, ...kmAt(episodes, horizonMs),
+    label: HORIZON_LABELS.get(horizonMs), horizonMs, ...kmAt(independent, horizonMs),
   }));
-  const eventDurations = episodes.filter((row) => row.event).map((row) => row.durationMs).sort((a, b) => a - b);
+  const eventDurations = independent.filter((row) => row.event).map((row) => row.durationMs).sort((a, b) => a - b);
   let medianMs = null;
   for (const horizon of horizons) {
     if (horizon.probability != null && horizon.probability >= 0.5) { medianMs = horizon.horizonMs; break; }
   }
   return {
-    episodes: episodes.length,
-    pairs: new Set(episodes.map((row) => row.matchId)).size,
+    episodes: independent.length,
+    rawEpisodes: episodes.length,
+    repeatedSamePairDirectionDay: episodes.length - independent.length,
+    independentPairDirectionDays: independent.length,
+    pairs: new Set(independent.map((row) => row.matchId)).size,
+    firstAt,
+    lastAt,
+    spanDays,
     observedProfitableExits: eventDurations.length,
-    rightCensored: episodes.length - eventDurations.length,
+    rightCensored: independent.length - eventDurations.length,
     medianTimeToProfitableMs: medianMs,
     observedMedianEventMs: eventDurations.length ? eventDurations[Math.floor(eventDurations.length / 2)] : null,
     horizons,
@@ -171,24 +212,33 @@ function summarizeCohort(episodes) {
 function summarizeConvergence(rows, options = {}) {
   const episodes = buildConvergenceEpisodes(rows, options);
   const approved = episodes.filter((row) => row.relationApproved);
+  const paper = episodes.filter((row) => row.paperEvalApproved && !row.relationApproved);
+  const diagnostic = episodes.filter((row) => !row.paperEvalApproved && !row.relationApproved);
   const eligible = (rows || []).map(normalizeSample).filter(eligibleSample)
     .sort((a, b) => a.observedAt - b.observedAt);
   const firstAt = eligible.length ? new Date(eligible[0].observedAt).toISOString() : null;
   const lastAt = eligible.length ? new Date(eligible.at(-1).observedAt).toISOString() : null;
   const spanDays = firstAt && lastAt ? (Date.parse(lastAt) - Date.parse(firstAt)) / 86_400_000 : 0;
+  const approvedSummary = summarizeCohort(approved);
+  const paperSummary = summarizeCohort(paper);
   return {
     methodology: 'First profitable executable liquidation after fixed ask-side entry; entry and exit fees charged on all four legs; Kaplan-Meier right-censoring.',
     horizons: HORIZONS_MS.map((ms) => HORIZON_LABELS.get(ms)),
     coverage: { firstAt, lastAt, spanDays, samples: eligible.length },
-    approvedEvidence: summarizeCohort(approved),
-    unapprovedDiagnostic: summarizeCohort(episodes),
-    evidenceReady: approved.length >= 300 && spanDays >= 30,
-    warning: 'Unproved text matches are discovery diagnostics, not deployable convergence evidence.',
+    approvedEvidence: approvedSummary,
+    paperEvaluation: paperSummary,
+    unapprovedDiagnostic: summarizeCohort(diagnostic),
+    evidenceReady: approvedSummary.independentPairDirectionDays >= 300
+      && approvedSummary.spanDays >= 30,
+    paperEvaluationReady: paperSummary.independentPairDirectionDays >= 300
+      && paperSummary.spanDays >= 14,
+    warning: 'Score-approved rows are paper tests of an assumed $1 parity relationship. They are not contractual-identity approvals, terminal locks, or live-trading evidence.',
   };
 }
 
 module.exports = {
   HORIZONS_MS, baseEligibleSample, buildConvergenceEpisodes,
   eligibleEntrySample, eligibleExitSample, eligibleSample, kmAt,
-  normalizeSample, summarizeCohort, summarizeConvergence,
+  firstEpisodePerPairDirectionDay, normalizeSample, pairDirectionDayKey,
+  summarizeCohort, summarizeConvergence,
 };

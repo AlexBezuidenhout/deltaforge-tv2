@@ -1,0 +1,22 @@
+{
+  "manifest_format": "borg-platform-manifest-v1",
+  "experiment_id": "institutional-platform-v2",
+  "supersedes": "institutional-platform-v1",
+  "status": "ACCEPTANCE_TEST",
+  "phase": "pilot",
+  "frozen_at": "2026-07-21T14:22:12.875Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "family": "research_infrastructure",
+  "requirements": {
+    "raw_event_provenance": ["source_time", "local_receive_time", "monotonic_time", "connection_epoch", "event_sequence"],
+    "append_before_process_wal": true,
+    "compressed_parquet_off_hot_database": true,
+    "local_postgresql_is_normalized_hot_tier": true,
+    "off_host_archive_required": true,
+    "minimum_free_disk_gib": 30,
+    "minimum_clean_collection_hours": 24,
+    "disallowed_during_burn_in": ["sequence_gap", "stale_required_feed", "WAL_failure", "missing_required_market", "silent_collector_exit"]
+  },
+  "decision_rule": "Infrastructure PASS only opens the evidence window. It never implies strategy profitability or authorizes live orders."
+}

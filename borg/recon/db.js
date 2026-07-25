@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS borg_book_snaps (
   rtds_divergence_bps REAL
 );
 CREATE INDEX IF NOT EXISTS borg_book_snaps_market_ts ON borg_book_snaps (market_id, ts);
+CREATE INDEX IF NOT EXISTS borg_book_snaps_ts_brin ON borg_book_snaps USING BRIN (ts);
 CREATE TABLE IF NOT EXISTS borg_clob_events (
   id BIGSERIAL PRIMARY KEY,
   ts TIMESTAMPTZ NOT NULL,
@@ -97,6 +98,7 @@ CREATE TABLE IF NOT EXISTS borg_chainlink_rounds (
   seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   btc_at_receipt NUMERIC
 );
+CREATE INDEX IF NOT EXISTS borg_chainlink_rounds_seen_at ON borg_chainlink_rounds (seen_at DESC);
 CREATE TABLE IF NOT EXISTS borg_rtds_ticks (
   id BIGSERIAL PRIMARY KEY,
   source TEXT NOT NULL,
@@ -162,6 +164,10 @@ CREATE TABLE IF NOT EXISTS borg_external_trades (
 );
 CREATE INDEX IF NOT EXISTS borg_external_trades_source_product_ts
   ON borg_external_trades (source, product, received_at);
+CREATE INDEX IF NOT EXISTS borg_external_trades_received_brin
+  ON borg_external_trades USING BRIN (received_at);
+CREATE UNIQUE INDEX IF NOT EXISTS borg_external_trades_dedup_received_uq
+  ON borg_external_trades (dedup_key, received_at);
 CREATE TABLE IF NOT EXISTS borg_taker_trades (
   id BIGSERIAL PRIMARY KEY,
   dedup_key TEXT UNIQUE,
@@ -383,6 +389,7 @@ CREATE TABLE IF NOT EXISTS borg_events (
   ts TIMESTAMPTZ DEFAULT now(),
   level TEXT, source TEXT, message TEXT, data JSONB
 );
+CREATE INDEX IF NOT EXISTS borg_events_source_id ON borg_events (source, id DESC);
 -- Collection epochs are immutable cohort boundaries. They separate data made
 -- under materially different infrastructure/data contracts without deleting
 -- or rewriting any historical observation.
@@ -409,6 +416,17 @@ CREATE TABLE IF NOT EXISTS borg_collector_runs (
   status TEXT NOT NULL DEFAULT 'RUNNING',
   metadata JSONB
 );
+CREATE TABLE IF NOT EXISTS borg_evidence_health_samples (
+  id BIGSERIAL PRIMARY KEY,
+  epoch_id TEXT NOT NULL REFERENCES borg_collection_epochs(epoch_id),
+  checked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status TEXT NOT NULL,
+  critical JSONB NOT NULL DEFAULT '[]'::jsonb,
+  warnings JSONB NOT NULL DEFAULT '[]'::jsonb,
+  metrics JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS borg_evidence_health_epoch_time
+  ON borg_evidence_health_samples (epoch_id, checked_at DESC);
 CREATE INDEX IF NOT EXISTS borg_collector_runs_epoch_started
   ON borg_collector_runs (epoch_id, started_at DESC);
 -- One row per registered strategy and collector process. This is runtime
@@ -464,6 +482,28 @@ CREATE TABLE IF NOT EXISTS borg_shadow_scores (
   pnl_gross REAL, pnl_05x REAL, pnl_1x REAL, pnl_2x REAL,
   detail JSONB
 );
+-- Frozen quote-survival counterfactuals are persisted while the high-rate
+-- event tape is still in the PostgreSQL hot tier. They never alter the
+-- strategy's signal or primary paper score; promotion uses them only to prove
+-- that a result is not dependent on one assumed order latency.
+CREATE TABLE IF NOT EXISTS borg_shadow_latency_scores (
+  order_id BIGINT NOT NULL REFERENCES borg_shadow_orders(id),
+  latency_ms INT NOT NULL,
+  scored_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  filled BOOLEAN NOT NULL,
+  fill_ts TIMESTAMPTZ,
+  fill_price REAL,
+  fill_size REAL,
+  pnl_gross REAL NOT NULL DEFAULT 0,
+  pnl_1x REAL NOT NULL DEFAULT 0,
+  pnl_2x REAL NOT NULL DEFAULT 0,
+  data_quality_grade TEXT NOT NULL,
+  execution_fidelity_grade TEXT NOT NULL,
+  detail JSONB NOT NULL DEFAULT '{}'::jsonb,
+  PRIMARY KEY (order_id, latency_ms)
+);
+CREATE INDEX IF NOT EXISTS borg_shadow_latency_scores_profile
+  ON borg_shadow_latency_scores (latency_ms, order_id);
 CREATE TABLE IF NOT EXISTS h53_live_orders (
   id BIGSERIAL PRIMARY KEY,
   shadow_order_id BIGINT UNIQUE NOT NULL REFERENCES borg_shadow_orders(id),
@@ -773,6 +813,10 @@ CREATE INDEX IF NOT EXISTS borg_structural_evaluations_candidate_ts
 CREATE INDEX IF NOT EXISTS borg_structural_evaluations_positive
   ON borg_structural_evaluations (evaluated_at DESC)
   WHERE economic_candidate OR qualified;
+CREATE INDEX IF NOT EXISTS borg_structural_evaluations_evaluated_brin
+  ON borg_structural_evaluations USING BRIN (evaluated_at);
+CREATE UNIQUE INDEX IF NOT EXISTS borg_structural_evaluations_dedup_evaluated_uq
+  ON borg_structural_evaluations (dedup_key, evaluated_at);
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS trigger_received_at TIMESTAMPTZ;
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS latency_ms INT NOT NULL DEFAULT 0;
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS reaction_us NUMERIC;
@@ -845,6 +889,7 @@ CREATE INDEX IF NOT EXISTS borg_deribit_option_touch_sample_brin
 CREATE TABLE IF NOT EXISTS borg_option_shadow_marks (
   id BIGSERIAL PRIMARY KEY,
   dedup_key TEXT UNIQUE NOT NULL,
+  experiment_id TEXT NOT NULL DEFAULT 'options-implied-binary-v1',
   observed_at TIMESTAMPTZ NOT NULL,
   market_id INT NOT NULL,
   condition_id TEXT,
@@ -872,10 +917,16 @@ CREATE TABLE IF NOT EXISTS borg_option_shadow_marks (
   executable BOOLEAN NOT NULL DEFAULT false,
   detail JSONB NOT NULL
 );
+ALTER TABLE borg_option_shadow_marks ADD COLUMN IF NOT EXISTS experiment_id TEXT
+  NOT NULL DEFAULT 'options-implied-binary-v1';
 CREATE INDEX IF NOT EXISTS borg_option_shadow_marks_market_time
   ON borg_option_shadow_marks (market_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS borg_option_shadow_marks_experiment_time
+  ON borg_option_shadow_marks (experiment_id, observed_at DESC);
 CREATE INDEX IF NOT EXISTS borg_option_shadow_marks_positive
   ON borg_option_shadow_marks (observed_at DESC) WHERE executable;
+CREATE UNIQUE INDEX IF NOT EXISTS borg_option_shadow_marks_dedup_observed_uq
+  ON borg_option_shadow_marks (dedup_key, observed_at);
 
 CREATE TABLE IF NOT EXISTS borg_options_runtime (
   run_id TEXT PRIMARY KEY,
@@ -1139,6 +1190,20 @@ CREATE INDEX IF NOT EXISTS am_markets_selected_score
 ALTER TABLE am_markets ADD COLUMN IF NOT EXISTS fee_exponent NUMERIC NOT NULL DEFAULT 1;
 ALTER TABLE am_markets ADD COLUMN IF NOT EXISTS fee_taker_only BOOLEAN NOT NULL DEFAULT true;
 
+CREATE TABLE IF NOT EXISTS am_panel_memberships (
+  collection_epoch_id TEXT NOT NULL,
+  panel_version TEXT NOT NULL,
+  panel_hash TEXT NOT NULL,
+  condition_id TEXT NOT NULL,
+  panel_rank INT NOT NULL,
+  selection_reason TEXT NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  selected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (collection_epoch_id, panel_version, condition_id)
+);
+CREATE INDEX IF NOT EXISTS am_panel_memberships_epoch_rank
+  ON am_panel_memberships (collection_epoch_id, panel_version, panel_rank);
+
 CREATE TABLE IF NOT EXISTS am_book_touches (
   id BIGSERIAL PRIMARY KEY,
   observed_at TIMESTAMPTZ NOT NULL,
@@ -1170,6 +1235,11 @@ CREATE INDEX IF NOT EXISTS am_book_touches_market_time
   ON am_book_touches (condition_id, observed_at DESC);
 CREATE INDEX IF NOT EXISTS am_book_touches_observed_brin
   ON am_book_touches USING BRIN (observed_at);
+-- The BRIN index is compact for replay scans, but a heavily recycled hot tier
+-- can leave sparse old pages that make bounded deletes recheck gigabytes of
+-- heap. This btree gives retention a causal, index-only starting point.
+CREATE INDEX IF NOT EXISTS am_book_touches_observed_id
+  ON am_book_touches (observed_at, id);
 
 CREATE TABLE IF NOT EXISTS am_order_intents (
   intent_id TEXT PRIMARY KEY,
@@ -1482,6 +1552,12 @@ CREATE TABLE IF NOT EXISTS cv_contract_matches (
   relation_proof JSONB,
   relation_resolution_audit JSONB,
   state_evidence JSONB,
+  paper_eval_approved BOOLEAN NOT NULL DEFAULT false,
+  paper_eval_status TEXT NOT NULL DEFAULT 'NOT_APPROVED',
+  paper_eval_source TEXT,
+  paper_eval_approved_at TIMESTAMPTZ,
+  paper_eval_score_at_approval NUMERIC,
+  paper_eval_threshold NUMERIC,
   approval_source TEXT,
   resolution_audit JSONB,
   mismatch_reasons JSONB NOT NULL,
@@ -1499,6 +1575,12 @@ ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS relation_status TEXT NO
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS relation_proof JSONB;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS relation_resolution_audit JSONB;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS state_evidence JSONB;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_approved BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_status TEXT NOT NULL DEFAULT 'NOT_APPROVED';
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_source TEXT;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_approved_at TIMESTAMPTZ;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_score_at_approval NUMERIC;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_threshold NUMERIC;
 CREATE INDEX IF NOT EXISTS cv_contract_matches_rank
   ON cv_contract_matches (identity_approved DESC, match_score DESC, refreshed_at DESC);
 CREATE INDEX IF NOT EXISTS cv_contract_matches_relation_rank
@@ -1590,6 +1672,8 @@ ALTER TABLE cv_book_snapshots ADD COLUMN IF NOT EXISTS synchronized BOOLEAN NOT 
 ALTER TABLE cv_book_snapshots ADD COLUMN IF NOT EXISTS causal_cut_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS cv_book_snapshots_match_time
   ON cv_book_snapshots (match_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS cv_book_snapshots_observed_id
+  ON cv_book_snapshots (observed_at, id);
 
 CREATE TABLE IF NOT EXISTS cv_opportunities (
   opportunity_id TEXT PRIMARY KEY,
@@ -1609,6 +1693,8 @@ CREATE TABLE IF NOT EXISTS cv_opportunities (
   stressed_profit NUMERIC NOT NULL,
   indicative_economic BOOLEAN NOT NULL DEFAULT false,
   economic BOOLEAN NOT NULL,
+  paper_eval_approved BOOLEAN NOT NULL DEFAULT false,
+  paper_trade_eligible BOOLEAN NOT NULL DEFAULT false,
   identity_approved BOOLEAN NOT NULL,
   relation_type TEXT NOT NULL DEFAULT 'UNREVIEWED',
   relation_approved BOOLEAN NOT NULL DEFAULT false,
@@ -1629,9 +1715,15 @@ ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS experiment_id TEXT NOT NUL
 ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS synchronized BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS cv_opportunities_match_time
   ON cv_opportunities (match_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS cv_opportunities_observed_id
+  ON cv_opportunities (observed_at, opportunity_id);
 CREATE INDEX IF NOT EXISTS cv_opportunities_economic_time
   ON cv_opportunities (observed_at DESC) WHERE economic;
+CREATE UNIQUE INDEX IF NOT EXISTS cv_opportunities_id_observed_uq
+  ON cv_opportunities (opportunity_id, observed_at);
 ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS indicative_economic BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS paper_eval_approved BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS paper_trade_eligible BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS relation_type TEXT NOT NULL DEFAULT 'UNREVIEWED';
 ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS relation_approved BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS guaranteed_min_payout_per_share NUMERIC;
@@ -1675,6 +1767,17 @@ CREATE TABLE IF NOT EXISTS cv_relation_episodes (
   UNIQUE (match_id, relation_id, direction, state_active_from)
 );
 ALTER TABLE cv_relation_episodes ADD COLUMN IF NOT EXISTS experiment_id TEXT NOT NULL DEFAULT 'crossvenue-identity-v2';
+-- The original natural key omitted experiment_id. A frozen successor trial
+-- therefore generated a different deterministic episode_id but collided with
+-- the historical trial's row. Keep cohorts isolated and make NULL active
+-- states deterministic as well; episode_id remains the upsert target.
+ALTER TABLE cv_relation_episodes
+  DROP CONSTRAINT IF EXISTS cv_relation_episodes_match_id_relation_id_direction_state_a_key;
+CREATE UNIQUE INDEX IF NOT EXISTS cv_relation_episodes_experiment_relation_state
+  ON cv_relation_episodes (
+    experiment_id,match_id,relation_id,direction,
+    COALESCE(state_active_from,'-infinity'::timestamptz)
+  );
 CREATE INDEX IF NOT EXISTS cv_relation_episodes_status_time
   ON cv_relation_episodes (lifecycle_status, last_observed_at DESC);
 CREATE INDEX IF NOT EXISTS cv_relation_episodes_relation
@@ -1706,6 +1809,8 @@ CREATE TABLE IF NOT EXISTS cv_basis_samples (
   immediate_round_trip_pnl NUMERIC,
   indicative_entry_economic BOOLEAN NOT NULL DEFAULT false,
   entry_economic BOOLEAN NOT NULL,
+  paper_eval_approved BOOLEAN NOT NULL DEFAULT false,
+  paper_entry_eligible BOOLEAN NOT NULL DEFAULT false,
   identity_approved BOOLEAN NOT NULL,
   relation_type TEXT NOT NULL DEFAULT 'UNREVIEWED',
   relation_approved BOOLEAN NOT NULL DEFAULT false,
@@ -1725,8 +1830,12 @@ ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS experiment_id TEXT NOT NUL
 ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS synchronized BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS cv_basis_samples_pair_time
   ON cv_basis_samples (match_id, direction, quantity, observed_at);
+CREATE INDEX IF NOT EXISTS cv_basis_samples_observed_id
+  ON cv_basis_samples (observed_at, sample_id);
 CREATE INDEX IF NOT EXISTS cv_basis_samples_entry_time
   ON cv_basis_samples (observed_at DESC) WHERE entry_economic;
+CREATE UNIQUE INDEX IF NOT EXISTS cv_basis_samples_id_observed_uq
+  ON cv_basis_samples (sample_id, observed_at);
 ALTER TABLE cv_basis_samples ALTER COLUMN poly_exit_vwap DROP NOT NULL;
 ALTER TABLE cv_basis_samples ALTER COLUMN kalshi_exit_vwap DROP NOT NULL;
 ALTER TABLE cv_basis_samples ALTER COLUMN poly_exit_fee DROP NOT NULL;
@@ -1735,6 +1844,8 @@ ALTER TABLE cv_basis_samples ALTER COLUMN gross_liquidation_proceeds DROP NOT NU
 ALTER TABLE cv_basis_samples ALTER COLUMN net_liquidation_proceeds DROP NOT NULL;
 ALTER TABLE cv_basis_samples ALTER COLUMN immediate_round_trip_pnl DROP NOT NULL;
 ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS indicative_entry_economic BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS paper_eval_approved BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS paper_entry_eligible BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS relation_type TEXT NOT NULL DEFAULT 'UNREVIEWED';
 ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS relation_approved BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS guaranteed_min_payout_per_share NUMERIC;

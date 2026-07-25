@@ -125,7 +125,9 @@ class GeorgeBotInstance {
       pool.query(
         `INSERT INTO system_heartbeats (component, beat_at, meta) VALUES ('george_bot', now(), $1)
          ON CONFLICT (component) DO UPDATE SET beat_at = now(), meta = $1`,
-        [JSON.stringify({ pid: process.pid, userId: this.userId, lastTickAgeSec: Math.round((Date.now() - this._lastTickAt) / 1000) })]
+        [JSON.stringify({ pid: process.pid, userId: this.userId,
+          runtimeInstanceId: process.env.DELTAFORGE_INSTANCE_ID || null,
+          lastTickAgeSec: Math.round((Date.now() - this._lastTickAt) / 1000) })]
       ).catch(() => {});
     }, 10000);
     await pool.query('UPDATE bot_settings SET george_is_active = true WHERE user_id = $1', [this.userId]).catch(() => {});

@@ -1,0 +1,41 @@
+{
+  "experiment_id": "cf-resolver-boundary-residual-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-21T14:22:12.875Z",
+  "evidence_started_at": "2026-07-21T14:22:12.875Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "resolver_source_boundary_residual",
+  "strategy_version": "cf-market-prior-residual-v1",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "hypothesis": "For CF Benchmarks-resolved contracts, an exact official resolver stream may explain a residual relative to the executable venue quote near the boundary.",
+  "data_contract": {
+    "required": "official licensed or otherwise authoritative CF Benchmarks RTI observations with source timestamp and exact settlement-rule binding",
+    "current_status": "BLOCKED_NO_AUTHORITATIVE_REALTIME_CF_FEED",
+    "prohibited_proxy": "Binance, Coinbase, Kalshi midpoint or any synthetic composite may not be relabelled as CF Benchmarks",
+    "available_capture": "rule-aware Polymarket/Kalshi quotes and terminal resolver mismatch outcomes remain diagnostic only"
+  },
+  "model_contract": {
+    "prior": "contemporaneous executable market quote",
+    "entry_rule": "fair lower bound - executable ask - doubled fees - slippage must be strictly positive",
+    "missing_feed_policy": "emit no eligible paper trade"
+  },
+  "strategy_bindings": [{
+    "strategy": "resolver_boundary_cf_residual_v1",
+    "family": "resolver_source_boundary_residual",
+    "arm": "blocked_pending_official_feed",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "terminal_net_pnl_2x_lower_bound_only"
+  }],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "require_positive_at_latency_ms": [100, 250, 500],
+    "null_outcome": "No authoritative feed means no experiment and no profitability claim."
+  }
+}

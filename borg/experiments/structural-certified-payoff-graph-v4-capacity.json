@@ -1,0 +1,72 @@
+{
+  "experiment_id": "structural-certified-payoff-graph-v4-capacity",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-23T15:10:00Z",
+  "evidence_started_at": "2026-07-23T15:10:00Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "certified_payoff_graph",
+  "supersedes": "structural-certified-payoff-graph-v3",
+  "strategy_version": "structural-certified-payoff-graph-v4-capacity",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "selection_disclosure": "V4 changes only deterministic coverage capacity after the storage architecture was repaired: 48 candidates, 128 tokens and four public CLOB shards instead of 16/48/two. It does not alter the payoff compiler, rule certifier, fee stress, edge hurdle, budget, orphan-risk rule or ranking from observed PnL. Every V1-V3 evaluation is excluded from V4 evidence by the content-addressed universe identifier and fresh v11 epoch.",
+  "hypothesis": "A wider deterministic panel of venue-rule-certified payoff identities will expose additional small-capacity executable locks without relaxing proof or execution standards.",
+  "certification": {
+    "accepted": [
+      "single-condition binary complements",
+      "non-augmented explicit negRisk complete event sets",
+      "same-resolution-scope ordered price thresholds",
+      "same-resolution-scope typed disjoint ranges",
+      "same-scope sports total and spread ladders with identical normalized rule templates"
+    ],
+    "fail_closed": [
+      "augmented negRisk sets",
+      "negRisk Other placeholders",
+      "partial event sets",
+      "mixed resolver or expiry scope",
+      "unknown rule documents, fee schedules, venue minimums or payoff states"
+    ],
+    "payoff_verifier": "deterministic finite-state proof; no AI output can certify a bundle",
+    "identity": "universe version, legs, payoff proof and rule-certification hash"
+  },
+  "coverage": {
+    "max_candidates": 48,
+    "max_tokens": 128,
+    "clob_shards": 4,
+    "selection": "deterministic round-robin across complete sets, sports totals, sports spreads, nested thresholds, disjoint ranges and binary controls",
+    "catalog_limit": 20000,
+    "gamma_views": "end-time and volume panels plus explicit sports taxonomy"
+  },
+  "execution": {
+    "latency_profiles_ms": [20, 50, 100, 250, 500],
+    "target_budget_usd": 10,
+    "book_model": "walk every displayed ask level on every leg",
+    "fees": "current per-market metadata stressed at 2x; unknown schedules fail closed",
+    "minimum_size": "maximum published minimum across legs",
+    "atomicity": false,
+    "orphan_rule": "no multi-leg candidate is qualified unless worst-case non-atomic orphan stress passes"
+  },
+  "evaluation": {
+    "minimum_independent_events": 300,
+    "minimum_calendar_days": 14,
+    "primary_metric": "statewise_guaranteed_profit_after_2x_fees_depth_rule_and_orphan_certification",
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bound_above_zero": true,
+    "require_positive_under_100ms_250ms_and_500ms": true,
+    "multiple_testing": "Holm correction across relation class, latency profile and capacity band",
+    "null_outcome": "No executable certified bundle is an acceptable and reportable result."
+  },
+  "strategy_bindings": [{
+    "strategy": "structural_certified_payoff_graph_v4",
+    "family": "certified_payoff_graph",
+    "arm": "expanded_capacity",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "guaranteed_profit_2x_depth_certified_rules"
+  }]
+}

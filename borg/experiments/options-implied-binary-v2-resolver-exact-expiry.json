@@ -1,0 +1,69 @@
+{
+  "experiment_id": "options-implied-binary-v2-resolver-exact-expiry",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-23T15:10:00Z",
+  "evidence_started_at": "2026-07-23T15:10:00Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "options_implied_prediction_market_value",
+  "supersedes": "options-implied-binary-v1",
+  "strategy_version": "deribit-surface-digital-v2-resolver-exact-expiry",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "selection_disclosure": "V1 showed no executable A/B marks because the nearest short-horizon Polymarket boundary generally preceded the listed option term. V2 was frozen before collection. It adds every strike only when the Polymarket boundary exactly equals an actually listed Deribit expiration and the Binance hourly-close rule is deterministically certified; it does not select assets, sides, strikes or events from PnL.",
+  "market_scope": {
+    "assets": ["BTC", "ETH"],
+    "baseline_targets": "active numeric Polymarket threshold contracts with a recognized resolver feed",
+    "exact_expiry_expansion": "all strikes in a current threshold event when its UTC boundary equals a listed Deribit call expiration to the millisecond",
+    "resolver_certification": "requires an above predicate, two distinct tokens, explicit Binance BTC/USDT or ETH/USDT source, explicit Close price and explicit one-hour candle",
+    "unknown_rules": "fail closed",
+    "deribit_selection": "calls at two strikes on each side of every target plus frozen ATM archive anchors, maximum 160 public subscriptions"
+  },
+  "valuation": {
+    "prior": "current executable Polymarket quote",
+    "model": "cash digital under the bid/mark/ask Deribit volatility surface",
+    "strike_interpolation": "linear in IV over log strike",
+    "term_interpolation": "linear in total variance",
+    "resolver_basis": "the live RTDS feed matching the contract rule, Binance for Binance-resolved contracts; Chainlink is never substituted",
+    "uncertainty": "resolver-versus-Deribit index basis plus or minus 3 bps and the complete bid/ask IV interval",
+    "fees": "current Polymarket fee metadata stressed at 2x; unknown fees fail closed",
+    "hedge": "rounded spot/perpetual base quantity equal to negative model delta with 5 bps cost stress",
+    "residual_risk": "binary gamma, IV and resolver-basis CVaR retained per observation"
+  },
+  "execution": {
+    "paper_only": true,
+    "target_budget_usd": 10,
+    "full_depth_walk": true,
+    "venue_minimum_required": true,
+    "minimum_tte_sec": 300,
+    "maximum_tte_sec": 604800,
+    "surface_max_age_ms": 3000,
+    "polymarket_book_max_age_ms": 500,
+    "shadow_executable_surface_grades": ["A", "B"],
+    "live_orders": false
+  },
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "primary_metric": "terminal_binary_pnl_plus_causal_hedge_pnl_after_2x_poly_fees_and_hedge_cost",
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "require_positive_under_100ms_250ms_and_500ms": true,
+    "multiple_testing": "Holm correction across asset, side, target class, surface fidelity and latency profile",
+    "capacity": "displayed Polymarket depth and executable hedge depth only",
+    "promotion": "Passing permits only a separately reviewed tiny authenticated canary; this manifest grants no live authority.",
+    "zero_edge_disclosure": "No exact-expiry opportunities or zero/negative post-cost PnL is a valid result and cannot be repaired by retuning this cohort."
+  },
+  "strategy_bindings": [{
+    "strategy": "options_implied_binary_v2",
+    "family": "options_implied_prediction_market_value",
+    "arm": "resolver_exact_expiry",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "terminal_net_pnl_2x_plus_hedge"
+  }]
+}

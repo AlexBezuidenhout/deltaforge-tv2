@@ -39,8 +39,8 @@ test('condition graph builds algebraic nested, disjoint, and explicit complete s
   assert.equal(complete.complete, true);
   assert.equal(complete.legs.length, 2);
   assert.equal(complete.ruleCertification.valid, true);
-  assert.equal(complete.universeId, 'structural-certified-payoff-graph-v3');
-  assert.equal(STRUCTURAL_UNIVERSE_VERSION, 'structural-certified-payoff-graph-v3');
+  assert.equal(complete.universeId, 'structural-certified-payoff-graph-v4-capacity');
+  assert.equal(STRUCTURAL_UNIVERSE_VERSION, 'structural-certified-payoff-graph-v4-capacity');
 });
 
 test('augmented negRisk sets fail closed as complete payoff identities', () => {
@@ -86,6 +86,9 @@ test('scanner separates 2x-fee economics, FOK capacity, and non-atomic orphan ri
   const result = evaluateCandidate(candidate, books, now, {
     targetNotionalUsd: 10, minCapacityProfitUsd: 0.05,
   });
+  assert.equal(result.passRuleCertification, true);
+  assert.equal(result.passProof, true);
+  assert.equal(typeof result.passProof, 'boolean');
   assert.equal(result.passStale, true);
   assert.equal(result.passFees2x, true);
   assert.equal(result.passFok, true);

@@ -15,7 +15,6 @@ Environment=BORG_ARCHIVE_MIN_FREE_GB=20
 Environment=BORG_DB_HOT_RETENTION_HOURS=24
 Environment=BORG_ARCHIVE_BATCH_ROWS=5000
 Environment=BORG_ARCHIVE_DEFAULT_MAX_BATCHES=4
-Environment=BORG_ARCHIVE_CLOB_MAX_BATCHES=24
 Environment=BORG_ARCHIVE_MAX_RUNTIME_MS=120000
 ExecStart=/usr/local/bin/node scripts/raw-archive.js
 TimeoutStartSec=3min

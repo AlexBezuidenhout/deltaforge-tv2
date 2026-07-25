@@ -14,6 +14,10 @@ const EQUITY_PRICE_SYMBOLS = new Set([
 ]);
 const MARKET_TO_FEED_SYMBOL = Object.freeze({ NG: 'NGD' });
 const FEED_TO_MARKET_SYMBOL = Object.freeze({ NGD: 'NG' });
+// The public RTDS endpoint currently stops delivering live updates when more
+// than 15 equity subscriptions are requested on one socket. Keep a hard bound
+// here and let the collector prioritize markets whose resolver window is open.
+const MAX_EQUITY_SUBSCRIPTIONS = 15;
 
 function finite(value, fallback = null) {
   const parsed = parseFloat(value);
@@ -39,6 +43,19 @@ function marketSymbolForFeed(symbol) {
 
 function isSupportedMarketSymbol(symbol) {
   return EQUITY_PRICE_SYMBOLS.has(feedSymbolForMarket(symbol));
+}
+
+function boundedMarketSymbols(symbols) {
+  const selected = [];
+  const seen = new Set();
+  for (const value of symbols || []) {
+    const symbol = String(value || '').trim().toUpperCase();
+    if (!symbol || seen.has(symbol) || !isSupportedMarketSymbol(symbol)) continue;
+    seen.add(symbol);
+    selected.push(symbol);
+    if (selected.length >= MAX_EQUITY_SUBSCRIPTIONS) break;
+  }
+  return selected;
 }
 
 function normalizeUpdate(row, historical, envelope = {}) {
@@ -92,7 +109,7 @@ function parseFrame(raw, envelope = {}) {
 class PythRtds {
   constructor(options = {}) {
     this.url = options.url || RTDS_URL;
-    this.symbols = new Set((options.symbols || []).map((value) => String(value).toUpperCase()));
+    this.symbols = new Set(boundedMarketSymbols(options.symbols));
     this.wal = options.wal || null;
     this.onTick = options.onTick || (() => {});
     this.onStatus = options.onStatus || (() => {});
@@ -114,23 +131,34 @@ class PythRtds {
   }
 
   setSymbols(symbols) {
-    const next = new Set((symbols || []).map((value) => String(value).toUpperCase()).filter(Boolean));
+    const next = new Set(boundedMarketSymbols(symbols));
     const changed = next.size !== this.symbols.size || [...next].some((value) => !this.symbols.has(value));
     this.symbols = next;
-    if (changed && this.ws?.readyState === WebSocket.OPEN) this.subscribe();
+    if (changed && this.ws?.readyState === WebSocket.OPEN) {
+      // Reconnect so a changed bounded set replaces the prior subscription;
+      // repeated subscribe messages on this endpoint are not reliably additive.
+      const socket = this.ws;
+      this.ws = null;
+      this.stopKeepalive();
+      try { socket.close(); } catch (_) {}
+      this.scheduleReconnect();
+    }
   }
 
   subscribe() {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    for (const symbol of this.symbols) {
-      const feedSymbol = feedSymbolForMarket(symbol);
-      if (!EQUITY_PRICE_SYMBOLS.has(feedSymbol)) continue;
-      this.ws.send(JSON.stringify({
-        action: 'subscribe', subscriptions: [{
-          topic: 'equity_prices', type: '*', filters: JSON.stringify({ symbol: feedSymbol }),
-        }],
+    // RTDS accepts multiple subscriptions in one request. Sending one request
+    // per symbol in a tight loop can leave the socket connected but with only
+    // empty acknowledgement frames, so make each desired symbol part of one
+    // atomic subscription message.
+    const subscriptions = [...this.symbols]
+      .map(feedSymbolForMarket)
+      .filter((symbol) => EQUITY_PRICE_SYMBOLS.has(symbol))
+      .map((symbol) => ({
+        topic: 'equity_prices', type: '*', filters: JSON.stringify({ symbol }),
       }));
-    }
+    if (!subscriptions.length) return;
+    this.ws.send(JSON.stringify({ action: 'subscribe', subscriptions }));
   }
 
   startKeepalive(socket) {
@@ -283,6 +311,7 @@ class PythRtds {
 }
 
 module.exports = {
-  EQUITY_PRICE_SYMBOLS, PythRtds, RTDS_URL, epochMs, feedSymbolForMarket, finite,
-  isSupportedMarketSymbol, marketSymbolForFeed, normalizeUpdate, parseFrame,
+  boundedMarketSymbols, EQUITY_PRICE_SYMBOLS, MAX_EQUITY_SUBSCRIPTIONS, PythRtds,
+  RTDS_URL, epochMs, feedSymbolForMarket, finite, isSupportedMarketSymbol,
+  marketSymbolForFeed, normalizeUpdate, parseFrame,
 };

@@ -209,8 +209,10 @@ function contractText(market, venue) {
     return [market.question, market.eventTitle, market.description, market.resolutionSource]
       .filter(Boolean).join(' ');
   }
-  return [market.title, market.subtitle, market.yesSubTitle, market.rulesPrimary, market.rulesSecondary]
-    .filter(Boolean).join(' ');
+  return [market.title, market.eventTitle, market.eventSubTitle, market.subtitle,
+    market.yesSubTitle, market.rulesPrimary, market.rulesSecondary,
+    ...(market.settlementSources || []).map((row) => typeof row === 'string'
+      ? row : row?.url || row?.name || '')].filter(Boolean).join(' ');
 }
 
 function identityFeatures(market, venue) {
@@ -218,7 +220,8 @@ function identityFeatures(market, venue) {
   if (market && typeof market === 'object' && cache.has(market)) return cache.get(market);
   const title = venue === 'poly'
     ? [market.question, market.eventTitle].filter(Boolean).join(' ')
-    : [market.title, market.subtitle, market.yesSubTitle].filter(Boolean).join(' ');
+    : [market.title, market.eventTitle, market.eventSubTitle,
+      market.subtitle, market.yesSubTitle].filter(Boolean).join(' ');
   const fullText = contractText(market, venue);
   const predicateInput = venue === 'poly' ? title
     : [market.rulesPrimary, market.title, market.yesSubTitle].filter(Boolean).join(' ');
@@ -395,6 +398,7 @@ function evaluateCombination({
   polyOutcome, kalshiOutcome, quantity, polyBook, kalshiBook,
   polyFeeRate = 0, polyFeeExponent = 1, kalshiFeeMultiplier = 1,
   polyTick = 0.01, kalshiTick = 0.01, identityApproved = false,
+  paperEvalApproved = false,
   relationApproved = false, relationType = 'UNREVIEWED',
   guaranteedMinPayoutPerShare = null, payoffProofHash = null,
   booksFresh = false, totalCapitalUsd = null, polyCapitalUsd = null,
@@ -442,6 +446,11 @@ function evaluateCombination({
   const economic = payoffApproved && booksFresh && budgetFeasible && indicativeEconomic;
   const lockableAfterBothFills = economic
     && stressedProfit > 0;
+  // A score-approved paper pair is allowed to simulate the parity thesis, but
+  // remains explicitly outside proved economics. Require the frozen 2x-fee +
+  // one-tick-per-leg stress before recording a paper trade candidate.
+  const paperTradeEligible = paperEvalApproved === true && !payoffApproved
+    && booksFresh && budgetFeasible && stressedProfit > 0;
   return {
     direction: `POLY_${polyOutcome}+KALSHI_${kalshiOutcome}`,
     polyOutcome, kalshiOutcome, quantity,
@@ -457,12 +466,13 @@ function evaluateCombination({
     worstImmediateOrphanUnwindPnl,
     immediateOrphanUnwindAvailable: polyUnwind.fullDepth && kalshiUnwind.fullDepth,
     terminalEdgeHeadroomPerShare: lockedProfitAfterBothFills / quantity,
-    indicativeEconomic, economic, identityApproved,
+    indicativeEconomic, economic, paperEvalApproved, paperTradeEligible, identityApproved,
     relationApproved: payoffApproved, relationType, payoffProofHash, booksFresh,
     lockableAfterBothFills,
     atomic: false,
     status: !budgetFeasible ? 'OVER_BUDGET'
       : lockableAfterBothFills ? 'LOCKABLE_NONATOMIC'
+      : paperTradeEligible ? 'PAPER_ASSUMED_PARITY_STRESSED_EDGE'
       : !payoffApproved && indicativeEconomic ? 'UNPROVEN_PAYOFF_CONTROL'
         : economic ? 'PROVEN_RAW_EDGE_FAILED_STRESS' : 'NO_EDGE',
     fills: { polymarket: polyFill.fills, kalshi: kalshiFill.fills },
@@ -566,7 +576,8 @@ function optimizeCombination(options) {
   const rows = [...candidateSet].sort((a, b) => a - b)
     .map(evaluate).filter((row) => row?.budgetFeasible);
   if (!rows.length) return null;
-  const robust = rows.filter((row) => row.relationApproved && row.stressedProfit > 0)
+  const robust = rows.filter((row) => (row.relationApproved || row.paperEvalApproved)
+    && row.stressedProfit > 0)
     .sort((left, right) => right.stressedProfit - left.stressedProfit
       || right.lockedProfitAfterBothFills - left.lockedProfitAfterBothFills
       || right.quantity - left.quantity);
@@ -611,7 +622,9 @@ function optimizePair(options) {
 function evaluateBasisCombination({
   polyOutcome, kalshiOutcome, quantity, polyBook, kalshiBook,
   polyFeeRate = 0, polyFeeExponent = 1, kalshiFeeMultiplier = 1,
+  polyTick = 0.01, kalshiTick = 0.01,
   identityApproved = false, relationApproved = false,
+  paperEvalApproved = false,
   relationType = 'UNREVIEWED', guaranteedMinPayoutPerShare = null,
   payoffProofHash = null, booksFresh = false,
 }) {
@@ -635,6 +648,10 @@ function evaluateBasisCombination({
   const terminalMinimumPayout = quantity * payoutPerShare;
   const terminalLockedProfit = terminalMinimumPayout - entryTotalCost;
   const immediateRoundTripPnl = fullExitDepth ? netLiquidationProceeds - entryTotalCost : null;
+  const paperStressProfit = terminalLockedProfit - polyEntryFee - kalshiEntryFee
+    - quantity * (Math.max(0, finite(polyTick, 0.01)) + Math.max(0, finite(kalshiTick, 0.01)));
+  const paperEntryEligible = paperEvalApproved === true && !payoffApproved
+    && booksFresh && paperStressProfit > 0;
 
   return {
     direction: `POLY_${polyOutcome}+KALSHI_${kalshiOutcome}`,
@@ -648,6 +665,7 @@ function evaluateBasisCombination({
     terminalLockedProfit, immediateRoundTripPnl,
     indicativeEntryEconomic: terminalLockedProfit > 0,
     entryEconomic: payoffApproved && booksFresh && terminalLockedProfit > 0,
+    paperEvalApproved, paperEntryEligible, paperStressProfit,
     identityApproved, relationApproved: payoffApproved, relationType, payoffProofHash, booksFresh,
     fullEntryDepth: true, fullExitDepth,
     entryFills: { polymarket: polyEntry.fills, kalshi: kalshiEntry.fills },

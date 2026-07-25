@@ -5,18 +5,35 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { Pool } = require('pg');
 const makeStrategies = require('../borg/shadow/strategies');
+const { filterStrategiesByDisposition, PARKED_STATUSES } = require('../borg/research/strategy-policy');
 const { riskWindowFloor } = require('../src/bot/PortfolioRiskPolicy');
 
-const CORE_HEARTBEATS = Object.freeze([
-  'main_bot', 'george_bot', 'h53_live', 'flow_boundary_canary',
-  'paired_maker_lab', 'structural_scanner', 'options_surface', 'pyth_boundary',
-  'crossvenue_lab', 'allmarket_lab',
+const BASE_REQUIRED_HEARTBEATS = Object.freeze([
+  'main_bot', 'george_bot', 'structural_scanner', 'options_surface',
+  'pyth_boundary', 'crossvenue_lab', 'allmarket_lab',
 ]);
-const HEARTBEAT_COMPONENTS = Object.freeze([...CORE_HEARTBEATS, 'gla_live', 'raw_archiver']);
+const OPTIONAL_EXECUTOR_HEARTBEATS = Object.freeze([
+  'gla_live', 'flow_boundary_canary', 'h53_live',
+]);
+const HEARTBEAT_COMPONENTS = Object.freeze([
+  ...BASE_REQUIRED_HEARTBEATS,
+  ...OPTIONAL_EXECUTOR_HEARTBEATS,
+  'paired_maker_lab',
+  'raw_archiver',
+]);
 
-function ageSeconds(value) {
+function requiredHeartbeatComponents(settings = {}) {
+  const required = [...BASE_REQUIRED_HEARTBEATS];
+  if (settings.live_gla_enabled === true) required.push('gla_live');
+  if (settings.live_flow_boundary_enabled === true) required.push('flow_boundary_canary');
+  if (settings.live_h53_enabled === true) required.push('h53_live');
+  return required;
+}
+
+function ageSeconds(value, nowMs = Date.now()) {
   if (!value) return null;
-  return Math.max(0, (Date.now() - new Date(value).getTime()) / 1000);
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? Math.max(0, (nowMs - parsed) / 1000) : null;
 }
 
 function number(value, fallback = 0) {
@@ -34,10 +51,9 @@ async function main() {
   const warnings = [];
   const checks = {};
   try {
-    const expected = [...new Set(makeStrategies().map((strategy) => strategy.name))].sort();
     const [
       { rows: settingsRows }, { rows: runRows }, { rows: heartbeatRows },
-      { rows: collectorRows }, { rows: flowRows },
+      { rows: collectorRows }, { rows: flowRows }, { rows: dispositionRows },
     ] = await Promise.all([
       pool.query(`SELECT user_id, paper_trading, is_active, george_is_active,
                          george_own_signal_enabled, george_resurrection_enabled,
@@ -65,7 +81,14 @@ async function main() {
       pool.query(`SELECT ts,data,EXTRACT(EPOCH FROM now()-ts)::int age_sec
                     FROM borg_events WHERE source='flow_heartbeat'
                    ORDER BY ts DESC LIMIT 1`),
+      pool.query(`SELECT DISTINCT strategy,status FROM borg_trial_ledger
+                   WHERE status=ANY($1::text[])`, [[...PARKED_STATUSES]]),
     ]);
+    const policy = filterStrategiesByDisposition(makeStrategies(), dispositionRows, {
+      includeParked: String(process.env.BORG_INCLUDE_PARKED_CONTROLS || 'false').toLowerCase() === 'true',
+    });
+    const expected = [...new Set(policy.active.map((strategy) => strategy.name))].sort();
+    checks.parkedStrategies = policy.parked;
 
     const settings = settingsRows[0];
     if (!settings) critical.push('bot_settings row is missing');
@@ -118,7 +141,9 @@ async function main() {
     } : null;
 
     const beatByName = Object.fromEntries(heartbeatRows.map((row) => [row.component, row]));
-    for (const component of CORE_HEARTBEATS) {
+    const requiredHeartbeats = requiredHeartbeatComponents(settings);
+    checks.requiredHeartbeats = requiredHeartbeats;
+    for (const component of requiredHeartbeats) {
       const beat = beatByName[component];
       if (!beat || number(beat.age_sec, Infinity) > 120) critical.push(`${component} heartbeat is stale or missing`);
     }
@@ -129,14 +154,12 @@ async function main() {
       critical.push(`George evaluator tick is ${beatByName.george_bot.meta.lastTickAgeSec}s old`);
     }
     const glaBeat = beatByName.gla_live;
-    if (settings?.live_gla_enabled === true) {
-      if (!glaBeat || number(glaBeat.age_sec, Infinity) > 120) {
-        critical.push('G_late_arb paper mirror is enabled but its heartbeat is stale or missing');
-      } else if (glaBeat.meta?.dry !== true) {
+    if (glaBeat && settings?.live_gla_enabled === true) {
+      if (glaBeat.meta?.dry !== true) {
         critical.push('G_late_arb mirror is not in its systemd-enforced dry-run paper mode');
       }
-    } else if (glaBeat && number(glaBeat.age_sec, Infinity) <= 120) {
-      warnings.push('G_late_arb mirror is running while its DB enable switch is off');
+    } else if (glaBeat && glaBeat.meta?.dry !== true) {
+      critical.push('G_late_arb live switch is off but heartbeat does not report paper mode');
     }
     if (beatByName.h53_live) {
       const expectedDry = settings?.live_h53_enabled !== true;
@@ -167,10 +190,34 @@ async function main() {
         critical.push(`${component} violated its paper-only runtime contract`);
       }
     }
+    if (beatByName.structural_scanner
+        && number(beatByName.structural_scanner.meta?.persistenceErrors) > 0) {
+      critical.push(`structural_scanner has ${number(beatByName.structural_scanner.meta.persistenceErrors)} persistence errors in the current process`);
+    }
     if (beatByName.options_surface) {
       const lastEventAt = number(beatByName.options_surface.meta?.lastEventAt, 0);
       if (!(lastEventAt > 0) || Date.now() - lastEventAt > 60_000) {
         critical.push('options_surface public feed is stale or missing');
+      }
+    }
+    if (beatByName.allmarket_lab) {
+      const universeRefreshAgeSec = ageSeconds(
+        beatByName.allmarket_lab.meta?.lastUniverseRefreshAt,
+      );
+      const maxUniverseAgeMs = number(
+        beatByName.allmarket_lab.meta?.universeMaxStaleMs,
+        7_200_000,
+      );
+      const consecutiveTimeouts = number(
+        beatByName.allmarket_lab.meta?.consecutiveUniverseRefreshTimeouts,
+        0,
+      );
+      if (universeRefreshAgeSec == null
+          || universeRefreshAgeSec * 1000 > maxUniverseAgeMs) {
+        critical.push('allmarket_lab full-universe metadata refresh is stale or missing');
+      }
+      if (consecutiveTimeouts >= 3) {
+        critical.push(`allmarket_lab has ${consecutiveTimeouts} consecutive universe timeouts`);
       }
     }
     if (beatByName.pyth_boundary) {
@@ -290,3 +337,5 @@ if (require.main === module) main().catch((error) => {
   console.error(error.stack || error.message);
   process.exit(1);
 });
+
+module.exports = { ageSeconds, requiredHeartbeatComponents };

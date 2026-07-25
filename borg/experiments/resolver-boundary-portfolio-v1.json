@@ -1,0 +1,26 @@
+{
+  "experiment_id": "resolver-boundary-portfolio-v1",
+  "manifest_format": "borg-analysis-v1",
+  "frozen_at": "2026-07-20T09:42:00.000Z",
+  "evidence_started_at": "2026-07-20T09:42:00.000Z",
+  "phase": "analysis",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "resolver_boundary_transfer",
+  "provisional": true,
+  "historical_rows_reused": false,
+  "purpose": "One read-only portfolio view across independently frozen boundary experiments. It does not merge evidence identities, alter lane mechanics or permit their overlapping PnL to be summed.",
+  "lanes": [
+    { "experiment_id": "research-h43-forward-v1", "primary_arm": "first H43 order per Polymarket market" },
+    { "experiment_id": "flow-late-absorption-boundary-v3", "primary_arm": "first 250ms arrival intent per condition" },
+    { "experiment_id": "pyth-resolver-boundary-transfer-v1", "primary_arm": "first valid 250ms arrival per condition" }
+  ],
+  "portfolio_rules": {
+    "independence": "Each lane is scored by first eligible attempt per market and clustered by market and UTC day.",
+    "capital_overlap": "Signals sharing a market window or resolver exposure are competing uses of capital, never additive trades.",
+    "promotion": "Each lane must separately pass its immutable minimum sample, duration, doubled-cost, chronological-half and clustered-lower-bound rules.",
+    "selection_correction": "Correct across all strategy arms and inspected boundary variants, not just the three displayed lanes.",
+    "null_outcome": "All three lanes may have approximately zero edge."
+  }
+}

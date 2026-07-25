@@ -1,0 +1,51 @@
+{
+  "experiment_id": "research-h45-forward-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-20T09:40:00.000Z",
+  "evidence_started_at": "2026-07-20T09:40:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "prospective_threshold_velocity",
+  "supersedes": "research-daily-structural-universe-v2",
+  "strategy_version": "unchanged-research-v5-h45-forward-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "provisional": true,
+  "historical_rows_reused": false,
+  "source_file_sha256_at_freeze": "85b94bdbe1116ed6d75ca70f727d137cb573156ef08b32c047af05a1abf93548",
+  "selection_disclosure": "H45 was selected after 41 pilot orders across 40 markets produced a positive point estimate. Every order before evidence_started_at is discovery only and excluded. The rule, assets, market family, thresholds, sizing and execution model are unchanged.",
+  "hypothesis": "A sustained 30-second change in resolver-spot distance from a same-day strike can reach the executable threshold-token book with a measurable lag after fees and displayed-depth constraints.",
+  "frozen_mechanics": {
+    "market_type": "threshold_daily",
+    "lookback_seconds": 30,
+    "entry_tte_seconds": [300, 1800],
+    "minimum_absolute_velocity_bps": 4,
+    "projection": "velocity_30s * min(tte_seconds,120) / 30, clipped to plus_or_minus_15_bps",
+    "fair_value": "binaryFair(projected_resolver_spot,strike,dynamic_sigma,tte)",
+    "entry": "bestAction against the executable ask with the pre-existing doubled-fee edge and capacity rules",
+    "independence": "at most one action per Polymarket market id",
+    "parameter_changes_at_freeze": false
+  },
+  "strategy_bindings": [{
+    "strategy": "H45_threshold_distance_velocity",
+    "family": "threshold_velocity",
+    "arm": "unchanged_30s_velocity",
+    "phase": "eval",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "net_pnl_2x_clustered_by_market_day"
+  }],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "cluster_by": ["Polymarket event/market", "UTC day"],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "multiple_testing": "Correct across all 135 inspected strategy arms and every post-hoc slice; H45 is not a one-hypothesis discovery.",
+    "promotion": "No live path. A passing read triggers an execution-fidelity and capital-overlap review, not automatic deployment.",
+    "null_outcome": "The discovery profit may be selection noise. Zero or negative forward edge is a valid and expected result."
+  }
+}

@@ -54,12 +54,17 @@ const DATA_TRADE_PAGE_SIZE = Math.max(100, Math.min(1000,
   Number(process.env.FLOW_DATA_TRADE_PAGE_SIZE || 500)));
 const DATA_TRADE_MAX_PAGES = Math.max(1, Math.min(10,
   Number(process.env.FLOW_DATA_TRADE_MAX_PAGES || 4)));
+const REST_MAX_ATTEMPTS = Math.max(1, Math.min(6,
+  Number(process.env.FLOW_REST_MAX_ATTEMPTS || 4)));
+const DATA_API_TIMEOUT_MS = Math.max(5_000,
+  Number(process.env.FLOW_DATA_API_TIMEOUT_MS || 20_000));
 const ORDER_TRANSIT_PROFILES_MS = Object.freeze([50, 100, 250, 500]);
 const UNIVERSE_REFRESH_MS = Math.max(30000, Number(process.env.FLOW_UNIVERSE_REFRESH_MS || 60000));
 // V1 is retained in the database as the blind post-sweep control. It is
 // structurally negative at every arm/latency and is disabled by default so the
 // forward V2 cohort does not spend storage re-proving the same spread cost.
 const FLOW_V1_CONTROL_ENABLED = process.env.FLOW_V1_CONTROL_ENABLED === 'true';
+const STRATEGY_SIGNALS_ENABLED = process.env.FLOW_STRATEGY_SIGNALS_ENABLED !== 'false';
 const RUN_ID = `flow:${os.hostname()}:${new Date().toISOString()}:${process.pid}:${crypto.randomUUID().slice(0, 8)}`;
 
 function finite(value) {
@@ -177,21 +182,60 @@ function sourceCursorCutoff(cursorSec) {
   return cursor != null && cursor > 0 ? Math.max(0, Math.floor(cursor) - 2) : 0;
 }
 
-async function fetchText(url, timeoutMs = 10000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    const text = await response.text();
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${text.slice(0, 160)}`);
-    return text;
-  } finally {
-    clearTimeout(timer);
-  }
+function globalCoverageState(saturated, cursorSec) {
+  if (!saturated) return 'COMPLETE';
+  return finite(cursorSec) > 0 ? 'GAP' : 'BOOTSTRAP_TRUNCATED';
 }
 
-async function fetchJson(url, timeoutMs = 10000) {
-  return JSON.parse(await fetchText(url, timeoutMs));
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchText(url, timeoutMs = 10000, options = {}) {
+  const fetchImpl = options.fetchImpl || fetch;
+  const sleep = options.sleep || wait;
+  const maxAttempts = Math.max(1, Math.min(6,
+    Number(options.maxAttempts || REST_MAX_ATTEMPTS)));
+  const baseDelayMs = Math.max(1, Number(options.baseDelayMs || 500));
+  let lastError = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(url, { signal: controller.signal });
+      const text = await response.text();
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}: ${text.slice(0, 160)}`);
+        error.status = response.status;
+        const retrySeconds = parseFloat(response.headers?.get?.('retry-after'));
+        error.retryAfterMs = Number.isFinite(retrySeconds)
+          ? Math.max(0, retrySeconds * 1000) : null;
+        throw error;
+      }
+      return text;
+    } catch (error) {
+      const timedOut = error?.name === 'AbortError';
+      lastError = timedOut
+        ? Object.assign(new Error(`HTTP timeout after ${timeoutMs}ms: ${url}`), {
+          code: 'ETIMEDOUT',
+        })
+        : error;
+      const retryable = timedOut || error?.status === 429
+        || error?.status >= 500 || error?.status == null;
+      if (!retryable || attempt + 1 >= maxAttempts) throw lastError;
+      const delayMs = Math.min(10_000,
+        error?.retryAfterMs ?? baseDelayMs * (2 ** attempt));
+      options.onRetry?.({ attempt: attempt + 1, delayMs, error: lastError, url: String(url) });
+      await sleep(delayMs);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError;
+}
+
+async function fetchJson(url, timeoutMs = 10000, options = {}) {
+  return JSON.parse(await fetchText(url, timeoutMs, options));
 }
 
 async function concurrentMap(items, width, fn) {
@@ -372,6 +416,7 @@ class FlowCollector {
     this.counters = {
       globalTrades: 0, realtimeTrades: 0, eligibleSweeps: 0, signals: 0,
       scored: 0, filled: 0, errors: 0, scheduledSkips: 0, globalCoverageGaps: 0,
+      globalBootstrapTruncations: 0, restRetries: 0, lastRestRetryAt: null,
       boundarySourceArmed: 0, boundaryReady: 0, boundaryRejected: 0,
       startedAt: new Date().toISOString(),
     };
@@ -386,16 +431,17 @@ class FlowCollector {
     // first interval could overlap this call while a large response was still
     // in flight.
     await this.scanGlobalTrades();
-    this._every(() => this.scanGlobalTrades(), GLOBAL_POLL_MS);
-    this._every(() => this.flushTouches(), 500);
-    this._every(() => this.persistBookHeartbeats(), 1000);
-    this._every(() => this.scorePending(), 2000);
-    this._every(() => this.refreshUniverse(), UNIVERSE_REFRESH_MS);
-    this._every(() => this.health(), 10000);
-    this._every(() => this.heartbeat(), 60000);
+    this._every(() => this.scanGlobalTrades(), GLOBAL_POLL_MS, 'global_trade_scan');
+    this._every(() => this.flushTouches(), 500, 'touch_flush');
+    this._every(() => this.persistBookHeartbeats(), 1000, 'book_heartbeat');
+    this._every(() => this.scorePending(), 2000, 'pending_score');
+    this._every(() => this.refreshUniverse(), UNIVERSE_REFRESH_MS, 'universe_refresh');
+    this._every(() => this.health(), 10000, 'socket_health');
+    this._every(() => this.heartbeat(), 60000, 'collector_heartbeat');
     await logEvent('INFO', 'flow', 'public-flow paper collector started', {
       paper_only: true, live_order_path: 'absent', strategy_version: CHALLENGER_STRATEGY_VERSION,
       retired_control_version: STRATEGY_VERSION, v1_control_enabled: FLOW_V1_CONTROL_ENABLED,
+      strategy_signals_enabled: STRATEGY_SIGNALS_ENABLED,
       realtime_markets: REALTIME_MARKETS, shards: SOCKET_SHARDS,
       global_poll_ms: GLOBAL_POLL_MS, data_trade_page_size: DATA_TRADE_PAGE_SIZE,
       data_trade_max_pages: DATA_TRADE_MAX_PAGES,
@@ -404,18 +450,24 @@ class FlowCollector {
     await this.heartbeat();
   }
 
-  _every(fn, interval) {
+  _every(fn, interval, task = 'scheduled_task') {
     const run = makeNonOverlappingTask(
       () => fn.call(this),
       () => { this.counters.scheduledSkips += 1; },
     );
-    const timer = setInterval(() => run().catch((error) => this.error(error)), interval);
+    const timer = setInterval(() => run().catch((error) => this.error(error, { task })), interval);
     this.timers.push(timer);
   }
 
   async fetchRecentTrades(sinceSec) {
     return collectRecentTradePages(
-      (offset, limit) => fetchJson(dataTradesUrl(limit, offset), 10000),
+      (offset, limit) => fetchJson(dataTradesUrl(limit, offset), DATA_API_TIMEOUT_MS, {
+        maxAttempts: REST_MAX_ATTEMPTS,
+        onRetry: () => {
+          this.counters.restRetries += 1;
+          this.counters.lastRestRetryAt = new Date().toISOString();
+        },
+      }),
       { sinceSec, pageSize: DATA_TRADE_PAGE_SIZE, maxPages: DATA_TRADE_MAX_PAGES },
     );
   }
@@ -687,7 +739,9 @@ class FlowCollector {
     const result = evaluatePublicSweep({
       trade: { assetId, side: event.side, price, size, outcome: market.outcomes[outcomeIndex] },
       market, triggerBook: this.books.get(assetId), oppositeBook: this.books.get(opposite),
-      preTouch, nowMs: observedAt, includeControls: FLOW_V1_CONTROL_ENABLED, includeChallengers: true,
+      preTouch, nowMs: observedAt,
+      includeControls: STRATEGY_SIGNALS_ENABLED && FLOW_V1_CONTROL_ENABLED,
+      includeChallengers: STRATEGY_SIGNALS_ENABLED,
     });
     this.counters.realtimeTrades += 1;
     if (result.eligible) {
@@ -876,6 +930,7 @@ class FlowCollector {
     // whenever this eventually-consistent endpoint trails the VPS clock.
     const start = sourceCursorCutoff(this.globalCursorSec);
     const recent = await this.fetchRecentTrades(start);
+    const completedCoverageState = globalCoverageState(recent.saturated, this.globalCursorSec);
     const receivedAt = Date.now();
     this.lastGlobalResponseAt = receivedAt;
     const trades = recent.trades;
@@ -917,6 +972,7 @@ class FlowCollector {
         request: {
           start, end, received_at_ms: receivedAt, returned: trades.length,
           pages: recent.pages, page_size: DATA_TRADE_PAGE_SIZE, saturated: recent.saturated,
+          coverage_state: completedCoverageState,
         },
         trades: uniqueEntries.map((entry) => entry.trade),
       }), {
@@ -935,7 +991,9 @@ class FlowCollector {
     ], rows, 'ON CONFLICT (dedup_key) DO NOTHING');
     this.counters.globalTrades += inserted;
     this.globalCursorSec = Math.max(this.globalCursorSec, maxTimestamp);
-    if (recent.saturated) {
+    if (completedCoverageState === 'BOOTSTRAP_TRUNCATED') {
+      this.counters.globalBootstrapTruncations += 1;
+    } else if (completedCoverageState === 'GAP') {
       this.counters.globalCoverageGaps += 1;
       if (receivedAt - this.lastGlobalSaturationLogAt >= 60000) {
         this.lastGlobalSaturationLogAt = receivedAt;
@@ -1162,13 +1220,17 @@ class FlowCollector {
         boundary: this.wal.boundary.health(),
       },
       paper_only: true,
+      strategy_signals_enabled: STRATEGY_SIGNALS_ENABLED,
     });
   }
 
-  async error(error) {
+  async error(error, context = {}) {
     this.counters.errors += 1;
     console.error('[flow]', error);
-    await logEvent('ERROR', 'flow', error.message, { stack: error.stack?.split('\n').slice(0, 5) });
+    const prefix = context.task ? `${context.task}: ` : '';
+    await logEvent('ERROR', 'flow', `${prefix}${error.message}`, {
+      ...context, stack: error.stack?.split('\n').slice(0, 5),
+    });
   }
 
   async close() {
@@ -1204,6 +1266,9 @@ module.exports = {
   collectRecentTradePages,
   dataTradesUrl,
   epochMs,
+  fetchJson,
+  fetchText,
+  globalCoverageState,
   latestSourceWindow,
   makeNonOverlappingTask,
   normLevels,

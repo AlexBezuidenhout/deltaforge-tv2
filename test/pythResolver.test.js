@@ -4,7 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  feedSymbolForMarket, isSupportedMarketSymbol, parseFrame,
+  EQUITY_PRICE_SYMBOLS, feedSymbolForMarket, isSupportedMarketSymbol,
+  MAX_EQUITY_SUBSCRIPTIONS, parseFrame, PythRtds,
 } = require('../borg/pyth/rtds');
 const {
   checkpointCrossings, executableMarkout, resolverSide, sizePaperEntry,
@@ -83,6 +84,19 @@ test('Pyth market aliases use only supported official equity-price symbols', () 
     },
   }));
   assert.equal(row.symbol, 'NG');
+});
+
+test('RTDS sends one supported subscription batch within the observed socket ceiling', () => {
+  const sent = [];
+  const requested = ['GBPUSD', 'NG', 'USDMXN', ...EQUITY_PRICE_SYMBOLS];
+  const rtds = new PythRtds({ symbols: requested });
+  rtds.ws = { readyState: 1, send: (message) => sent.push(JSON.parse(message)) };
+  rtds.subscribe();
+  assert.equal(sent.length, 1);
+  const subscribed = sent[0].subscriptions.map((row) => JSON.parse(row.filters).symbol);
+  assert.equal(subscribed.length, MAX_EQUITY_SUBSCRIPTIONS);
+  assert.deepEqual(subscribed.slice(0, 2), ['GBPUSD', 'NGD']);
+  assert.ok(!subscribed.includes('USDMXN'));
 });
 
 test('Pyth universe accepts only exact, endpoint-bound, Pyth-settled Up/Down rules', () => {

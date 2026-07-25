@@ -18,12 +18,23 @@ const {
 const { simulatePortfolio } = require('../../borg/research/portfolio-simulator');
 const { CHALLENGER_STRATEGY_VERSION } = require('../../borg/flow/strategy');
 const { summarizeConvergence } = require('../../borg/crossvenue/convergence');
+const { buildResolverBoundaryPortfolio } = require('../../borg/research/resolver-boundary-portfolio');
+const { buildPriorityLaneStatus } = require('../../borg/research/priority-lane-status');
 const { createReadThroughCache } = require('../utils/readThroughCache');
 
 const dashboardReports = createReadThroughCache();
-const CROSSVENUE_EXPERIMENT_ID = 'crossvenue-certified-convergence-v3';
-const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v3';
-const PYTH_EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v1';
+const { CURRENT_CROSSVENUE_EXPERIMENT_ID: CROSSVENUE_EXPERIMENT_ID } =
+  require('../../borg/crossvenue/experiment');
+const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v4-capacity';
+const PYTH_EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v2';
+
+router.get('/research/priority-lanes', authMiddleware, async (req, res) => {
+  try {
+    const value = await dashboardReports.get('priority-research-lanes-v4', 10_000,
+      () => buildPriorityLaneStatus(pool));
+    res.json(value);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // Virtual paper account: BORG's "paper trading" is the scored shadow ledger —
 // fills only when the recorded tape proves the order would have filled
@@ -39,103 +50,122 @@ router.get('/status', authMiddleware, async (req, res) => {
     // operator's last paper reset (borg_paper_reset_at -> account rebases to
     // $500); history is never deleted, only the display window moves.
     const since = req.query.since && !isNaN(Date.parse(req.query.since)) ? new Date(req.query.since) : null;
-    const resetAt = (await pool.query(
-      'SELECT borg_paper_reset_at FROM bot_settings WHERE user_id = $1', [req.userId]
-    ).catch(() => ({ rows: [] }))).rows[0]?.borg_paper_reset_at || null;
-    // stats window floor = the later of session-since and the paper reset
-    const statsFloor = since && resetAt ? new Date(Math.max(since.getTime(), new Date(resetAt).getTime()))
-      : (since || (resetAt ? new Date(resetAt) : null));
-    const [fresh, markets, heartbeat, shadowEvt, gaps, paper, pending, collection, runtime] = await Promise.all([
-      pool.query(`SELECT 'book_snaps' t, max(ts) latest FROM borg_book_snaps
-        UNION ALL SELECT 'binance_1s', max(ts) FROM borg_binance_1s
-        UNION ALL SELECT 'clob_events', max(ts) FROM borg_clob_events
-        UNION ALL SELECT 'taker_trades', max(ts) FROM borg_taker_trades
-        UNION ALL SELECT 'chainlink_rounds', max(seen_at) FROM borg_chainlink_rounds`),
-      pool.query(`SELECT count(*)::int total,
-          count(*) FILTER (WHERE outcome IS NOT NULL)::int resolved,
-          count(*) FILTER (WHERE binance_open_src = 'live')::int live_opens,
-          count(*) FILTER (WHERE outcome IS NOT NULL AND binance_open IS NOT NULL AND binance_close IS NOT NULL
-            AND outcome <> CASE WHEN binance_close >= binance_open THEN 'UP' ELSE 'DOWN' END)::int sign_disagreements
-        FROM borg_markets`),
-      pool.query(`SELECT ts, level, message, data FROM borg_events
-        WHERE source='heartbeat' ORDER BY id DESC LIMIT 1`),
-      pool.query(`SELECT ts, message FROM borg_events
-        WHERE source='shadow' AND message LIKE '%strategies%' ORDER BY id DESC LIMIT 1`),
-      pool.query(`SELECT count(*)::int n FROM (
-          SELECT ts - lag(ts) OVER (ORDER BY ts) gap FROM borg_book_snaps
-          WHERE ts > now() - interval '24 hours') g WHERE gap > interval '5 seconds'`),
-      pool.query(`SELECT count(*)::int scored,
-          count(*) FILTER (WHERE s.filled)::int fills,
-          count(*) FILTER (WHERE s.filled AND s.pnl_1x > 0)::int wins,
-          count(*) FILTER (WHERE s.filled AND s.pnl_1x <= 0)::int losses,
-          COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled), 0)::float pnl_1x,
-          max(s.scored_at) last_scored
-        FROM borg_shadow_scores s
-        JOIN borg_shadow_orders o ON o.id = s.order_id
-        WHERE o.features->>'research_capital_version' = $1
-        ${statsFloor ? 'AND o.ts >= $2' : ''}`,
-      statsFloor ? [RESEARCH_CAPITAL_VERSION, statsFloor] : [RESEARCH_CAPITAL_VERSION]),
-      pool.query(`SELECT count(*)::int n FROM borg_shadow_orders o
-        LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
-        WHERE o.action='place' AND s.order_id IS NULL
-          AND o.features->>'research_capital_version' = $1`, [RESEARCH_CAPITAL_VERSION]),
-      pool.query(`SELECT e.*, r.run_id, r.started_at run_started_at, r.code_version run_code_version,
-                         EXTRACT(EPOCH FROM now() - r.started_at)::int run_age_sec
-                    FROM borg_collector_runs r
-                    JOIN borg_collection_epochs e ON e.epoch_id=r.epoch_id
-                   WHERE r.status='RUNNING' ORDER BY r.started_at DESC LIMIT 1`),
-      pool.query(`WITH latest AS (
-                    SELECT run_id FROM borg_collector_runs
-                     WHERE status='RUNNING' ORDER BY started_at DESC LIMIT 1
-                  )
-                  SELECT count(*)::int registered,
-                         count(*) FILTER (WHERE evaluations > 0)::int evaluated,
-                         count(*) FILTER (WHERE errors > 0)::int with_errors,
-                         max(updated_at) updated_at
-                    FROM borg_strategy_runtime r JOIN latest l ON l.run_id=r.collector_run_id`),
-    ]);
-    const now = Date.now();
-    const feeds = {};
-    for (const r of fresh.rows) {
-      feeds[r.t] = r.latest ? Math.round((now - new Date(r.latest).getTime()) / 1000) : null;
-    }
-    // alive = book snapshots landing on the 1s cadence (15s of slack)
-    const alive = feeds.book_snaps != null && feeds.book_snaps < 15;
-    const hb = heartbeat.rows[0] || null;
-    res.json({
-      alive,
-      feeds, // seconds since last row, per table
-      markets: markets.rows[0],
-      snapshotGaps24h: gaps.rows[0].n,
-      heartbeat: hb ? { ts: hb.ts, level: hb.level, message: hb.message, counters: hb.data } : null,
-      collection: collection.rows[0] || null,
-      strategyRuntime: runtime.rows[0] || { registered: 0, evaluated: 0, with_errors: 0, updated_at: null },
-      shadowPaused: shadowEvt.rows[0] ? /paused/.test(shadowEvt.rows[0].message) : false,
-      paper: {
-        startBalance: PAPER_START_BALANCE,
-        // balance = $500 + everything scored since the last paper reset
-        // (independent of the session toggle, which only scopes the stats)
-        balance: +(PAPER_START_BALANCE + (await pool.query(
-          `SELECT COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled), 0)::float p
-           FROM borg_shadow_scores s JOIN borg_shadow_orders o ON o.id = s.order_id
-           WHERE o.features->>'research_capital_version' = $1
-           ${resetAt ? 'AND o.ts >= $2' : ''}`,
-          resetAt ? [RESEARCH_CAPITAL_VERSION, resetAt] : [RESEARCH_CAPITAL_VERSION]
-        )).rows[0].p).toFixed(2),
-        balanceMeaning: 'NAIVE_LEDGER_SUM_NOT_SHARED_CAPITAL',
-        warning: 'This aggregate assumes every strategy could consume the same capital and liquidity. Use /research/portfolio for the shared-$500 result.',
-        capitalVersion: RESEARCH_CAPITAL_VERSION,
-        sessionScoped: !!since,
-        resetAt: resetAt || null,
-        pnl1x: +paper.rows[0].pnl_1x.toFixed(2),
-        scored: paper.rows[0].scored,
-        fills: paper.rows[0].fills,
-        wins: paper.rows[0].wins,
-        losses: paper.rows[0].losses,
-        pendingScore: pending.rows[0].n,
-        lastScored: paper.rows[0].last_scored,
-      },
+    const cacheKey = `borg-status:${req.userId}:${since ? since.toISOString() : 'all'}`;
+    const value = await dashboardReports.get(cacheKey, 10_000, async () => {
+      // Keep this whole report on one checked-out connection. Previously the
+      // Promise.all below could consume ten pool slots per browser refresh;
+      // two tabs were enough to starve every dashboard route.
+      const client = await pool.connect();
+      try {
+        const resetAt = (await client.query(
+          'SELECT borg_paper_reset_at FROM bot_settings WHERE user_id = $1', [req.userId]
+        )).rows[0]?.borg_paper_reset_at || null;
+        // stats window floor = the later of session-since and the paper reset
+        const statsFloor = since && resetAt ? new Date(Math.max(since.getTime(), new Date(resetAt).getTime()))
+          : (since || (resetAt ? new Date(resetAt) : null));
+        const [fresh, markets, heartbeat, shadowEvt, gaps, paper, pending, collection, runtime, balance] = await Promise.all([
+          client.query(`SELECT
+              (SELECT ts FROM borg_book_snaps ORDER BY id DESC LIMIT 1) AS book_snaps,
+              (SELECT ts FROM borg_binance_1s ORDER BY ts DESC LIMIT 1) AS binance_1s,
+              (SELECT ts FROM borg_clob_events ORDER BY id DESC LIMIT 1) AS clob_events,
+              (SELECT ts FROM borg_taker_trades ORDER BY id DESC LIMIT 1) AS taker_trades,
+              (SELECT seen_at FROM borg_chainlink_rounds ORDER BY seen_at DESC LIMIT 1) AS chainlink_rounds`),
+          client.query(`SELECT count(*)::int total,
+              count(*) FILTER (WHERE outcome IS NOT NULL)::int resolved,
+              count(*) FILTER (WHERE binance_open_src = 'live')::int live_opens,
+              count(*) FILTER (WHERE outcome IS NOT NULL AND binance_open IS NOT NULL AND binance_close IS NOT NULL
+                AND outcome <> CASE WHEN binance_close >= binance_open THEN 'UP' ELSE 'DOWN' END)::int sign_disagreements
+            FROM borg_markets`),
+          client.query(`SELECT ts, level, message, data FROM borg_events
+            WHERE source='heartbeat' ORDER BY id DESC LIMIT 1`),
+          client.query(`SELECT ts, message FROM borg_events
+            WHERE source='shadow' AND message LIKE '%strategies%' ORDER BY id DESC LIMIT 1`),
+          // A bounded recent continuity diagnostic. The old 24-hour window
+          // sorted millions of 2KB JSON book rows every five seconds.
+          client.query(`WITH recent AS (
+              SELECT id, ts FROM borg_book_snaps ORDER BY id DESC LIMIT 10000
+            ), ordered AS (
+              SELECT ts - lag(ts) OVER (ORDER BY ts, id) gap FROM recent
+            )
+            SELECT count(*)::int n FROM ordered WHERE gap > interval '5 seconds'`),
+          client.query(`SELECT count(*)::int scored,
+              count(*) FILTER (WHERE s.filled)::int fills,
+              count(*) FILTER (WHERE s.filled AND s.pnl_1x > 0)::int wins,
+              count(*) FILTER (WHERE s.filled AND s.pnl_1x <= 0)::int losses,
+              COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled), 0)::float pnl_1x,
+              max(s.scored_at) last_scored
+            FROM borg_shadow_scores s
+            JOIN borg_shadow_orders o ON o.id = s.order_id
+            WHERE o.features->>'research_capital_version' = $1
+            ${statsFloor ? 'AND o.ts >= $2' : ''}`,
+          statsFloor ? [RESEARCH_CAPITAL_VERSION, statsFloor] : [RESEARCH_CAPITAL_VERSION]),
+          client.query(`SELECT count(*)::int n FROM borg_shadow_orders o
+            LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
+            WHERE o.action='place' AND s.order_id IS NULL
+              AND o.features->>'research_capital_version' = $1`, [RESEARCH_CAPITAL_VERSION]),
+          client.query(`SELECT e.*, r.run_id, r.started_at run_started_at, r.code_version run_code_version,
+                             EXTRACT(EPOCH FROM now() - r.started_at)::int run_age_sec
+                        FROM borg_collector_runs r
+                        JOIN borg_collection_epochs e ON e.epoch_id=r.epoch_id
+                       WHERE r.status='RUNNING' ORDER BY r.started_at DESC LIMIT 1`),
+          client.query(`WITH latest AS (
+                        SELECT run_id FROM borg_collector_runs
+                         WHERE status='RUNNING' ORDER BY started_at DESC LIMIT 1
+                      )
+                      SELECT count(*)::int registered,
+                             count(*) FILTER (WHERE evaluations > 0)::int evaluated,
+                             count(*) FILTER (WHERE errors > 0)::int with_errors,
+                             max(updated_at) updated_at
+                        FROM borg_strategy_runtime r JOIN latest l ON l.run_id=r.collector_run_id`),
+          client.query(`SELECT COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled), 0)::float p
+             FROM borg_shadow_scores s JOIN borg_shadow_orders o ON o.id = s.order_id
+             WHERE o.features->>'research_capital_version' = $1
+             ${resetAt ? 'AND o.ts >= $2' : ''}`,
+          resetAt ? [RESEARCH_CAPITAL_VERSION, resetAt] : [RESEARCH_CAPITAL_VERSION]),
+        ]);
+        const now = Date.now();
+        const latest = fresh.rows[0] || {};
+        const feeds = {};
+        for (const name of ['book_snaps', 'binance_1s', 'clob_events', 'taker_trades', 'chainlink_rounds']) {
+          feeds[name] = latest[name] ? Math.round((now - new Date(latest[name]).getTime()) / 1000) : null;
+        }
+        // alive = book snapshots landing on the 1s cadence (15s of slack)
+        const alive = feeds.book_snaps != null && feeds.book_snaps < 15;
+        const hb = heartbeat.rows[0] || null;
+        return {
+          alive,
+          feeds, // seconds since last row, per table
+          markets: markets.rows[0],
+          snapshotGapsRecent: gaps.rows[0].n,
+          snapshotGapWindowRows: 10000,
+          heartbeat: hb ? { ts: hb.ts, level: hb.level, message: hb.message, counters: hb.data } : null,
+          collection: collection.rows[0] || null,
+          strategyRuntime: runtime.rows[0] || { registered: 0, evaluated: 0, with_errors: 0, updated_at: null },
+          shadowPaused: shadowEvt.rows[0] ? /paused/.test(shadowEvt.rows[0].message) : false,
+          paper: {
+            startBalance: PAPER_START_BALANCE,
+            // balance = $500 + everything scored since the last paper reset
+            // (independent of the session toggle, which only scopes the stats)
+            balance: +(PAPER_START_BALANCE + balance.rows[0].p).toFixed(2),
+            balanceMeaning: 'NAIVE_LEDGER_SUM_NOT_SHARED_CAPITAL',
+            warning: 'This aggregate assumes every strategy could consume the same capital and liquidity. Use /research/portfolio for the shared-$500 result.',
+            capitalVersion: RESEARCH_CAPITAL_VERSION,
+            sessionScoped: !!since,
+            resetAt: resetAt || null,
+            pnl1x: +paper.rows[0].pnl_1x.toFixed(2),
+            scored: paper.rows[0].scored,
+            fills: paper.rows[0].fills,
+            wins: paper.rows[0].wins,
+            losses: paper.rows[0].losses,
+            pendingScore: pending.rows[0].n,
+            lastScored: paper.rows[0].last_scored,
+          },
+        };
+      } finally {
+        client.release();
+      }
     });
+    res.json(value);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -144,27 +174,30 @@ router.get('/status', authMiddleware, async (req, res) => {
 // --- Shadow scoreboard: per strategy, orders + scored fills + cost-grid PnL ---
 router.get('/shadow/summary', authMiddleware, async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT o.strategy, o.phase,
-        count(*) FILTER (WHERE o.action='place')::int places,
-        count(*) FILTER (WHERE o.action='cancel')::int cancels,
-        count(s.order_id)::int scored,
-        count(s.order_id) FILTER (WHERE s.filled)::int fills,
-        COALESCE(sum(s.pnl_gross) FILTER (WHERE s.filled), 0)::float pnl_gross,
-        COALESCE(sum(s.pnl_05x)  FILTER (WHERE s.filled), 0)::float pnl_05x,
-        COALESCE(sum(s.pnl_1x)   FILTER (WHERE s.filled), 0)::float pnl_1x,
-        COALESCE(sum(s.pnl_2x)   FILTER (WHERE s.filled), 0)::float pnl_2x,
-        count(s.order_id) FILTER (WHERE s.data_quality_grade IN ('A','B'))::int quality_ab,
-        count(s.order_id) FILTER (WHERE s.data_quality_grade='F')::int quality_f,
-        count(s.order_id) FILTER (WHERE s.execution_fidelity_grade IN ('A','B'))::int fidelity_ab,
-        count(s.order_id) FILTER (WHERE s.execution_fidelity_grade='F')::int fidelity_f,
-        max(o.ts) latest
-      FROM borg_shadow_orders o
-      LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
-      WHERE o.features->>'research_capital_version' = $1
-      GROUP BY o.strategy, o.phase
-      ORDER BY o.strategy`, [RESEARCH_CAPITAL_VERSION]);
-    res.json(rows);
+    const value = await dashboardReports.get('borg-shadow-summary', 15_000, async () => {
+      const { rows } = await pool.query(`
+        SELECT o.strategy, o.phase,
+          count(*) FILTER (WHERE o.action='place')::int places,
+          count(*) FILTER (WHERE o.action='cancel')::int cancels,
+          count(s.order_id)::int scored,
+          count(s.order_id) FILTER (WHERE s.filled)::int fills,
+          COALESCE(sum(s.pnl_gross) FILTER (WHERE s.filled), 0)::float pnl_gross,
+          COALESCE(sum(s.pnl_05x)  FILTER (WHERE s.filled), 0)::float pnl_05x,
+          COALESCE(sum(s.pnl_1x)   FILTER (WHERE s.filled), 0)::float pnl_1x,
+          COALESCE(sum(s.pnl_2x)   FILTER (WHERE s.filled), 0)::float pnl_2x,
+          count(s.order_id) FILTER (WHERE s.data_quality_grade IN ('A','B'))::int quality_ab,
+          count(s.order_id) FILTER (WHERE s.data_quality_grade='F')::int quality_f,
+          count(s.order_id) FILTER (WHERE s.execution_fidelity_grade IN ('A','B'))::int fidelity_ab,
+          count(s.order_id) FILTER (WHERE s.execution_fidelity_grade='F')::int fidelity_f,
+          max(o.ts) latest
+        FROM borg_shadow_orders o
+        LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
+        WHERE o.features->>'research_capital_version' = $1
+        GROUP BY o.strategy, o.phase
+        ORDER BY o.strategy`, [RESEARCH_CAPITAL_VERSION]);
+      return rows;
+    });
+    res.json(value);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -173,48 +206,56 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
 // --- H53 independently gated live mirror (explicit unproven operator override) ---
 router.get('/h53/live', authMiddleware, async (req, res) => {
   try {
-    const [heartbeat, settings, totals, recent] = await Promise.all([
-      pool.query(`SELECT beat_at,meta FROM system_heartbeats WHERE component='h53_live'`),
-      pool.query(`SELECT COALESCE(live_h53_enabled,false) enabled FROM bot_settings WHERE user_id=$1`, [req.userId]),
-      pool.query(`SELECT
-          count(*)::int decisions,
-          count(*) FILTER (WHERE NOT dry_run)::int live_decisions,
-          count(*) FILTER (WHERE NOT dry_run AND matched_shares>0)::int matched,
-          count(*) FILTER (WHERE NOT dry_run AND (status='ERROR' OR status LIKE '%INVARIANT%'))::int errors,
-          count(*) FILTER (WHERE status LIKE 'SKIPPED_%')::int skipped,
-          COALESCE(sum(requested_notional) FILTER (WHERE NOT dry_run AND status NOT LIKE 'SKIPPED_%' AND status<>'ERROR'),0)::float submitted_notional,
-          COALESCE(sum(matched_notional) FILTER (WHERE NOT dry_run),0)::float matched_notional,
-          COALESCE(sum(fee_paid) FILTER (WHERE NOT dry_run),0)::float fees_paid,
-          COALESCE(sum(matched_notional+COALESCE(fee_paid,0)) FILTER (WHERE NOT dry_run),0)::float economic_cost,
-          COALESCE(sum(realized_pnl) FILTER (WHERE NOT dry_run),0)::float realized_pnl,
-          count(*) FILTER (WHERE NOT dry_run AND matched_shares>0 AND resolved_outcome IS NULL)::int unresolved,
-          avg(acknowledgement_latency_ms) FILTER (WHERE NOT dry_run)::float avg_ack_ms,
-          max(created_at) latest
-        FROM h53_live_orders`),
-      pool.query(`SELECT id,created_at,token,signal_price::float,signal_size::float,
-          requested_notional::float,worst_price::float,dry_run,status,
-          acknowledgement_latency_ms,matched_shares::float,matched_notional::float,
-          average_fill_price::float,fee_paid::float,fee_rate::float,fee_exponent::float,
-          tick_size::float,resolved_outcome,realized_pnl::float,error
-        FROM h53_live_orders ORDER BY id DESC LIMIT 40`),
-    ]);
-    const beat = heartbeat.rows[0] || null;
-    const ageSec = beat?.beat_at
-      ? Math.max(0, Math.round((Date.now() - new Date(beat.beat_at).getTime()) / 1000))
-      : null;
-    res.json({
-      strategy: 'H53_5m_neareven_favorite_live_v1',
-      evidenceStatus: 'UNPROVEN_OPERATOR_OVERRIDE',
-      dbEnabled: settings.rows[0]?.enabled === true,
-      alive: ageSec != null && ageSec < 30,
-      heartbeatAgeSec: ageSec,
-      mode: beat?.meta?.dryRun === false ? 'LIVE' : 'DRY',
-      walletBalanceUsdc: beat?.meta?.balanceUsdc ?? null,
-      errorsObserved: beat?.meta?.errors ?? null,
-      executionHaltReason: beat?.meta?.executionHaltReason ?? null,
-      totals: totals.rows[0] || {},
-      recent: recent.rows,
+    const value = await dashboardReports.get(`borg-h53-live:${req.userId}`, 5_000, async () => {
+      const client = await pool.connect();
+      try {
+        const [heartbeat, settings, totals, recent] = await Promise.all([
+          client.query(`SELECT beat_at,meta FROM system_heartbeats WHERE component='h53_live'`),
+          client.query(`SELECT COALESCE(live_h53_enabled,false) enabled FROM bot_settings WHERE user_id=$1`, [req.userId]),
+          client.query(`SELECT
+              count(*)::int decisions,
+              count(*) FILTER (WHERE NOT dry_run)::int live_decisions,
+              count(*) FILTER (WHERE NOT dry_run AND matched_shares>0)::int matched,
+              count(*) FILTER (WHERE NOT dry_run AND (status='ERROR' OR status LIKE '%INVARIANT%'))::int errors,
+              count(*) FILTER (WHERE status LIKE 'SKIPPED_%')::int skipped,
+              COALESCE(sum(requested_notional) FILTER (WHERE NOT dry_run AND status NOT LIKE 'SKIPPED_%' AND status<>'ERROR'),0)::float submitted_notional,
+              COALESCE(sum(matched_notional) FILTER (WHERE NOT dry_run),0)::float matched_notional,
+              COALESCE(sum(fee_paid) FILTER (WHERE NOT dry_run),0)::float fees_paid,
+              COALESCE(sum(matched_notional+COALESCE(fee_paid,0)) FILTER (WHERE NOT dry_run),0)::float economic_cost,
+              COALESCE(sum(realized_pnl) FILTER (WHERE NOT dry_run),0)::float realized_pnl,
+              count(*) FILTER (WHERE NOT dry_run AND matched_shares>0 AND resolved_outcome IS NULL)::int unresolved,
+              avg(acknowledgement_latency_ms) FILTER (WHERE NOT dry_run)::float avg_ack_ms,
+              max(created_at) latest
+            FROM h53_live_orders`),
+          client.query(`SELECT id,created_at,token,signal_price::float,signal_size::float,
+              requested_notional::float,worst_price::float,dry_run,status,
+              acknowledgement_latency_ms,matched_shares::float,matched_notional::float,
+              average_fill_price::float,fee_paid::float,fee_rate::float,fee_exponent::float,
+              tick_size::float,resolved_outcome,realized_pnl::float,error
+            FROM h53_live_orders ORDER BY id DESC LIMIT 40`),
+        ]);
+        const beat = heartbeat.rows[0] || null;
+        const ageSec = beat?.beat_at
+          ? Math.max(0, Math.round((Date.now() - new Date(beat.beat_at).getTime()) / 1000))
+          : null;
+        return {
+          strategy: 'H53_5m_neareven_favorite_live_v1',
+          evidenceStatus: 'UNPROVEN_OPERATOR_OVERRIDE',
+          dbEnabled: settings.rows[0]?.enabled === true,
+          alive: ageSec != null && ageSec < 30,
+          heartbeatAgeSec: ageSec,
+          mode: beat?.meta?.dryRun === false ? 'LIVE' : 'DRY',
+          walletBalanceUsdc: beat?.meta?.balanceUsdc ?? null,
+          errorsObserved: beat?.meta?.errors ?? null,
+          executionHaltReason: beat?.meta?.executionHaltReason ?? null,
+          totals: totals.rows[0] || {},
+          recent: recent.rows,
+        };
+      } finally {
+        client.release();
+      }
     });
+    res.json(value);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -224,18 +265,21 @@ router.get('/h53/live', authMiddleware, async (req, res) => {
 router.get('/shadow/orders', authMiddleware, async (req, res) => {
   try {
     const limit = Math.min(200, parseInt(req.query.limit, 10) || 50);
-    const { rows } = await pool.query(`
-      SELECT o.id, o.ts, o.strategy, o.phase, o.action, o.side, o.token,
-             o.price, o.size, o.tte_sec, o.order_kind, o.queue_ahead,
-             o.experiment_id, o.arm, o.latency_profile,
-             o.features->>'note' AS note,
-             s.filled, s.fill_size, s.pnl_1x, s.outcome,
-             s.data_quality_grade, s.execution_fidelity_grade, s.fidelity_level
-      FROM borg_shadow_orders o
-      LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
-      WHERE o.features->>'research_capital_version' = $1
-      ORDER BY o.id DESC LIMIT $2`, [RESEARCH_CAPITAL_VERSION, limit]);
-    res.json(rows);
+    const value = await dashboardReports.get(`borg-shadow-orders:${limit}`, 5_000, async () => {
+      const { rows } = await pool.query(`
+        SELECT o.id, o.ts, o.strategy, o.phase, o.action, o.side, o.token,
+               o.price, o.size, o.tte_sec, o.order_kind, o.queue_ahead,
+               o.experiment_id, o.arm, o.latency_profile,
+               o.features->>'note' AS note,
+               s.filled, s.fill_size, s.pnl_1x, s.outcome,
+               s.data_quality_grade, s.execution_fidelity_grade, s.fidelity_level
+        FROM borg_shadow_orders o
+        LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
+        WHERE o.features->>'research_capital_version' = $1
+        ORDER BY o.id DESC LIMIT $2`, [RESEARCH_CAPITAL_VERSION, limit]);
+      return rows;
+    });
+    res.json(value);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -314,27 +358,30 @@ router.get('/research/quality', authMiddleware, async (req, res) => {
 router.get('/research/portfolio', authMiddleware, async (req, res) => {
   try {
     const phase = ['pilot', 'eval'].includes(req.query.phase) ? req.query.phase : 'pilot';
-    const { rows } = await pool.query(`
-      SELECT o.id, o.strategy, o.market_id, o.token, o.ts, o.available_at,
-             o.source_event_id, o.features, s.filled, s.fill_ts, s.fill_price, s.fill_size,
-             s.pnl_gross, s.pnl_1x, s.pnl_2x, s.detail, m.window_end, m.resolved_at
-      FROM borg_shadow_orders o
-      JOIN borg_shadow_scores s ON s.order_id=o.id
-      JOIN borg_markets m ON m.id=o.market_id
-      WHERE o.action='place' AND o.phase=$1 AND o.experiment_id IS NOT NULL
-        AND o.features->>'research_capital_version'=$2
-      ORDER BY COALESCE(s.fill_ts,o.available_at,o.ts), o.id`, [phase, RESEARCH_CAPITAL_VERSION]);
-    const result = simulatePortfolio(rows.map((row) => ({
-      orderId: String(row.id), strategy: row.strategy, marketId: String(row.market_id), token: row.token,
-      ts: row.ts, availableAt: row.available_at, sourceEventId: row.source_event_id,
-      filled: row.filled, fillTs: row.fill_ts, fillPrice: row.fill_price, fillSize: row.fill_size,
-      pnlGross: row.pnl_gross, pnl1x: row.pnl_1x, pnl2x: row.pnl_2x,
-      detail: row.detail, capacityAtArrival: row.detail?.capacity_at_arrival,
-      capacityKey: row.detail?.clob_event_sequence != null
-        ? `${row.market_id}:${row.token}:${row.detail.clob_connection_epoch}:${row.detail.clob_event_sequence}` : null,
-      groupId: row.features?.group_id, windowEnd: row.window_end, resolvedAt: row.resolved_at,
-    })));
-    res.json({ phase, evidence: phase === 'eval' ? 'prospective evaluation scenario' : 'pilot machinery only', ...result });
+    const value = await dashboardReports.get(`borg-research-portfolio:${phase}`, 30_000, async () => {
+      const { rows } = await pool.query(`
+        SELECT o.id, o.strategy, o.market_id, o.token, o.ts, o.available_at,
+               o.source_event_id, o.features, s.filled, s.fill_ts, s.fill_price, s.fill_size,
+               s.pnl_gross, s.pnl_1x, s.pnl_2x, s.detail, m.window_end, m.resolved_at
+        FROM borg_shadow_orders o
+        JOIN borg_shadow_scores s ON s.order_id=o.id
+        JOIN borg_markets m ON m.id=o.market_id
+        WHERE o.action='place' AND o.phase=$1 AND o.experiment_id IS NOT NULL
+          AND o.features->>'research_capital_version'=$2
+        ORDER BY COALESCE(s.fill_ts,o.available_at,o.ts), o.id`, [phase, RESEARCH_CAPITAL_VERSION]);
+      const result = simulatePortfolio(rows.map((row) => ({
+        orderId: String(row.id), strategy: row.strategy, marketId: String(row.market_id), token: row.token,
+        ts: row.ts, availableAt: row.available_at, sourceEventId: row.source_event_id,
+        filled: row.filled, fillTs: row.fill_ts, fillPrice: row.fill_price, fillSize: row.fill_size,
+        pnlGross: row.pnl_gross, pnl1x: row.pnl_1x, pnl2x: row.pnl_2x,
+        detail: row.detail, capacityAtArrival: row.detail?.capacity_at_arrival,
+        capacityKey: row.detail?.clob_event_sequence != null
+          ? `${row.market_id}:${row.token}:${row.detail.clob_connection_epoch}:${row.detail.clob_event_sequence}` : null,
+        groupId: row.features?.group_id, windowEnd: row.window_end, resolvedAt: row.resolved_at,
+      })));
+      return { phase, evidence: phase === 'eval' ? 'prospective evaluation scenario' : 'pilot machinery only', ...result };
+    });
+    res.json(value);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -345,11 +392,15 @@ router.get('/events', authMiddleware, async (req, res) => {
   try {
     const limit = Math.min(100, parseInt(req.query.limit, 10) || 30);
     const level = req.query.level === 'warn' ? ['WARN', 'ERROR'] : ['INFO', 'WARN', 'ERROR'];
-    const { rows } = await pool.query(`
-      SELECT ts, level, source, message FROM borg_events
-      WHERE level = ANY($1) AND source <> 'heartbeat'
-      ORDER BY id DESC LIMIT $2`, [level, limit]);
-    res.json(rows);
+    const cacheKey = `borg-events:${req.query.level === 'warn' ? 'warn' : 'all'}:${limit}`;
+    const value = await dashboardReports.get(cacheKey, 5_000, async () => {
+      const { rows } = await pool.query(`
+        SELECT ts, level, source, message FROM borg_events
+        WHERE level = ANY($1) AND source <> 'heartbeat'
+        ORDER BY id DESC LIMIT $2`, [level, limit]);
+      return rows;
+    });
+    res.json(value);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -785,7 +836,7 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
       return {
         alive: ageSec != null && ageSec < 30, heartbeatAt: hb?.beat_at || null,
         experimentId: STRUCTURAL_EXPERIMENT_ID,
-        contract: 'Frozen V3 content-addressed rule universe. Only rule-certified predicates with a deterministic finite-state payoff proof enter economics; augmented negRisk sets fail closed. Qualified remains false unless all legs are atomic; current public CLOB bundles are non-atomic.',
+        contract: 'Frozen V4 expanded-capacity, content-addressed rule universe. Proof, rule, fee, depth and orphan-risk standards are unchanged from V3; only the deterministic candidate/token panel is wider. Augmented negRisk sets fail closed. Qualified remains false unless every required execution test passes.',
         candidates: candidates.rows, rows: rows.rows,
       };
     });
@@ -803,6 +854,7 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
       pool.query(`SELECT * FROM cv_runtime ORDER BY started_at DESC LIMIT 1`),
       pool.query(`SELECT count(*) FILTER (WHERE observed_at>now()-interval '1 hour')::int evaluations_1h,
                          count(*) FILTER (WHERE economic AND relation_approved AND observed_at>now()-interval '1 hour')::int economic_1h,
+                         count(*) FILTER (WHERE paper_trade_eligible AND observed_at>now()-interval '1 hour')::int paper_trades_1h,
                          count(*) FILTER (WHERE lockable_after_both_fills AND observed_at>now()-interval '1 hour')::int lockable_1h,
                          count(DISTINCT episode_id) FILTER (WHERE economic AND relation_approved AND observed_at>now()-interval '1 hour')::int episodes_1h,
                          max(observed_at) latest
@@ -824,6 +876,7 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
         && hb?.meta?.runId === currentRuntime?.run_id,
       heartbeatAt: hb?.beat_at || null, heartbeatAgeSec: ageSec,
       evidenceEnabled: approvedMatches > 0,
+      paperEvaluationEnabled: hb?.meta?.paperEvaluationPolicy?.enabled === true,
       evidenceBlocker: approvedMatches > 0 ? null
         : 'ZERO_RULE_CERTIFIED_RELATIONS: monitored dislocations are diagnostic controls, not PnL evidence',
       contract: {
@@ -832,6 +885,7 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
         capitalPerVenueUsd: STARTING_BANKROLL_USD / 2,
         sizingMode: 'equal payout shares, optimized over executable depth and the $250-per-venue bankroll',
         identityRule: 'Only a frozen deterministic payoff proof with every state gate satisfied may be labelled economic or lockable.',
+        paperScorePolicy: hb?.meta?.paperEvaluationPolicy || null,
         experimentId: CROSSVENUE_EXPERIMENT_ID,
         kalshiTransport: hb?.meta?.kalshiTransport || 'public_batch_rest',
         kalshiFeed: hb?.meta?.kalshiFeed || null,
@@ -845,22 +899,31 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
 
 router.get('/crossvenue/matches', authMiddleware, async (req, res) => {
   try {
-    const limit = Math.min(500, parseInt(req.query.limit, 10) || 100);
-    const { rows } = await pool.query(`
+    const limit = Math.min(2000, Math.max(1, parseInt(req.query.limit, 10) || 100));
+    const [matches, total] = await Promise.all([pool.query(`
       SELECT match_id,poly_condition_id,poly_question,kalshi_ticker,kalshi_title,
              match_score::float,title_similarity::float,identity_status,identity_approved,
              identity_snapshot_hash,identity_certification,
              relation_type,relation_approved,relation_status,relation_proof,
              relation_resolution_audit,state_evidence,
+             paper_eval_approved,paper_eval_status,paper_eval_source,
+             paper_eval_approved_at,paper_eval_score_at_approval::float,
+             paper_eval_threshold::float,
              approval_source,resolution_audit,mismatch_reasons,end_delta_hours::float,
              monitored,active,metadata,refreshed_at
         FROM cv_contract_matches
        WHERE active=true OR relation_approved=true
-       ORDER BY relation_approved DESC,identity_approved DESC,monitored DESC,match_score DESC,refreshed_at DESC
-       LIMIT $1`, [limit]);
+       ORDER BY relation_approved DESC,paper_eval_approved DESC,identity_approved DESC,
+                monitored DESC,match_score DESC,refreshed_at DESC
+       LIMIT $1`, [limit]), pool.query(`
+      SELECT count(*)::int total
+        FROM cv_contract_matches
+       WHERE active=true OR relation_approved=true`)]);
     res.json({
       warning: 'A title match is not a payoff relation. Approval requires exact ids, typed terminal states, a deterministic minimum-payout proof, and satisfied state evidence.',
-      rows,
+      total: total.rows[0]?.total || 0,
+      returned: matches.rows.length,
+      rows: matches.rows,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -873,7 +936,8 @@ router.get('/crossvenue/opportunities', authMiddleware, async (req, res) => {
              o.quantity::float,o.poly_outcome,o.kalshi_outcome,o.poly_vwap::float,
              o.kalshi_vwap::float,o.poly_fee::float,o.kalshi_fee::float,
              o.total_cost::float,o.locked_profit_after_both_fills::float,
-             o.stressed_profit::float,o.indicative_economic,o.economic,o.identity_approved,
+             o.stressed_profit::float,o.indicative_economic,o.economic,
+             o.paper_eval_approved,o.paper_trade_eligible,o.identity_approved,
              o.relation_type,o.relation_approved,o.guaranteed_min_payout_per_share::float,
              o.payoff_proof_hash,o.books_fresh,
              (100*o.locked_profit_after_both_fills/NULLIF(o.total_cost,0))::float raw_roi_pct,
@@ -923,16 +987,19 @@ router.get('/crossvenue/summary', authMiddleware, async (req, res) => {
              count(DISTINCT match_id)::int pairs,
              count(DISTINCT episode_id) FILTER (WHERE economic AND relation_approved)::int economic_episodes,
              count(*) FILTER (WHERE indicative_economic)::int indicative_controls,
+             count(*) FILTER (WHERE paper_trade_eligible)::int paper_trade_observations,
              count(*) FILTER (WHERE economic AND relation_approved)::int economic_observations,
              count(*) FILTER (WHERE lockable_after_both_fills)::int lockable_observations,
              max(locked_profit_after_both_fills)::float max_indicative_profit,
              max(stressed_profit) FILTER (WHERE relation_approved)::float max_stressed_profit,
+             max(stressed_profit) FILTER (WHERE paper_trade_eligible)::float max_paper_stressed_profit,
              max(100*locked_profit_after_both_fills/NULLIF(total_cost,0))::float max_raw_roi_pct,
              max(100*stressed_profit/NULLIF(total_cost,0)) FILTER (WHERE relation_approved)::float max_stressed_roi_pct,
              max(quantity)::float max_sized_quantity,
              avg(locked_profit_after_both_fills)::float mean_indicative_profit,
              avg(locked_profit_after_both_fills)
                FILTER (WHERE relation_approved)::float mean_approved_profit,
+             avg(stressed_profit) FILTER (WHERE paper_trade_eligible)::float mean_paper_stressed_profit,
              max(observed_at) latest
         FROM cv_opportunities
        WHERE experiment_id=$1 AND synchronized=true
@@ -954,7 +1021,7 @@ router.get('/crossvenue/summary', authMiddleware, async (req, res) => {
         evidenceBlocker: provedEvents > 0 ? null
           : 'No rule-certified relation event exists. Indicative controls are overlapping quote diagnostics and cannot be added or called profit.',
         engineCohort: CROSSVENUE_EXPERIMENT_ID,
-        warning: 'Rows are overlapping observations, not additive trades. Indicative controls assume unproved parity; economic requires an approved deterministic relation. Every cross-venue execution remains non-atomic.',
+        warning: 'Rows are overlapping observations, not additive trades. The >80% operator cohort paper-tests assumed parity after 2x fees and one adverse tick per leg; economic/lockable still requires an approved deterministic relation. Every cross-venue execution remains non-atomic.',
         requirement: 'Forward synchronized L2; one approved relation event per state activation/direction; at least 300 independent events and 14 UTC days, positive 2x-cost economics in both halves, and market/day clustered lower bounds above zero before any deployment review.',
         rows: observations.rows,
         relationEvents: episodes.rows,
@@ -972,7 +1039,8 @@ router.get('/crossvenue/convergence', authMiddleware, async (req, res) => {
         SELECT observed_at,match_id,direction,quantity::float,
              entry_total_cost::float,net_liquidation_proceeds::float,
              terminal_locked_profit::float,immediate_round_trip_pnl::float,
-             entry_economic,identity_approved,relation_approved,relation_type,books_fresh,
+             entry_economic,paper_eval_approved,paper_entry_eligible,
+             identity_approved,relation_approved,relation_type,books_fresh,
              full_entry_depth,full_exit_depth,
              data_quality_grade,execution_fidelity_grade
         FROM cv_basis_samples
@@ -987,6 +1055,14 @@ router.get('/crossvenue/convergence', authMiddleware, async (req, res) => {
     });
     return res.json(value);
   } catch (err) { return res.status(500).json({ error: err.message }); }
+});
+
+router.get('/research/resolver-boundary', authMiddleware, async (req, res) => {
+  try {
+    const value = await dashboardReports.get('resolver-boundary-portfolio-v2', 60_000,
+      () => buildResolverBoundaryPortfolio(pool));
+    res.json(value);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- Pyth resolver-source boundary transfer lab (public feeds, paper only) ---
@@ -1025,10 +1101,10 @@ router.get('/pyth/status', authMiddleware, async (req, res) => {
       contract: {
         experimentId: PYTH_EXPERIMENT_ID, mode: 'PAPER_ONLY_FORWARD_MEASUREMENT',
         walletLoaded: false, liveOrderPath: false, historicalRowsReused: false,
-        signal: 'current Pyth resolver side at frozen TTE checkpoints and live sign flips; no fair-value claim',
-        execution: '$10 displayed-depth taker probe at 20/50/100/250/500ms; 1/5/30s executable bid markouts',
+        signal: 'market-quote prior plus Pyth resolver residual calibration probes; no frozen fair lower bound yet',
+        execution: '$10 displayed-depth paper probes at 100/250/500ms; 1/5/30s executable bid markouts; probes are non-promotable',
         independence: 'market/day clustered; rows and latency arms are not additive trades',
-        acceptance: '>=300 independent markets, >=14 days, both halves positive after doubled costs, clustered lower bound >0',
+        acceptance: 'blocked until a separately frozen out-of-sample fair lower bound exists; a successor would then require >=300 markets and >=14 days',
       },
       runtime: current, universe: universe.rows[0] || {}, activity: activity.rows[0] || {},
     });

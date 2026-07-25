@@ -1,0 +1,34 @@
+{
+  "experiment_id": "resolver-boundary-portfolio-v2",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-21T15:24:00.000Z",
+  "evidence_started_at": "2026-07-21T15:24:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "resolver_boundary_research_portfolio",
+  "supersedes": "resolver-boundary-portfolio-v1",
+  "strategy_version": "resolver-boundary-portfolio-v2",
+  "historical_rows_reused": false,
+  "portfolio_contract": {
+    "additive_pnl": false,
+    "active_evidence_lane": "research-h43-forward-v1 unchanged",
+    "calibration_only_lane": "pyth-resolver-boundary-transfer-v2",
+    "blocked_lanes": [
+      "chainlink-resolver-boundary-residual-v1",
+      "cf-resolver-boundary-residual-v1"
+    ],
+    "excluded_control": "flow-late-absorption-boundary-v3"
+  },
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "cost_stress": "2x",
+    "latency_profiles_ms": [100, 250, 500],
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "multiple_testing": "Holm correction across every resolver source and attempted boundary variant",
+    "null_outcome": "Every resolver residual can be fully incorporated into executable quotes."
+  }
+}

@@ -10,9 +10,12 @@ application live locks remain authoritative.
 - `/opt/deltaforge/df2/current` — isolated DF2 application
 - `/etc/deltaforge/*.env` — mode `0640`, not stored in Git
 - `/var/lib/deltaforge/wal/borg` — append-before-process event WAL
-- `/var/lib/deltaforge/archive/borg-raw` — immutable database-prune archive
-- `/var/lib/deltaforge/parquet` — immutable compacted research datasets
-- `/var/lib/deltaforge/db-snapshots` — verified daily local-Postgres snapshots
+- `/var/lib/deltaforge/archive/borg-raw` — immutable archive for raw rows that
+  are not already represented in the append-before-process WAL
+- `/var/lib/deltaforge/parquet` — short-lived local Parquet build tier; the
+  permanent copy is off-host
+- `/var/lib/deltaforge/db-snapshots` — temporary verified daily PostgreSQL
+  recovery dumps, removed locally only after an independent off-host receipt
 
 PostgreSQL 18 runs on loopback and is the hot dashboard/scoring database. The
 former US-east Neon URL is retained only as `OFFHOST_DATABASE_URL`; it is not
@@ -37,11 +40,15 @@ ssh -NT \
   deltaforge-vps
 ```
 
-The Mac launch agent maintains that tunnel. A separate hourly launch agent
-pulls sealed WAL/archive files, Parquet and database snapshots into iCloud
-Drive. It never uses `--delete`, so source retention cannot propagate deletions
-to historical storage. VPS retention refuses to delete when that receipt is
-missing or older than three hours.
+The Mac launch agent maintains that tunnel. A separate 15-minute launch agent
+pulls sealed gzip WAL/archive files, Parquet and database snapshots into iCloud
+Drive. Transfers land on ordinary APFS storage first, are SHA-256 checksummed,
+and are then atomically published into iCloud; this avoids File Provider
+deadlocks on evicted placeholders. Per-pull manifests and independent raw and
+snapshot receipts are copied back to the VPS. The pull never uses `--delete`,
+so source retention cannot propagate deletions to historical storage. VPS
+retention refuses to delete when the relevant receipt is missing, stale, empty,
+or older than three hours.
 
 For normal use, double-click `TV2 Dashboard.webloc` or `DF2 Dashboard.webloc`
 on the Mac Desktop. They open `http://localhost:3004/` and
@@ -85,14 +92,43 @@ same public prints and must never be summed as one portfolio.
 
 `borg-score.service` uses `--scheduled`: it scores only newly resolved orders,
 omits the expensive full-history bootstrap, emits a heartbeat throughout the
-run, and performs old pilot-order hygiene. Raw-tape archival is isolated in
-`deltaforge-raw-archive.service`, so a large CLOB backlog cannot delay scoring.
-That worker prioritizes up to 24 verified 5k `borg_clob_touch` batches and four
-batches from each lower-rate source per pass. Every batch is fsynced,
-hash-verified and only then deleted from PostgreSQL; the cutoff also remains at
-least one hour before the oldest unscored order. A manual
-`node borg/shadow/score.js` retains the complete report and legacy unbounded
-catch-up archive behavior.
+run, and performs old pilot-order hygiene. Raw-row archival is isolated in
+`deltaforge-raw-archive.service`, so it cannot delay scoring. CLOB events,
+touches, books, external feeds, structural evaluations, option marks and
+cross-venue samples are not archived a second time from PostgreSQL: their
+source/decision frames already exist in the append-before-process WAL. The SQL
+copies are daily partitions used only as the bounded dashboard/research hot
+tier. Lower-rate rows without an equivalent WAL representation are gzip
+written, fsynced, hash-verified and only then deleted.
+
+`deltaforge-hot-partitions.timer` runs every five minutes, creates the next seven UTC-day partitions and
+drops only complete old partitions covered by a fresh off-host raw/WAL receipt.
+At the measured v10 write rate, a nominal three-day query tier would itself
+consume most of the 125 GiB disk. The highest-rate CLOB, external-book and
+cross-venue snapshot/opportunity tables therefore retain the current UTC day;
+the remaining partitioned projections retain the current and previous UTC
+days. Rare positive structural, options and cross-venue rows are copied into
+compact retained tables before a partition is dropped. There is intentionally
+no default partition: if partition maintenance dies for more than seven days,
+writes fail visibly instead of silently creating an unbounded heap.
+
+The one-time conversion of an existing heap requires a fresh checksum-matching
+off-host database snapshot and an explicit operator confirmation:
+
+```bash
+sudo -u deltaforge bash -lc '
+  set -a
+  source /etc/deltaforge/tv2.env
+  set +a
+  cd /opt/deltaforge/tv2/current
+  DELTAFORGE_PARTITION_MIGRATION_CONFIRM=verified-offhost-snapshot \
+    /usr/local/bin/node scripts/hot-tier-partitions.js --migrate --truncate
+'
+```
+
+This operation is appropriate only for replayable paper/research projections.
+It is never applied to user settings, trades, positions, trial manifests,
+scores, resolutions, or authenticated execution records.
 
 ## Service checks
 
@@ -103,9 +139,19 @@ ssh deltaforge-vps 'systemctl status gla-paper'
 ssh deltaforge-vps 'systemctl status flow-boundary-canary'
 ssh deltaforge-vps 'systemctl status borg-allmarket borg-paired-maker borg-structural-scanner borg-pyth-boundary'
 ssh deltaforge-vps 'journalctl -u borg-collector -n 100 --no-pager'
-ssh deltaforge-vps 'systemctl list-timers borg-score.timer deltaforge-raw-archive.timer deltaforge-health.timer'
+ssh deltaforge-vps 'systemctl list-timers borg-score.timer deltaforge-raw-archive.timer deltaforge-hot-partitions.timer deltaforge-health.timer'
 ssh deltaforge-vps 'cd /opt/deltaforge/tv2/current && npm run audit:runtime'
 ```
 
-Raw SQL tables target a 24-hour query window. Sealed VPS files are pruned only
-through the fail-closed off-host receipt policy; the iCloud copy is append-only.
+Use `ops/vps/start-evidence-epoch.sh <epoch-id>` only after the storage and
+off-host checks pass. It drains the full collector fleet, writes one new epoch
+boundary, seeds partition/archive health, starts all required paper collectors,
+and waits for process stability plus real domain progress. A fresh epoch is
+`PENDING_24H`; it is not clean evidence until 24 uninterrupted hours have
+fresh heartbeats, no sequence gaps, no persistence failures, complete health
+samples and at least 30 GiB free.
+
+Sealed VPS files are pruned only through the fail-closed off-host receipt
+policy; the iCloud copy is append-only. CSV is not used as an archival
+optimization: compressed NDJSON preserves raw event fidelity and Parquet is the
+compact columnar backtest format.

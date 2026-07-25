@@ -1613,7 +1613,7 @@
       <div style="font-size:10px;color:var(--text-muted);">outcome vs Binance sign</div>
     </div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;">
-      <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Snapshot Gaps 24h</div>
+      <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Snapshot Gaps (recent 10k)</div>
       <div style="font-size:18px;font-weight:700;" id="bGaps">—</div>
       <div style="font-size:10px;color:var(--text-muted);" id="bUptime">uptime —</div>
     </div></div>
@@ -1758,6 +1758,11 @@
     <div style="border:1px solid var(--yellow);color:var(--yellow);font-size:10px;font-weight:700;padding:4px 8px;border-radius:4px;letter-spacing:1px;">FORWARD PILOT · PROVISIONAL</div>
   </div>
 
+  <div class="panel"><div class="panel-header"><span>PRIORITY RESEARCH LANES</span><span style="font-size:10px;color:var(--text-muted);">four active paper programs · fair-bound maker capture-only</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
+    <thead><tr><th>#</th><th>Program</th><th>Run mode</th><th>Status</th><th>Current evidence</th><th>Next falsification</th></tr></thead>
+    <tbody id="priorityLanesBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;">Loading frozen research program…</td></tr></tbody>
+  </table></div></div></div>
+
   <div class="grid-5col">
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Universe</div><div style="font-size:18px;font-weight:700;" id="bookLabUniverse">—</div><div style="font-size:10px;color:var(--text-muted);" id="bookLabSelected">— selected</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Intents 1h</div><div style="font-size:18px;font-weight:700;" id="bookLabIntents">—</div><div style="font-size:10px;color:var(--text-muted);" id="bookLabFills">— fills</div></div></div>
@@ -1806,7 +1811,7 @@
   <div class="grid-5col">
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Polymarket</div><div style="font-size:18px;font-weight:700;" id="cvPolyMarkets">—</div><div style="font-size:10px;color:var(--text-muted);">active binary markets</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Kalshi</div><div style="font-size:18px;font-weight:700;" id="cvKalshiMarkets">—</div><div style="font-size:10px;color:var(--text-muted);">active binary markets</div></div></div>
-    <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Pending / Approved</div><div style="font-size:18px;font-weight:700;" id="cvCandidates">—</div><div style="font-size:10px;color:var(--text-muted);" id="cvMonitored">— reviewed rejected · — monitored</div></div></div>
+    <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Paper &gt;80 / Proved</div><div style="font-size:18px;font-weight:700;" id="cvCandidates">—</div><div style="font-size:10px;color:var(--text-muted);" id="cvMonitored">— paper monitored · — total monitored</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Forward Relation Events</div><div style="font-size:18px;font-weight:700;" id="cvEpisodes">—</div><div style="font-size:10px;color:var(--text-muted);" id="cvLockable">— ever economic · — disappeared</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Capital Model</div><div style="font-size:18px;font-weight:700;color:var(--yellow);">$250 + $250</div><div style="font-size:10px;color:var(--text-muted);">prefunded · $500 total</div></div></div>
   </div>
@@ -1831,13 +1836,13 @@
     <tbody id="cvRelationEpisodesBody"><tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:18px;">Waiting for a forward approved relation event…</td></tr></tbody>
   </table></div></div></div>
 
-  <div class="panel"><div class="panel-header"><span>RECENT PAPER OPPORTUNITIES</span><span style="font-size:10px;color:var(--text-muted);">unproved parity is a control; only a deterministic payoff relation can become economic</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;max-height:360px;overflow:auto;"><table>
+  <div class="panel"><div class="panel-header"><span>RECENT PAPER OPPORTUNITIES</span><span style="font-size:10px;color:var(--text-muted);">score-approved pairs paper-test assumed parity; only a deterministic payoff relation is a proved lock</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;max-height:360px;overflow:auto;"><table>
     <thead><tr><th>Time</th><th>Pair</th><th>Direction</th><th>Qty</th><th>Poly</th><th>Kalshi</th><th>Capital</th><th>Raw lock</th><th>Raw ROI</th><th>Stress ROI</th><th>Orphan abort</th><th>Status</th><th>Quality</th></tr></thead>
     <tbody id="cvOpportunitiesBody"><tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:18px;">No synchronized evaluations yet</td></tr></tbody>
   </table></div></div></div>
 
   <div class="panel"><div class="panel-body" style="font-size:11px;line-height:1.7;color:var(--text-muted);">
-    <strong style="color:var(--text-hi);">How to read this:</strong> exact identities support opposite-outcome bundles, but non-identical contracts can also support a proved implication. If event A implies event B, <code>NO(A) + YES(B)</code> pays at least $1 in every allowed terminal state. The engine now enumerates those states and rejects any bundle whose minimum payout is zero. A state-conditioned relation activates only after timestamped evidence satisfies every frozen gate. Convergence does not create terminal edge; it can release capital early. Cross-venue orders are never atomic. Current Kalshi transport may be public REST, so quality can be capped at B; authenticated WebSocket capture is preferred. The Dublin host is research-only for Kalshi because of current geographic restrictions.
+    <strong style="color:var(--text-hi);">How to read this:</strong> the operator-approved &gt;80% cohort is a paper test, not an 80% probability that contracts are identical. It assumes $1 parity only for simulation and requires executable depth, fees and adverse-tick stress. Exact identities support opposite-outcome bundles, while non-identical contracts require a proved implication or other typed payoff relation. Convergence can release capital early but cannot repair a rule mismatch. Cross-venue orders are never atomic. Current Kalshi transport may be public REST, so quality can be capped at B; authenticated WebSocket capture is preferred. The Dublin host is research-only for Kalshi because of current geographic restrictions.
   </div></div>
 </div>
 
@@ -2797,7 +2802,10 @@
       await loadClaudeAnalysis();
       loadSettingsFromAPI();
 
-      setInterval(async () => { await loadBotStatus(); await loadDashboard(); }, 10000);
+      setInterval(async () => {
+        await loadBotStatus();
+        if (document.getElementById('dashboard')?.classList.contains('active')) await loadDashboard();
+      }, 10000);
       checkSystemHealth();
       setInterval(checkSystemHealth, 30000);
 
@@ -3039,12 +3047,13 @@
   }
 
   async function loadBookLabOnce() {
-    let status, summary, intents, structural, pairedStatus, pairedSummary, pairedCycles;
+    let status, summary, intents, structural, pairedStatus, pairedSummary, pairedCycles, priority;
     try {
-      [status, summary, intents, structural, pairedStatus, pairedSummary, pairedCycles] = await Promise.all([
+      [status, summary, intents, structural, pairedStatus, pairedSummary, pairedCycles, priority] = await Promise.all([
         labApiGet('/allmarket/status'), labApiGet('/allmarket/summary'), labApiGet('/allmarket/intents?limit=75'),
         labApiGet('/structural/summary'), labApiGet('/pairedmaker/status'), labApiGet('/pairedmaker/summary'),
         labApiGet('/pairedmaker/cycles?limit=50'),
+        labApiGet('/research/priority-lanes'),
       ]);
     } catch (error) {
       document.getElementById('bookLabStatusTitle').textContent = 'BOOK LAB: API UNAVAILABLE';
@@ -3052,7 +3061,7 @@
       document.getElementById('bookLabStatusIndicator').style.background = 'var(--danger)';
       return;
     }
-    const bothAlive = status.alive && structural.alive && pairedStatus.alive;
+    const bothAlive = status.alive && structural.alive;
     document.getElementById('bookLabStatusIndicator').style.background = bothAlive ? 'var(--green)' : 'var(--yellow)';
     document.getElementById('bookLabStatusTitle').textContent = bothAlive ? 'BOOK LAB: EVENT-DRIVEN PAPER COLLECTION LIVE' : 'BOOK LAB: ONE OR MORE COLLECTORS STALE';
     document.getElementById('bookLabStatusSubtitle').textContent = status.contract.internalTargetMs + ' ms target · public WS · wallet ' + (status.contract.walletLoaded ? 'loaded' : 'absent') + ' · database hot path ' + (status.contract.databaseInHotPath ? 'yes' : 'no') + ' · refreshed ' + new Date().toLocaleTimeString();
@@ -3069,8 +3078,20 @@
     document.getElementById('pairedMakerStatus').textContent = pairedStatus.alive
       ? 'LIVE PAPER · ' + (pairedStatus.runtime?.open_cycles ?? 0) + ' open cycles · '
         + (pairedActivity.eligible_one_cent_1h ?? 0) + ' one-cent observations in 1h'
-      : 'STALE · no profit should be inferred while collection is offline';
+      : 'RETIRED NEGATIVE CONTROL · excluded from the priority fleet';
     document.getElementById('pairedMakerStatus').style.color = pairedStatus.alive ? 'var(--green)' : 'var(--yellow)';
+
+    const laneEvidence = function (lane) {
+      const e = lane.evidence || {};
+      if (lane.program === 'resolver_boundary_transfer') return (e.evaluations || 0) + ' evaluations · ' + (e.actions || 0) + ' actions · ' + (e.errors || 0) + ' errors';
+      if (lane.program === 'certified_payoff_graph') return (e.candidates || 0) + ' candidates · ' + (e.qualified || 0) + ' qualified';
+      if (lane.program === 'rule_aware_crossvenue') return (e.pairs || 0) + ' pairs · ' + (e.paperTradeLeads || 0) + ' eligible leads';
+      if (lane.program === 'options_implied_binary_residual') return (e.markets || 0) + ' targets · ' + (e.executable || 0) + ' executable marks';
+      return (e.selectedMarkets || 0) + ' frozen capture markets · ' + (e.decisions || 0) + ' quote decisions';
+    };
+    document.getElementById('priorityLanesBody').innerHTML = (priority.lanes || []).map((lane) =>
+      '<tr><td>' + lane.priority + '</td><td style="font-weight:700;">' + escapeHtml(lane.program) + '</td><td>' + escapeHtml(lane.runMode || '—') + '</td><td style="color:' + (lane.active ? 'var(--green)' : 'var(--yellow)') + ';">' + escapeHtml(lane.status) + '</td><td>' + escapeHtml(laneEvidence(lane)) + '</td><td style="max-width:420px;color:var(--text-muted);">' + escapeHtml(lane.nextTest || '') + '</td></tr>'
+    ).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;">No lane report available.</td></tr>';
 
     document.getElementById('bookLabSummaryBody').innerHTML = summary.rows.length ? summary.rows.map((row) => {
       const winPct = row.fills ? Math.round(100 * Number(row.wins_5s || 0) / row.fills) + '%' : '—';
@@ -3124,14 +3145,20 @@
     const cvEvidenceEnabled = status.evidenceEnabled === true;
     document.getElementById('cvStatusIndicator').style.background = status.alive && cvEvidenceEnabled ? 'var(--green)' : 'var(--yellow)';
     document.getElementById('cvStatusTitle').textContent = !status.alive ? 'CROSS-VENUE: COLLECTOR STALE'
-      : cvEvidenceEnabled ? 'CROSS-VENUE: RULE-CERTIFIED PAPER EVIDENCE ACTIVE'
+      : cvEvidenceEnabled && status.paperEvaluationEnabled ? 'CROSS-VENUE: PROVED + SCORE>80 PAPER COHORTS ACTIVE'
+        : cvEvidenceEnabled ? 'CROSS-VENUE: RULE-CERTIFIED PAPER EVIDENCE ACTIVE'
         : 'CROSS-VENUE: TRANSPORT HEALTHY · 0 PROVED RELATIONS · CONTROLS ONLY';
-    document.getElementById('cvStatusSubtitle').textContent = (status.evidenceBlocker || ('Polymarket WebSocket + Kalshi ' + (status.contract?.kalshiTransport || 'public_batch_rest') + ' · deterministic payoff relations · $500 depth-optimized sizing · orders non-atomic')) + ' · refreshed ' + new Date().toLocaleTimeString();
+    const cvRuntimeMetrics = runtime.metrics || {};
+    const cvUniverseHealth = cvRuntimeMetrics.kalshiUniverseTruncated || cvRuntimeMetrics.polyUniverseTruncated
+      ? ' · WARNING: venue universe fallback/truncated'
+      : cvRuntimeMetrics.kalshiEvents
+        ? ' · full scans: ' + (cvRuntimeMetrics.polyEvents ?? '—') + ' Poly / ' + cvRuntimeMetrics.kalshiEvents + ' Kalshi events'
+        : '';
+    document.getElementById('cvStatusSubtitle').textContent = (status.evidenceBlocker || ('Polymarket WebSocket + Kalshi ' + (status.contract?.kalshiTransport || 'public_batch_rest') + ' · deterministic payoff relations · $500 depth-optimized sizing · orders non-atomic')) + cvUniverseHealth + ' · refreshed ' + new Date().toLocaleTimeString();
     document.getElementById('cvPolyMarkets').textContent = runtime.poly_markets ?? 0;
     document.getElementById('cvKalshiMarkets').textContent = runtime.kalshi_markets ?? 0;
-    const cvRuntimeMetrics = runtime.metrics || {};
-    document.getElementById('cvCandidates').textContent = (cvRuntimeMetrics.pendingCandidates ?? runtime.candidates ?? 0) + ' / ' + (runtime.approved_matches ?? 0);
-    document.getElementById('cvMonitored').textContent = (cvRuntimeMetrics.reviewedRejected ?? 0) + ' reviewed rejected · ' + (runtime.monitored_matches ?? 0) + ' monitored';
+    document.getElementById('cvCandidates').textContent = (cvRuntimeMetrics.paperApprovedMatches ?? 0) + ' / ' + (runtime.approved_matches ?? 0);
+    document.getElementById('cvMonitored').textContent = (matches.total ?? runtime.candidates ?? 0) + ' discovered · ' + (cvRuntimeMetrics.paperMonitoredMatches ?? 0) + ' paper monitored · ' + (runtime.monitored_matches ?? 0) + ' total monitored';
     document.getElementById('cvEpisodes').textContent = activity.relation_events ?? 0;
     document.getElementById('cvLockable').textContent = (activity.ever_economic ?? 0) + ' ever economic · ' + (activity.disappeared ?? 0) + ' disappeared';
 
@@ -3152,11 +3179,12 @@
     };
     const cvCohorts = [
       { label: 'APPROVED EVIDENCE', row: convergence.approvedEvidence, evidence: true },
+      { label: 'SCORE>80 PAPER TEST', row: convergence.paperEvaluation, paper: true },
       { label: 'UNAPPROVED DIAGNOSTIC', row: convergence.unapprovedDiagnostic, evidence: false },
     ];
     document.getElementById('cvConvergenceBody').innerHTML = cvCohorts.map((item) => {
       const row = item.row || {};
-      return '<tr><td style="font-weight:700;color:' + (item.evidence ? 'var(--green)' : 'var(--yellow)') + ';">' + item.label + '</td><td>' + (row.episodes || 0) + '</td><td>' + (row.pairs || 0) + '</td><td>' + (row.observedProfitableExits || 0) + '</td><td>' + (row.rightCensored || 0) + '</td><td>' + cvDuration(row.observedMedianEventMs) + '</td><td>' + cvProbability(row, '1h') + '</td><td>' + cvProbability(row, '6h') + '</td><td>' + cvProbability(row, '24h') + '</td><td>' + cvProbability(row, '7d') + '</td></tr>';
+      return '<tr><td style="font-weight:700;color:' + (item.evidence ? 'var(--green)' : item.paper ? 'var(--yellow)' : 'var(--text-muted)') + ';">' + item.label + '</td><td>' + (row.episodes || 0) + '</td><td>' + (row.pairs || 0) + '</td><td>' + (row.observedProfitableExits || 0) + '</td><td>' + (row.rightCensored || 0) + '</td><td>' + cvDuration(row.observedMedianEventMs) + '</td><td>' + cvProbability(row, '1h') + '</td><td>' + cvProbability(row, '6h') + '</td><td>' + cvProbability(row, '24h') + '</td><td>' + cvProbability(row, '7d') + '</td></tr>';
     }).join('');
     const coverageDays = Number(convergence.coverage?.spanDays || 0);
     document.getElementById('cvConvergenceCoverage').textContent = 'four fees · right-censored · ' + Number(convergence.coverage?.samples || 0) + ' samples · ' + coverageDays.toFixed(1) + ' observed days';
@@ -3165,10 +3193,11 @@
       const flags = Array.isArray(row.mismatch_reasons) && row.mismatch_reasons.length ? row.mismatch_reasons.join(', ') : 'manual rules review pending';
       const rejected = row.identity_status === 'MANUALLY_REJECTED' || row.identity_status === 'REJECTED';
       const relationApproved = row.relation_approved === true;
-      const decision = relationApproved ? 'RELATION APPROVED' : row.identity_approved ? 'IDENTITY APPROVED' : rejected ? 'IDENTITY REJECTED' : 'PENDING';
+      const paperApproved = row.paper_eval_approved === true;
+      const decision = relationApproved ? 'RELATION APPROVED' : paperApproved ? 'PAPER APPROVED (>80%)' : row.identity_approved ? 'IDENTITY APPROVED' : rejected ? 'IDENTITY REJECTED' : 'PENDING';
       const rationale = row.relation_resolution_audit?.rationale || row.resolution_audit?.rationale || '';
       const relationLabel = relationApproved ? row.relation_type : row.identity_status;
-      return '<tr><td title="' + escapeHtml(row.poly_question || '') + '">' + escapeHtml((row.poly_question || '').slice(0, 52)) + '</td><td title="' + escapeHtml(row.kalshi_title || '') + '">' + escapeHtml((row.kalshi_title || '').slice(0, 52)) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(row.kalshi_ticker || '') + '</div></td><td>' + (100 * Number(row.match_score || 0)).toFixed(1) + '%</td><td>' + escapeHtml(relationLabel) + '</td><td style="color:' + (relationApproved || row.identity_approved ? 'var(--green)' : rejected ? 'var(--danger)' : 'var(--yellow)') + '">' + decision + '</td><td>' + (row.end_delta_hours == null ? '—' : Number(row.end_delta_hours).toFixed(1) + 'h') + '</td><td title="' + escapeHtml(flags + (rationale ? ' — ' + rationale : '')) + '">' + escapeHtml(flags.slice(0, 42)) + '</td><td>' + (row.monitored ? (relationApproved ? 'PROVED PAPER' : rejected ? 'DIAGNOSTIC' : 'LIVE') : rejected ? 'closed' : 'queue') + '</td></tr>';
+      return '<tr><td title="' + escapeHtml(row.poly_question || '') + '">' + escapeHtml((row.poly_question || '').slice(0, 52)) + '</td><td title="' + escapeHtml(row.kalshi_title || '') + '">' + escapeHtml((row.kalshi_title || '').slice(0, 52)) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(row.kalshi_ticker || '') + '</div></td><td>' + (100 * Number(row.match_score || 0)).toFixed(1) + '%</td><td>' + escapeHtml(relationLabel) + '</td><td style="color:' + (relationApproved || row.identity_approved ? 'var(--green)' : rejected ? 'var(--danger)' : 'var(--yellow)') + '">' + decision + '</td><td>' + (row.end_delta_hours == null ? '—' : Number(row.end_delta_hours).toFixed(1) + 'h') + '</td><td title="' + escapeHtml(flags + (rationale ? ' — ' + rationale : '')) + '">' + escapeHtml(flags.slice(0, 42)) + '</td><td>' + (row.monitored ? (relationApproved ? 'PROVED PAPER' : paperApproved ? 'PAPER TEST' : rejected ? 'DIAGNOSTIC' : 'CONTROL') : rejected ? 'closed' : 'queue') + '</td></tr>';
     }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;">No comparable pairs discovered in the current active universe</td></tr>';
 
     const relationRows = relationEpisodes.rows || [];
@@ -3181,7 +3210,11 @@
     document.getElementById('cvOpportunitiesBody').innerHTML = opportunities.length ? opportunities.map((row) => {
       const orphan = row.detail?.legRisk?.worstImmediateUnwindPnl;
       const control = row.relation_approved !== true;
-      return '<tr><td style="color:var(--text-muted);">' + new Date(row.observed_at).toLocaleTimeString() + '</td><td title="' + escapeHtml((row.poly_question || '') + ' / ' + (row.kalshi_title || '')) + '">' + escapeHtml((row.poly_question || '').slice(0, 34)) + '</td><td>' + escapeHtml(row.direction) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(row.relation_type || 'UNREVIEWED') + '</div></td><td>' + Number(row.quantity).toFixed(1) + '</td><td>' + Number(row.poly_vwap).toFixed(3) + '</td><td>' + Number(row.kalshi_vwap).toFixed(3) + '</td><td>' + _bMoney(row.total_cost) + '</td><td style="color:' + (control ? 'var(--yellow)' : _bPnlColor(row.locked_profit_after_both_fills)) + '">' + _bMoney(row.locked_profit_after_both_fills) + (control ? ' CONTROL' : '') + '</td><td>' + (row.raw_roi_pct == null ? '—' : Number(row.raw_roi_pct).toFixed(2) + '%' + (control ? ' CONTROL' : '')) + '</td><td>' + (row.stressed_roi_pct == null ? '—' : Number(row.stressed_roi_pct).toFixed(2) + '%') + '</td><td style="color:' + _bPnlColor(orphan) + '">' + (orphan == null ? 'unavailable' : _bMoney(orphan)) + '</td><td style="color:' + (row.lockable_after_both_fills ? 'var(--green)' : row.relation_approved ? 'var(--yellow)' : 'var(--text-muted)') + '">' + (control ? 'CONTROL — NOT TRADE' : escapeHtml(row.status)) + '</td><td>' + escapeHtml(row.data_quality_grade + '/' + row.execution_fidelity_grade) + '</td></tr>';
+      const paperApproved = row.paper_eval_approved === true;
+      const paperTrade = row.paper_trade_eligible === true;
+      const statusText = paperTrade ? 'PAPER ENTRY ELIGIBLE' : paperApproved ? 'PAPER OBSERVE — NO STRESSED EDGE' : control ? 'CONTROL — NOT TRADE' : row.status;
+      const assumption = control ? (paperApproved ? ' PAPER' : ' CONTROL') : '';
+      return '<tr><td style="color:var(--text-muted);">' + new Date(row.observed_at).toLocaleTimeString() + '</td><td title="' + escapeHtml((row.poly_question || '') + ' / ' + (row.kalshi_title || '')) + '">' + escapeHtml((row.poly_question || '').slice(0, 34)) + '</td><td>' + escapeHtml(row.direction) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(row.relation_type || 'UNREVIEWED') + '</div></td><td>' + Number(row.quantity).toFixed(1) + '</td><td>' + Number(row.poly_vwap).toFixed(3) + '</td><td>' + Number(row.kalshi_vwap).toFixed(3) + '</td><td>' + _bMoney(row.total_cost) + '</td><td style="color:' + (control ? 'var(--yellow)' : _bPnlColor(row.locked_profit_after_both_fills)) + '">' + _bMoney(row.locked_profit_after_both_fills) + assumption + '</td><td>' + (row.raw_roi_pct == null ? '—' : Number(row.raw_roi_pct).toFixed(2) + '%' + assumption) + '</td><td>' + (row.stressed_roi_pct == null ? '—' : Number(row.stressed_roi_pct).toFixed(2) + '%') + '</td><td style="color:' + _bPnlColor(orphan) + '">' + (orphan == null ? 'unavailable' : _bMoney(orphan)) + '</td><td style="color:' + (row.lockable_after_both_fills ? 'var(--green)' : paperTrade ? 'var(--yellow)' : 'var(--text-muted)') + '">' + escapeHtml(statusText) + '</td><td>' + escapeHtml(row.data_quality_grade + '/' + row.execution_fidelity_grade) + '</td></tr>';
     }).join('') : '<tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:18px;">Waiting for both venue books on monitored pairs</td></tr>';
   }
 
@@ -3259,27 +3292,41 @@
 
   // ═══════════════ BORG — shadow-only edge discovery (read-only view) ═══════════════
   let _borgInterval = null;
+  let _borgLoading = false;
 
   const _bAge = (s) => s == null ? 'never' : (s < 60 ? s + 's' : s < 3600 ? Math.round(s / 60) + 'm' : Math.round(s / 3600) + 'h') + ' ago';
   const _bMoney = (v) => v == null ? '—' : (v < 0 ? '-' : '') + '$' + Math.abs(v).toFixed(2);
   const _bPnlColor = (v) => v > 0 ? 'var(--green)' : v < 0 ? 'var(--danger)' : 'var(--text-muted)';
 
   async function loadBorg() {
+    if (_borgLoading) return;
+    _borgLoading = true;
+    try { await loadBorgOnce(); } finally { _borgLoading = false; }
+  }
+
+  async function loadBorgOnce() {
     const get = (p) => fetch((window.API_BASE || '') + '/api/borg' + p, { headers: { ...authHeaders() } })
       .then((r) => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)));
-    let status, summary, orders, events, portfolio, h53;
-    try {
-      [status, summary, orders, events, portfolio, h53] = await Promise.all([
-        get('/status'), get('/shadow/summary'), get('/shadow/orders?limit=40'), get('/events?limit=30'),
-        get('/research/portfolio?phase=pilot'), get('/h53/live'),
-      ]);
-    } catch (e) {
+    const names = ['status', 'scoreboard', 'orders', 'events', 'portfolio', 'H53'];
+    const settled = await Promise.allSettled([
+      get('/status'), get('/shadow/summary'), get('/shadow/orders?limit=40'), get('/events?limit=30'),
+      get('/research/portfolio?phase=pilot'), get('/h53/live'),
+    ]);
+    if (settled[0].status === 'rejected') {
+      const e = settled[0].reason;
       document.getElementById('borgStatusTitle').textContent = 'BORG: API UNAVAILABLE';
       document.getElementById('borgStatusSubtitle').textContent =
         'Could not reach /api/borg (' + e.message + '). If the server was just updated, restart it to pick up the new routes.';
       document.getElementById('borgStatusIndicator').style.background = 'var(--danger)';
       return;
     }
+    const status = settled[0].value;
+    const optional = settled.slice(1).map((result) => result.status === 'fulfilled' ? result.value : null);
+    const [summary, orders, events, portfolio, h53] = optional;
+    const delayed = settled.map((result, index) => result.status === 'rejected' ? names[index] : null).filter(Boolean);
+    document.getElementById('borgStatusSubtitle').textContent = delayed.length
+      ? 'Collector status is live. Retaining the previous values for delayed panels: ' + delayed.join(', ') + '.'
+      : 'Research remains shadow-only except the separately gated, explicitly unproven H53 five-minute live mirror. Every H53 order is reconciled against its shadow source.';
 
     // banner + tiles
     const ind = document.getElementById('borgStatusIndicator');
@@ -3298,36 +3345,38 @@
     document.getElementById('bMarkets').textContent = (m.resolved ?? '—') + ' / ' + (m.total ?? '—');
     document.getElementById('bLiveOpens').textContent = (m.live_opens ?? '—') + ' live-captured opens';
     document.getElementById('bQ3').textContent = (m.sign_disagreements ?? '—') + ' / ' + (m.resolved ?? '—');
-    document.getElementById('bGaps').textContent = status.snapshotGaps24h ?? '—';
+    document.getElementById('bGaps').textContent = status.snapshotGapsRecent ?? '—';
     document.getElementById('bUptime').textContent = 'uptime ' +
       (status.heartbeat?.counters?.uptimeMin != null ? status.heartbeat.counters.uptimeMin + 'm' : '—');
 
-    // H53 explicit live override
-    const h53Mode = document.getElementById('h53Mode');
-    h53Mode.textContent = h53.mode + (h53.alive ? '' : ' · STALE');
-    h53Mode.style.color = h53.mode === 'LIVE' && h53.alive ? 'var(--green)' : 'var(--danger)';
-    document.getElementById('h53Heartbeat').textContent = 'heartbeat ' + _bAge(h53.heartbeatAgeSec);
-    document.getElementById('h53Balance').textContent = _bMoney(h53.walletBalanceUsdc);
-    const ht = h53.totals || {};
-    document.getElementById('h53Orders').textContent = ht.live_decisions ?? 0;
-    document.getElementById('h53Skipped').textContent = (ht.skipped ?? 0) + ' skipped · ' + (ht.errors ?? 0) + ' errors';
-    document.getElementById('h53Matched').textContent = ht.matched ?? 0;
-    document.getElementById('h53Ack').textContent = ht.avg_ack_ms == null ? 'ack —' : 'avg ack ' + Math.round(ht.avg_ack_ms) + 'ms';
-    const h53Pnl = Number(ht.realized_pnl || 0);
-    document.getElementById('h53Pnl').textContent = _bMoney(h53Pnl);
-    document.getElementById('h53Pnl').style.color = _bPnlColor(h53Pnl);
-    document.getElementById('h53Unresolved').textContent = (ht.unresolved ?? 0) + ' unresolved';
-    const h53Body = document.getElementById('h53LiveBody');
-    h53Body.innerHTML = (h53.recent || []).length ? h53.recent.map((row) =>
-      '<tr><td style="color:var(--text-muted);">' + new Date(row.created_at).toLocaleTimeString() + '</td>' +
-      '<td>' + escapeHtml(row.token) + '</td><td>' + Number(row.signal_price).toFixed(2) + ' × ' + Number(row.signal_size).toFixed(2) + '</td>' +
-      '<td>' + _bMoney(row.requested_notional) + '</td><td>' + escapeHtml(row.status) + '</td>' +
-      '<td>' + (row.matched_shares == null ? '—' : Number(row.matched_shares).toFixed(2)) + '</td>' +
-      '<td>' + (row.average_fill_price == null ? '—' : Number(row.average_fill_price).toFixed(3)) + '</td>' +
-      '<td>' + (row.acknowledgement_latency_ms == null ? '—' : row.acknowledgement_latency_ms + 'ms') + '</td>' +
-      '<td>' + escapeHtml(row.resolved_outcome || '—') + '</td>' +
-      '<td style="color:' + _bPnlColor(row.realized_pnl) + ';">' + (row.realized_pnl == null ? '—' : _bMoney(row.realized_pnl)) + '</td></tr>'
-    ).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);">Waiting for H53 live decisions</td></tr>';
+    // H53 explicit live override. A delayed H53 report must not blank BORG.
+    if (h53) {
+      const h53Mode = document.getElementById('h53Mode');
+      h53Mode.textContent = h53.mode + (h53.alive ? '' : ' · STALE');
+      h53Mode.style.color = h53.mode === 'LIVE' && h53.alive ? 'var(--green)' : 'var(--danger)';
+      document.getElementById('h53Heartbeat').textContent = 'heartbeat ' + _bAge(h53.heartbeatAgeSec);
+      document.getElementById('h53Balance').textContent = _bMoney(h53.walletBalanceUsdc);
+      const ht = h53.totals || {};
+      document.getElementById('h53Orders').textContent = ht.live_decisions ?? 0;
+      document.getElementById('h53Skipped').textContent = (ht.skipped ?? 0) + ' skipped · ' + (ht.errors ?? 0) + ' errors';
+      document.getElementById('h53Matched').textContent = ht.matched ?? 0;
+      document.getElementById('h53Ack').textContent = ht.avg_ack_ms == null ? 'ack —' : 'avg ack ' + Math.round(ht.avg_ack_ms) + 'ms';
+      const h53Pnl = Number(ht.realized_pnl || 0);
+      document.getElementById('h53Pnl').textContent = _bMoney(h53Pnl);
+      document.getElementById('h53Pnl').style.color = _bPnlColor(h53Pnl);
+      document.getElementById('h53Unresolved').textContent = (ht.unresolved ?? 0) + ' unresolved';
+      const h53Body = document.getElementById('h53LiveBody');
+      h53Body.innerHTML = (h53.recent || []).length ? h53.recent.map((row) =>
+        '<tr><td style="color:var(--text-muted);">' + new Date(row.created_at).toLocaleTimeString() + '</td>' +
+        '<td>' + escapeHtml(row.token) + '</td><td>' + Number(row.signal_price).toFixed(2) + ' × ' + Number(row.signal_size).toFixed(2) + '</td>' +
+        '<td>' + _bMoney(row.requested_notional) + '</td><td>' + escapeHtml(row.status) + '</td>' +
+        '<td>' + (row.matched_shares == null ? '—' : Number(row.matched_shares).toFixed(2)) + '</td>' +
+        '<td>' + (row.average_fill_price == null ? '—' : Number(row.average_fill_price).toFixed(3)) + '</td>' +
+        '<td>' + (row.acknowledgement_latency_ms == null ? '—' : row.acknowledgement_latency_ms + 'ms') + '</td>' +
+        '<td>' + escapeHtml(row.resolved_outcome || '—') + '</td>' +
+        '<td style="color:' + _bPnlColor(row.realized_pnl) + ';">' + (row.realized_pnl == null ? '—' : _bMoney(row.realized_pnl)) + '</td></tr>'
+      ).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);">Waiting for H53 live decisions</td></tr>';
+    }
 
     // paper account (scored shadow ledger)
     const pa = status.paper;
@@ -3350,59 +3399,63 @@
         ? _bAge(Math.round((Date.now() - new Date(pa.lastScored).getTime()) / 1000)) : 'never';
     }
 
-    // scoreboard
-    const sb = document.getElementById('borgSummaryBody');
-    if (!summary.length) {
-      sb.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr>';
-    } else {
-      sb.innerHTML = summary.map((s) => {
-        const fillPct = s.scored > 0 ? Math.round((100 * s.fills) / s.scored) + '%' : '—';
-        return '<tr>' +
-          '<td style="font-weight:700;">' + escapeHtml(s.strategy) + '</td>' +
-          '<td><span style="color:var(--yellow);">' + escapeHtml(s.phase) + '</span></td>' +
-          '<td>' + s.places + '</td><td>' + s.cancels + '</td><td>' + s.scored + '</td><td>' + s.fills + '</td>' +
-          '<td>' + fillPct + '</td>' +
-          '<td style="color:' + _bPnlColor(s.pnl_gross) + ';">' + _bMoney(s.pnl_gross) + '</td>' +
-          '<td style="color:' + _bPnlColor(s.pnl_05x) + ';">' + _bMoney(s.pnl_05x) + '</td>' +
-          '<td style="color:' + _bPnlColor(s.pnl_1x) + ';font-weight:700;">' + _bMoney(s.pnl_1x) + '</td>' +
-          '<td style="color:' + _bPnlColor(s.pnl_2x) + ';">' + _bMoney(s.pnl_2x) + '</td>' +
-          '<td>' + (s.scored > 0 ? Math.round(100 * s.quality_ab / s.scored) + '%' : '—') + '</td>' +
-          '<td>' + (s.scored > 0 ? Math.round(100 * s.fidelity_ab / s.scored) + '%' : '—') + '</td>' +
-          '<td style="color:var(--text-muted);">' + _bAge(Math.round((Date.now() - new Date(s.latest).getTime()) / 1000)) + '</td>' +
-          '</tr>';
-      }).join('');
+    // scoreboard. Keep the previous render if this supplemental report lags.
+    if (summary) {
+      const sb = document.getElementById('borgSummaryBody');
+      if (!summary.length) {
+        sb.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr>';
+      } else {
+        sb.innerHTML = summary.map((s) => {
+          const fillPct = s.scored > 0 ? Math.round((100 * s.fills) / s.scored) + '%' : '—';
+          return '<tr>' +
+            '<td style="font-weight:700;">' + escapeHtml(s.strategy) + '</td>' +
+            '<td><span style="color:var(--yellow);">' + escapeHtml(s.phase) + '</span></td>' +
+            '<td>' + s.places + '</td><td>' + s.cancels + '</td><td>' + s.scored + '</td><td>' + s.fills + '</td>' +
+            '<td>' + fillPct + '</td>' +
+            '<td style="color:' + _bPnlColor(s.pnl_gross) + ';">' + _bMoney(s.pnl_gross) + '</td>' +
+            '<td style="color:' + _bPnlColor(s.pnl_05x) + ';">' + _bMoney(s.pnl_05x) + '</td>' +
+            '<td style="color:' + _bPnlColor(s.pnl_1x) + ';font-weight:700;">' + _bMoney(s.pnl_1x) + '</td>' +
+            '<td style="color:' + _bPnlColor(s.pnl_2x) + ';">' + _bMoney(s.pnl_2x) + '</td>' +
+            '<td>' + (s.scored > 0 ? Math.round(100 * s.quality_ab / s.scored) + '%' : '—') + '</td>' +
+            '<td>' + (s.scored > 0 ? Math.round(100 * s.fidelity_ab / s.scored) + '%' : '—') + '</td>' +
+            '<td style="color:var(--text-muted);">' + _bAge(Math.round((Date.now() - new Date(s.latest).getTime()) / 1000)) + '</td>' +
+            '</tr>';
+        }).join('');
+      }
     }
 
     // recent orders
-    const ob = document.getElementById('borgOrdersBody');
-    if (!orders.length) {
-      ob.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr>';
-    } else {
-      ob.innerHTML = orders.map((o) => {
-        const t = new Date(o.ts).toLocaleTimeString();
-        const filled = o.filled == null ? '<span style="color:var(--text-muted);">pending</span>'
-          : o.filled ? '<span style="color:var(--green);">yes</span>' : '<span style="color:var(--text-muted);">no</span>';
-        return '<tr>' +
-          '<td style="color:var(--text-muted);">' + t + '</td>' +
-          '<td>' + escapeHtml(o.strategy) + '</td>' +
-          '<td>' + (o.action === 'cancel' ? '<span style="color:var(--text-muted);">cancel</span>' : '<span style="color:var(--cyan);">place</span>') + '</td>' +
-          '<td>' + (o.side ? escapeHtml(o.side) + ' ' + escapeHtml(o.token || '') : '—') + '</td>' +
-          '<td>' + (o.price != null ? Number(o.price).toFixed(2) : '—') + '</td>' +
-          '<td>' + (o.size != null ? Number(o.size).toFixed(1) : '—') + '</td>' +
-          '<td>' + (o.tte_sec != null ? Math.round(o.tte_sec) + 's' : '—') + '</td>' +
-          '<td>' + (o.queue_ahead != null ? Number(o.queue_ahead).toFixed(0) : '—') + '</td>' +
-          '<td>' + (o.action === 'place' ? filled : '') + '</td>' +
-          '<td>' + escapeHtml(o.data_quality_grade || '—') + '</td>' +
-          '<td title="' + escapeHtml(o.fidelity_level || '') + '">' + escapeHtml(o.execution_fidelity_grade || '—') + '</td>' +
-          '<td style="color:' + _bPnlColor(o.pnl_1x) + ';">' + (o.pnl_1x != null ? _bMoney(o.pnl_1x) : '') + '</td>' +
-          '<td style="color:var(--text-muted);">' + escapeHtml(o.note || '') + '</td>' +
-          '</tr>';
-      }).join('');
+    if (orders) {
+      const ob = document.getElementById('borgOrdersBody');
+      if (!orders.length) {
+        ob.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr>';
+      } else {
+        ob.innerHTML = orders.map((o) => {
+          const t = new Date(o.ts).toLocaleTimeString();
+          const filled = o.filled == null ? '<span style="color:var(--text-muted);">pending</span>'
+            : o.filled ? '<span style="color:var(--green);">yes</span>' : '<span style="color:var(--text-muted);">no</span>';
+          return '<tr>' +
+            '<td style="color:var(--text-muted);">' + t + '</td>' +
+            '<td>' + escapeHtml(o.strategy) + '</td>' +
+            '<td>' + (o.action === 'cancel' ? '<span style="color:var(--text-muted);">cancel</span>' : '<span style="color:var(--cyan);">place</span>') + '</td>' +
+            '<td>' + (o.side ? escapeHtml(o.side) + ' ' + escapeHtml(o.token || '') : '—') + '</td>' +
+            '<td>' + (o.price != null ? Number(o.price).toFixed(2) : '—') + '</td>' +
+            '<td>' + (o.size != null ? Number(o.size).toFixed(1) : '—') + '</td>' +
+            '<td>' + (o.tte_sec != null ? Math.round(o.tte_sec) + 's' : '—') + '</td>' +
+            '<td>' + (o.queue_ahead != null ? Number(o.queue_ahead).toFixed(0) : '—') + '</td>' +
+            '<td>' + (o.action === 'place' ? filled : '') + '</td>' +
+            '<td>' + escapeHtml(o.data_quality_grade || '—') + '</td>' +
+            '<td title="' + escapeHtml(o.fidelity_level || '') + '">' + escapeHtml(o.execution_fidelity_grade || '—') + '</td>' +
+            '<td style="color:' + _bPnlColor(o.pnl_1x) + ';">' + (o.pnl_1x != null ? _bMoney(o.pnl_1x) : '') + '</td>' +
+            '<td style="color:var(--text-muted);">' + escapeHtml(o.note || '') + '</td>' +
+            '</tr>';
+        }).join('');
+      }
     }
 
     // log
     const lb = document.getElementById('borgLogBody');
-    if (events.length) {
+    if (events?.length) {
       lb.innerHTML = events.map((e) => {
         const col = e.level === 'ERROR' ? 'var(--danger)' : e.level === 'WARN' ? 'var(--yellow)' : 'var(--text-muted)';
         return '<div><span style="color:var(--text-muted);">' + new Date(e.ts).toLocaleTimeString() + '</span> ' +
@@ -3641,7 +3694,17 @@
       const problems = [];
       if (!h.dbWritable) problems.push(`DB NOT WRITABLE (${h.dbSizeMb ?? '?'} MB)`);
       if (h.writeErrors > 0) problems.push(`${h.writeErrors} failed DB writes (last ${h.lastDbErrorAt || '?'})`);
-      for (const c of h.staleComponents || []) problems.push(`${c} silent >120s`);
+      for (const c of h.staleComponents || []) {
+        const beat = h.heartbeats?.[c] || {};
+        if (beat.reason === 'feed_degraded') {
+          problems.push(`${c} feed degraded (${beat.feedStatus || 'unknown'})`);
+        } else if (beat.ageSec == null) {
+          problems.push(`${c} heartbeat missing`);
+        } else {
+          problems.push(`${c} silent ${beat.ageSec}s (limit ${beat.maxAgeSec || '?'}s)`);
+        }
+      }
+      if (h.heartbeatCheck === 'failed') problems.push('heartbeat health query failed');
       if (problems.length) {
         banner.textContent = '⛔ SYSTEM DEGRADED — ' + problems.join(' · ');
         banner.style.display = 'block';
@@ -3969,7 +4032,15 @@
     } finally { document.body.style.cursor = ''; }
   }
 
+  let _dashboardLoading = false;
+
   async function loadDashboard() {
+    if (_dashboardLoading) return;
+    _dashboardLoading = true;
+    try { await loadDashboardOnce(); } finally { _dashboardLoading = false; }
+  }
+
+  async function loadDashboardOnce() {
     try {
       const el = id => document.getElementById(id);
       loadBotsOverview().catch(() => {});

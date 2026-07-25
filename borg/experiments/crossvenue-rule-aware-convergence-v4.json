@@ -1,0 +1,63 @@
+{
+  "experiment_id": "crossvenue-rule-aware-convergence-v4",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-20T09:41:00.000Z",
+  "evidence_started_at": "2026-07-20T09:41:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "rule_aware_crossvenue_convergence",
+  "supersedes": "crossvenue-certified-convergence-v3",
+  "strategy_version": "crossvenue-rule-aware-convergence-v4",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "selection_disclosure": "Every V1-V3 quote, basis sample and relation episode is excluded. The score-approved cohort and strict greater-than-0.80 discovery rule were chosen before this boundary. A score is not a payoff proof and may not be relabelled as risk-free arbitrage.",
+  "hypothesis": "For prospectively selected, rule-compatible cross-venue pairs, persistent executable probability dislocations may converge slowly enough to monetize after all four taker fees, displayed-depth limits and non-atomic leg-risk stress. Separately, content-hash-certified payoff relations may occasionally produce a terminal lock.",
+  "cohorts": {
+    "certified_terminal_lock": {
+      "eligibility": "exact identifiers, current rule-document hashes and deterministic statewise payoff proof",
+      "claim": "minimum terminal payout may be called locked only after both simulated legs fill"
+    },
+    "score_approved_convergence": {
+      "eligibility": "strict match score greater than 0.80, no hard mismatch or rejection, operator paper approval, fresh synchronized books",
+      "claim": "risky convergence hypothesis only; no identity, parity or terminal-payout claim"
+    }
+  },
+  "synchronization": {
+    "maximum_receive_skew_ms": 250,
+    "causality": "latest state from each venue available at the decision cut; never backward-search for a favorable pair",
+    "required_quality": ["A", "B"],
+    "unsynchronized_rows": "diagnostic only"
+  },
+  "execution": {
+    "entry": "walk equal share quantity through both executable ask books",
+    "exit": "walk both executable bid books",
+    "costs": "all four venue taker fees plus one adverse tick per leg stress",
+    "capital": "$500 total with $250 per venue and displayed-depth/minimum-size constraints",
+    "atomicity": false,
+    "jurisdiction": "paper observation only; no Kalshi trading path on the Dublin host"
+  },
+  "strategy_bindings": [{
+    "strategy": "crossvenue_rule_aware_convergence_v4",
+    "family": "rule_aware_crossvenue_convergence",
+    "arm": "250ms_synchronized_l2",
+    "phase": "eval",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "first_episode_per_pair_direction_day_net_convergence_pnl_after_four_fees"
+  }],
+  "evaluation": {
+    "minimum_independent_pair_direction_days": 300,
+    "minimum_calendar_days": 14,
+    "independent_unit": "first eligible episode per match_id, direction and UTC day",
+    "right_censor_unconverged_positions": true,
+    "require_both_chronological_halves_positive": true,
+    "require_pair_and_day_clustered_lower_bound_above_zero": true,
+    "require_positive_under_two_times_cost_and_orphan_stress": true,
+    "report_time_to_profitable_liquidation": ["1m", "5m", "30m", "1h", "6h", "24h", "7d", "30d"],
+    "selection_correction": "Report certified and score-approved cohorts separately and correct across direction, horizon and all reviewed matching variants.",
+    "null_outcome": "No terminal locks or no post-fee convergence is a valid result."
+  }
+}

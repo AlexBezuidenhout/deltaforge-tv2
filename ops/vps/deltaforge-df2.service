@@ -11,6 +11,10 @@ Group=deltaforge
 WorkingDirectory=/opt/deltaforge/df2/current
 EnvironmentFile=/etc/deltaforge/df2.env
 Environment=NODE_ENV=production
+Environment=DELTAFORGE_INSTANCE_ID=df2
+Environment=BOT_RUNNER_ENABLED=false
+Environment=DF2_ALLOW_AUTOSTART=false
+Environment=DF2_RUNNER_ENABLED=false
 ExecStart=/usr/local/bin/node src/index.js
 Restart=always
 RestartSec=5

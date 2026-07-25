@@ -1,0 +1,19 @@
+[Unit]
+Description=Record DeltaForge clean evidence-epoch health
+Requires=postgresql.service
+After=postgresql.service borg-collector.service
+
+[Service]
+Type=oneshot
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+Environment=NODE_ENV=production
+Environment=BORG_MIN_CLEAN_EVIDENCE_HOURS=24
+Environment=BORG_EVIDENCE_MIN_FREE_GIB=30
+ExecStart=/usr/local/bin/node scripts/evidence-epoch-status.js --record
+TimeoutStartSec=45
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

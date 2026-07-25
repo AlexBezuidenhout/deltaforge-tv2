@@ -9,7 +9,7 @@ const {
   certifyStructuralRelation, createRuleDocument,
 } = require('./rule-certifier');
 
-const STRUCTURAL_UNIVERSE_VERSION = 'structural-certified-payoff-graph-v3';
+const STRUCTURAL_UNIVERSE_VERSION = 'structural-certified-payoff-graph-v4-capacity';
 
 function jsonArray(value) {
   if (Array.isArray(value)) return value;
@@ -429,9 +429,9 @@ function evaluateCandidate(candidate, books, nowMs, options = {}) {
     };
   });
   const passRuleCertification = candidate.ruleCertification?.valid === true
-    && candidate.ruleCertification?.certificationHash;
+    && Boolean(candidate.ruleCertification?.certificationHash);
   const passProof = candidate.payoffProof?.valid === true
-    && candidate.payoffProof?.proofHash
+    && Boolean(candidate.payoffProof?.proofHash)
     && finite(candidate.guaranteedMinPayout) > 0
     && passRuleCertification;
   const passStale = legStates.every((entry) => entry.bookAt != null && nowMs - entry.bookAt <= staleMs);

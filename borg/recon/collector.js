@@ -27,6 +27,7 @@ const RawWal = require('./wal');
 const ShadowEngine = require('../shadow/engine');
 const makeStrategies = require('../shadow/strategies');
 const { syncExperimentRegistry } = require('../research/experiment-registry');
+const { loadActiveStrategies } = require('../research/strategy-policy');
 const { LegacyPaperAdapter } = require('../shadow/legacy-paper-adapter');
 
 // Standard normal CDF (Abramowitz–Stegun; prior art PhiModel.js)
@@ -100,6 +101,7 @@ async function main() {
     metadata: { node: process.version, platform: `${process.platform}-${process.arch}` },
   });
   const experimentRegistry = await syncExperimentRegistry(pool);
+  const strategyPolicy = await loadActiveStrategies(pool, makeStrategies());
 
   const { rows: assets } = await pool.query(
     'SELECT * FROM asset_config WHERE enabled_borg = true ORDER BY asset');
@@ -166,12 +168,16 @@ async function main() {
   const shadow = process.env.BORG_SHADOW === '0'
     ? null
     : new ShadowEngine({
-      clob, insertRows, logEvent, strategies: makeStrategies(), experimentRegistry,
+      clob, insertRows, logEvent, strategies: strategyPolicy.active, experimentRegistry,
       decisionWal: wals.decisions || null,
       collectionEpochId: collection.epochId,
       collectorRunId: collection.runId,
     });
-  if (shadow) await logEvent('INFO', 'shadow', 'shadow engine enabled', { strategies: shadow.strategies.map((s) => s.name) });
+  if (shadow) await logEvent('INFO', 'shadow', 'shadow engine enabled', {
+    strategies: shadow.strategies.map((s) => s.name),
+    parkedStrategies: strategyPolicy.parked,
+    includeParkedControls: process.env.BORG_INCLUDE_PARKED_CONTROLS === 'true',
+  });
   const persistStrategyRuntime = async () => {
     if (!shadow) return 0;
     return upsertStrategyRuntime(collection.epochId, collection.runId, shadow.runtimeStatus());
@@ -490,7 +496,7 @@ async function main() {
             row.sourceMs ? new Date(row.sourceMs) : null, new Date(row.receivedAt),
             row.receiveMonoNs, row.price, row.size, row.side,
             row.connectionEpoch, row.eventSequence, row.walEventId,
-          ]), 'ON CONFLICT (dedup_key) DO NOTHING');
+          ]), 'ON CONFLICT (dedup_key,received_at) DO NOTHING');
       } catch (err) {
         await logEvent('ERROR', 'collector', `external trade flush failed (${externalRows.trades.length}; raw WAL retained): ${err.message}`);
       }

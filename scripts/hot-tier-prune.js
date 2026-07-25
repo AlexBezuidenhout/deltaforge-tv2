@@ -12,6 +12,7 @@
 const path = require('node:path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { Pool } = require('pg');
+const { verifyRetentionAuthority } = require('./hot-tier-partitions');
 
 function positiveInt(value, fallback) {
   const parsed = parseInt(value, 10);
@@ -23,12 +24,32 @@ const MAX_BATCHES = positiveInt(process.env.DELTAFORGE_HOT_PRUNE_MAX_BATCHES, 4)
 const RETENTION_LOCK = 'deltaforge-raw-retention-v1';
 const specs = [
   {
+    // Full-rate Coinbase/Hyperliquid frames are immutable in the source WAL.
+    // SQL is the normalized replay/dashboard tier, not a second permanent copy.
+    table: 'borg_external_book_touch', timeColumn: 'received_at',
+    keepHours: positiveInt(process.env.EXTERNAL_BOOK_SQL_HOT_HOURS, 24),
+  },
+  {
+    table: 'borg_external_trades', timeColumn: 'received_at',
+    keepHours: positiveInt(process.env.EXTERNAL_TRADE_SQL_HOT_HOURS, 24),
+  },
+  {
+    // Preserve every rare positive/proved cell in SQL. Negative high-rate
+    // evaluations are replayable from structural-decision WAL segments.
+    table: 'borg_structural_evaluations', timeColumn: 'evaluated_at',
+    keepHours: positiveInt(process.env.STRUCTURAL_SQL_HOT_HOURS, 24),
+    predicate: 'NOT (t.economic_candidate OR t.qualified)',
+  },
+  {
     table: 'am_book_touches', timeColumn: 'observed_at',
     keepHours: positiveInt(process.env.ALLMARKET_SQL_HOT_HOURS, 6),
     // This relation has several execution/research indexes and is currently
     // above 10 GB. Four 5k batches per five-minute run still exceed the
     // incoming row rate without monopolizing PostgreSQL for 15 seconds.
     batchRows: positiveInt(process.env.ALLMARKET_HOT_PRUNE_BATCH_ROWS, 5000),
+    // am_book_touches_observed_id makes this deterministic even after repeated
+    // deletion leaves a sparse/bloated heap that is expensive to BRIN-recheck.
+    orderByTime: true,
   },
   {
     table: 'pm_flow_touches', timeColumn: 'observed_at',
@@ -72,14 +93,42 @@ const specs = [
     keepHours: positiveInt(process.env.PYTH_SQL_HOT_HOURS, 24),
     orderByTime: true,
   },
+  {
+    // The complete synchronized snapshot and decision payloads are appended
+    // to the cross-venue WAL before these dashboard rows are buffered. Keep a
+    // short normalized SQL window; compact independent relation/convergence
+    // ledgers and Parquet are the research history, not millions of repeated
+    // quote states.
+    table: 'cv_book_snapshots', timeColumn: 'observed_at',
+    keepHours: positiveInt(process.env.CROSSVENUE_BOOK_SQL_HOT_HOURS, 24),
+    orderByTime: true,
+  },
+  {
+    table: 'cv_opportunities', timeColumn: 'observed_at', idColumn: 'opportunity_id',
+    keepHours: positiveInt(process.env.CROSSVENUE_OPPORTUNITY_SQL_HOT_HOURS, 24),
+    // JSONB opportunity rows can carry external TOAST values. Smaller commits
+    // keep the maintenance worker below its fixed 15-second statement budget
+    // even when an old bloated index page must be revisited.
+    batchRows: positiveInt(process.env.CROSSVENUE_OPPORTUNITY_HOT_PRUNE_BATCH_ROWS, 5000),
+    orderByTime: true,
+  },
+  {
+    // Basis samples support the longest capital-release horizon directly in
+    // PostgreSQL. Thirty days is deliberate and independent of headline PnL;
+    // older samples remain replayable from the immutable decision WAL.
+    table: 'cv_basis_samples', timeColumn: 'observed_at', idColumn: 'sample_id',
+    keepHours: positiveInt(process.env.CROSSVENUE_BASIS_SQL_HOT_HOURS, 24 * 30),
+    orderByTime: true,
+  },
 ];
 
 function deleteSql(spec) {
   const extra = spec.predicate ? ` AND ${spec.predicate}` : '';
-  const order = spec.orderByTime ? `ORDER BY t.${spec.timeColumn}, t.id` : '';
+  const idColumn = spec.idColumn || 'id';
+  const order = spec.orderByTime ? `ORDER BY t.${spec.timeColumn}, t.${idColumn}` : '';
   return `
     WITH doomed AS (
-      SELECT t.id FROM ${spec.table} t
+      SELECT t.${idColumn} AS row_id FROM ${spec.table} t
        WHERE t.${spec.timeColumn} < $1${extra}
        -- BRIN-backed touch tables deliberately need no ordering: sorting the
        -- sparse eligible pages of a bloated relation can exhaust the 15-second
@@ -90,7 +139,7 @@ function deleteSql(spec) {
        FOR UPDATE SKIP LOCKED
     ), deleted AS (
       DELETE FROM ${spec.table} t USING doomed d
-       WHERE t.id=d.id
+       WHERE t.${idColumn}=d.row_id
        RETURNING 1
     )
     SELECT count(*)::int AS n FROM deleted
@@ -151,10 +200,25 @@ async function main() {
       console.log(JSON.stringify(report, null, 2));
       return;
     }
+    const authority = verifyRetentionAuthority();
+    report.archiveAuthority = {
+      completedAt: authority.receipt.completed_at,
+      sourceCutoffEpoch: authority.sourceCutoffEpoch,
+    };
     for (const spec of specs) {
       try {
-        const { rows: relation } = await pool.query('SELECT to_regclass($1) relation', [`public.${spec.table}`]);
+        const { rows: relation } = await pool.query(`
+          SELECT c.oid::regclass relation,c.relkind
+            FROM pg_class c WHERE c.oid=to_regclass($1)`, [`public.${spec.table}`]);
         if (!relation[0]?.relation) continue;
+        if (relation[0].relkind === 'p') {
+          report.tables.push({
+            table: spec.table,
+            status: 'SKIPPED_PARTITIONED',
+            reason: 'daily partition retention owns this table',
+          });
+          continue;
+        }
         report.tables.push(await pruneTable(pool, spec));
       } catch (error) {
         report.errors.push({ table: spec.table, error: error.message });

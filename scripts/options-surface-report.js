@@ -5,7 +5,9 @@ const path = require('node:path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { Pool } = require('pg');
 
-const MANIFEST_EVIDENCE_START = '2026-07-18T18:25:48.389Z';
+const OPTIONS_EXPERIMENT_ID = 'options-implied-binary-v2-resolver-exact-expiry';
+const OPTIONS_STRATEGY = 'options_implied_binary_v2';
+const MANIFEST_EVIDENCE_START = '2026-07-23T15:10:00Z';
 
 function finite(value) {
   const parsed = parseFloat(value);
@@ -61,7 +63,7 @@ function score(row) {
   const shares = finite(row.target_shares);
   const gross = finite(optimized?.fill?.gross);
   const entryFees2x = finite(optimized?.fill?.fees);
-  const entrySpot = finite(detail.chainlink);
+  const entrySpot = finite(detail.resolverPrice ?? detail.chainlink);
   const exitSpot = finite(row.binance_close);
   const hedgeBase = finite(hedge.hedgeBase ?? row.hedge_base);
   if (!(shares > 0) || gross == null || entryFees2x == null
@@ -106,9 +108,10 @@ async function buildReport(pool) {
     SELECT experiment_id,strategy,status,evidence_started_at,
            min_independent_markets,min_days,manifest_hash
       FROM borg_trial_ledger
-     WHERE experiment_id='options-implied-binary-v1'
-       AND strategy='options_implied_binary_v1'
-     ORDER BY registered_at DESC LIMIT 1`);
+     WHERE experiment_id=$1
+       AND strategy=$2
+     ORDER BY registered_at DESC LIMIT 1`,
+  [OPTIONS_EXPERIMENT_ID, OPTIONS_STRATEGY]);
   const trial = trialRows[0] || null;
   // Registry time may conservatively lag the manifest freeze during deployment.
   // Use the later boundary so warm-up observations can never leak into evidence.
@@ -134,9 +137,10 @@ async function buildReport(pool) {
                               AND detail->'optimized' <> 'null'::jsonb)::int positive_depth_walks,
            max(observed_at) latest
       FROM borg_option_shadow_marks
-     WHERE observed_at >= $1
+     WHERE observed_at >= $1 AND experiment_id=$2
      GROUP BY surface_fidelity,surface_mode,barrier
-     ORDER BY observations DESC,surface_fidelity,surface_mode,barrier`, [evidenceStart]);
+     ORDER BY observations DESC,surface_fidelity,surface_mode,barrier`,
+  [evidenceStart, OPTIONS_EXPERIMENT_ID]);
   // Frozen policy: one first executable intent per independent market. Later
   // observations cannot replace an earlier loss and both sides cannot stack.
   const { rows } = await pool.query(`
@@ -144,8 +148,9 @@ async function buildReport(pool) {
            s.*,m.outcome,m.binance_close,m.event_id,m.slug
       FROM borg_option_shadow_marks s
       JOIN borg_markets m ON m.id=s.market_id
-     WHERE s.observed_at >= $1 AND s.executable=true
-     ORDER BY s.market_id,s.observed_at,s.id`, [evidenceStart]);
+     WHERE s.observed_at >= $1 AND s.experiment_id=$2 AND s.executable=true
+     ORDER BY s.market_id,s.observed_at,s.id`,
+  [evidenceStart, OPTIONS_EXPERIMENT_ID]);
   const scored = rows.map(score).filter(Boolean);
   return {
     generatedAt: new Date().toISOString(),

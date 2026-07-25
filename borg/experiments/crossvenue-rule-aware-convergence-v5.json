@@ -1,0 +1,76 @@
+{
+  "experiment_id": "crossvenue-rule-aware-convergence-v5",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-21T14:22:12.875Z",
+  "evidence_started_at": "2026-07-21T14:22:12.875Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "rule_aware_crossvenue",
+  "supersedes": "crossvenue-rule-aware-convergence-v4",
+  "strategy_version": "crossvenue-rule-aware-convergence-v5",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "selection_disclosure": "Every V1-V4 quote, basis sample, match review and relation episode is discovery or infrastructure history and contributes zero V5 promotion evidence.",
+  "products": {
+    "certified_terminal_lock": {
+      "strategy": "crossvenue_certified_terminal_lock_v5",
+      "eligibility": "current content-hashed rules, exact identifiers and a deterministic worst-state payoff proof",
+      "claim": "A terminal lock exists only after both complete simulated legs fill; non-atomic orphan risk is reported separately."
+    },
+    "rule_aware_convergence": {
+      "strategy": "crossvenue_rule_aware_convergence_v5",
+      "eligibility": "operator-approved score above 0.80, no hard rule mismatch, fresh synchronized A/B books",
+      "claim": "Risky statistical convergence only. Resolver mismatch, non-convergence and capital duration remain loss modes."
+    }
+  },
+  "synchronization": {
+    "maximum_receive_skew_ms": 250,
+    "causality": "latest state from each venue available at the decision cut",
+    "required_quality": ["A", "B"],
+    "latency_replay_profiles_ms": [100, 250, 500]
+  },
+  "execution": {
+    "entry": "walk equal-share quantity through both executable ask books",
+    "exit": "walk both executable bid books",
+    "costs": "all four venue taker fees, doubled-cost view, and one adverse tick per leg",
+    "capital": "$500 shared total, initially $250 per venue, with displayed depth and venue minimums",
+    "atomicity": false,
+    "jurisdiction": "paper observation only; no Kalshi order path on the Dublin host"
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "crossvenue_certified_terminal_lock_v5",
+      "family": "crossvenue_certified_terminal_lock",
+      "arm": "250ms_synchronized_l2",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "worst_state_profit_2x_cost_orphan_stressed"
+    },
+    {
+      "strategy": "crossvenue_rule_aware_convergence_v5",
+      "family": "crossvenue_rule_aware_convergence",
+      "arm": "250ms_synchronized_l2",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "first_pair_direction_day_terminal_net_pnl_2x"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_pair_direction_days": 300,
+    "minimum_calendar_days": 30,
+    "independent_unit": "first eligible episode per match, direction and UTC day",
+    "right_censor_unconverged_positions": true,
+    "require_both_chronological_halves_positive_at_2x_costs": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "require_positive_at_latency_ms": [100, 250, 500],
+    "require_positive_shared_500usd_capacity": true,
+    "require_no_single_event_asset_or_day_dominance": true,
+    "multiple_testing": "Holm correction across both products, direction, horizon and every reviewed matching variant",
+    "null_outcome": "No terminal locks or no post-fee convergence is a valid result."
+  }
+}
