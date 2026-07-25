@@ -120,6 +120,13 @@ copies are daily partitions used only as the bounded dashboard/research hot
 tier. Lower-rate rows without an equivalent WAL representation are gzip
 written, fsynced, hash-verified and only then deleted.
 
+The primary collector coalesces only its derived `borg_clob_touch` query rows
+to one state per token per 250 ms plus the trailing state. This does not change
+in-memory strategy reaction time and does not discard source evidence: every
+WebSocket frame and depth delta remains timestamped and sequenced in the
+compressed immutable WAL. Sub-250 ms tests therefore replay WAL/Parquet rather
+than treating the sampled PostgreSQL projection as the source tape.
+
 `deltaforge-hot-partitions.timer` runs every five minutes, creates the next seven UTC-day partitions and
 drops only complete old partitions covered by a fresh off-host raw/WAL receipt.
 At the measured v10 write rate, a nominal three-day query tier would itself

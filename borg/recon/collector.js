@@ -163,12 +163,18 @@ async function main() {
   });
   const markets = new MarketsRecon(feeds, chainlink, assets);
   const evaluationMarkets = () => capturePolicy.filterMarkets(markets.evaluationAll());
+  const sqlTouchMinIntervalMs = Math.max(0,
+    Number(process.env.BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS || 0) || 0);
   const clob = new ClobMultiplex((assetId) => {
     for (const rec of markets.bySlug.values()) {
       if (rec.up_token_id === assetId || rec.down_token_id === assetId) return rec.id;
     }
     return null;
-  }, { wal: wals.clob, onMarketEvent: (event) => enqueueEventEvaluation(event) });
+  }, {
+    wal: wals.clob,
+    sqlTouchMinIntervalMs,
+    onMarketEvent: (event) => enqueueEventEvaluation(event),
+  });
 
   // Shadow engine (EVAL_PROTOCOL §1): logs intended orders only — this
   // process still has no execution path. Disable with BORG_SHADOW=0.
@@ -580,6 +586,7 @@ async function main() {
         wal: walHealth,
         active: evaluationMarkets().map((m) => `${m.asset}:${m.market_type || 'direction_5m'}`).join(',') || null,
         capturePolicy: capturePolicy.describe(),
+        sqlTouchMinIntervalMs,
         bookSnapshotMs,
         researchSelection: markets.researchSelectionMeta });
   }, 60000));

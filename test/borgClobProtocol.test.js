@@ -131,6 +131,40 @@ test('CLOB keeps deep deltas in WAL but persists only execution-relevant touch c
   assert.deepEqual(clob.getBook('UP').bids, [[0.50, 10], [0.49, 4]]);
 });
 
+test('derived SQL touches coalesce while event callbacks retain every touch change', () => {
+  let callbacks = 0;
+  const clob = new ClobRecon(() => 1, {
+    sqlTouchMinIntervalMs: 250,
+    onMarketEvent: () => { callbacks += 1; },
+  });
+  const provenance = {
+    receive_wall_timestamp_ms: 1000,
+    receive_monotonic_ns: '1',
+  };
+  clob._handleEvent({
+    event_type: 'book', asset_id: 'UP',
+    bids: [{ price: '0.50', size: '10' }],
+    asks: [{ price: '0.51', size: '10' }],
+  }, provenance);
+  clob._handleEvent({
+    event_type: 'price_change',
+    price_changes: [{ asset_id: 'UP', side: 'BUY', price: '0.50', size: '9' }],
+  }, { ...provenance, receive_wall_timestamp_ms: 1100, event_sequence: 2 });
+  clob._handleEvent({
+    event_type: 'price_change',
+    price_changes: [{ asset_id: 'UP', side: 'BUY', price: '0.50', size: '8' }],
+  }, { ...provenance, receive_wall_timestamp_ms: 1200, event_sequence: 3 });
+
+  assert.equal(callbacks, 3);
+  assert.equal(clob.touchBuf.length, 1);
+  assert.equal(clob._pendingSqlTouch.size, 1);
+  assert.equal(clob._drainMaturedPendingTouches(1249), 0);
+  assert.equal(clob._drainMaturedPendingTouches(1250), 1);
+  assert.equal(clob.touchBuf.length, 2);
+  assert.equal(clob.touchBuf.at(-1)[0].getTime(), 1200);
+  assert.equal(clob.touchBuf.at(-1)[5], 8);
+});
+
 test('dedicated collectors can suppress duplicate derived rows and opt into trade callbacks', () => {
   const events = [];
   const clob = new ClobRecon(() => null, {

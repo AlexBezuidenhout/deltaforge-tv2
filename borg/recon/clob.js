@@ -64,6 +64,17 @@ class ClobRecon {
     this.books = new Map(); // assetId -> { bids:[[p,s]], asks:[[p,s]], at, src }
     this.eventBuf = [];     // rows for borg_clob_events
     this.touchBuf = [];     // compact rows for borg_clob_touch
+    // PostgreSQL is a bounded query tier; the append-before-process WAL keeps
+    // every frame. Coalesce only derived SQL touches so sub-second replay
+    // fidelity remains recoverable without duplicating every quote mutation
+    // in a 100+ byte indexed row.
+    this.sqlTouchMinIntervalMs = Math.max(0, Number(
+      options.sqlTouchMinIntervalMs
+        ?? process.env.BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS
+        ?? 0,
+    ) || 0);
+    this._lastSqlTouchAt = new Map();
+    this._pendingSqlTouch = new Map();
     this._flushPromise = null;
     this.lastWsMsgAt = 0;
     this._reconnectDelay = 2000;
@@ -429,7 +440,7 @@ class ClobRecon {
     const book = this.books.get(assetId);
     if (!book) return;
     const receivedAt = provenance.receive_wall_timestamp_ms || Date.now();
-    this.touchBuf.push([
+    const row = [
       new Date(receivedAt),
       epochMs(sourceTimestamp) ? new Date(epochMs(sourceTimestamp)) : null,
       this.resolveMarketId(assetId), assetId,
@@ -442,8 +453,37 @@ class ClobRecon {
       provenance.event_id || null,
       bookHash || book.hash || null,
       eventType,
-    ]);
+    ];
+    const previousAt = this._lastSqlTouchAt.get(assetId);
+    if (!this.sqlTouchMinIntervalMs
+        || previousAt == null
+        || receivedAt - previousAt >= this.sqlTouchMinIntervalMs) {
+      this.touchBuf.push(row);
+      this._lastSqlTouchAt.set(assetId, receivedAt);
+      this._pendingSqlTouch.delete(assetId);
+    } else {
+      // Keep the most recent state inside the interval. The next eligible
+      // event or scheduled flush emits this trailing state; intermediate
+      // states remain losslessly available in the raw WAL.
+      this._pendingSqlTouch.set(assetId, row);
+    }
     if (this.touchBuf.length > 200000) this.touchBuf.splice(0, 100000);
+  }
+
+  _drainMaturedPendingTouches(now = Date.now()) {
+    if (!this.sqlTouchMinIntervalMs || !this._pendingSqlTouch.size) return 0;
+    let drained = 0;
+    for (const [assetId, row] of this._pendingSqlTouch) {
+      const previousAt = this._lastSqlTouchAt.get(assetId);
+      if (previousAt != null && now - previousAt < this.sqlTouchMinIntervalMs) continue;
+      this.touchBuf.push(row);
+      // Use the drain clock as the next rate-limit boundary. The row itself
+      // retains the true receive timestamp of the last state in the interval.
+      this._lastSqlTouchAt.set(assetId, now);
+      this._pendingSqlTouch.delete(assetId);
+      drained += 1;
+    }
+    return drained;
   }
 
   /** REST book poll — authoritative snapshot for one token. */
@@ -524,6 +564,7 @@ class ClobRecon {
   }
 
   async _flushBatches() {
+    this._drainMaturedPendingTouches();
     const rows = this.eventBuf;
     this.eventBuf = [];
     const touches = this.touchBuf;

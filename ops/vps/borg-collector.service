@@ -20,6 +20,9 @@ Environment=BORG_CODE_VERSION=dublin-runtime-v3
 Environment=BORG_ACTIVE_STRATEGIES=H43_resolution_boundary_buffer,ETH_G_late_exact_forward_v1
 Environment=BORG_CAPTURE_ASSETS=btc,eth,sol,xrp
 Environment=BORG_CAPTURE_MARKET_TYPES=direction_5m
+# Full event fidelity remains in compressed WAL. PostgreSQL stores at most one
+# derived touch per token/250 ms, plus the trailing state, for fast queries.
+Environment=BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS=250
 Environment=BORG_BOOK_SNAPSHOT_MS=5000
 Environment=BORG_COLLECTION_BENCHMARK_FILE=/opt/deltaforge/tv2/current/borg/benchmarks/dublin-vps-2026-07-15.json
 ExecStart=/usr/local/bin/node borg/recon/collector.js
