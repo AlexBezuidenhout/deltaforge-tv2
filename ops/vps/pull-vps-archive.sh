@@ -18,6 +18,7 @@ PARQUET_INPUTS=""
 PARQUET_SOURCE_STAGE=""
 PARQUET_OUTPUT_STAGE=""
 SNAPSHOT_SOURCE_PRESENT=false
+PUBLISHER_PID=""
 
 if [ -z "$NODE_BIN" ]; then
   for candidate in \
@@ -43,6 +44,10 @@ started_epoch=$(date +%s)
 # minute cushion absorbs small host-clock uncertainty.
 source_cutoff_epoch=$((started_epoch - 300))
 cleanup() {
+  if [ -n "$PUBLISHER_PID" ]; then
+    /bin/kill "$PUBLISHER_PID" 2>/dev/null || true
+    wait "$PUBLISHER_PID" 2>/dev/null || true
+  fi
   [ -z "$RECEIPT" ] || rm -f "$RECEIPT"
   [ -z "$PULL_INDEX" ] || rm -f "$PULL_INDEX"
   [ -z "$PARQUET_INPUTS" ] || rm -f "$PARQUET_INPUTS"
@@ -156,13 +161,17 @@ streamed_rsync_attempt() {
     publish_staged_files "$stage" "$destination" "$transfer_manifest"
   ) &
   publisher_pid=$!
+  PUBLISHER_PID=$publisher_pid
 
   set +e
   "${RSYNC[@]}" --compare-dest="$destination" "$source" "$stage/"
   rsync_status=$?
-  /usr/bin/touch "$done_marker"
+  if ! /usr/bin/touch "$done_marker"; then
+    /bin/kill "$publisher_pid" 2>/dev/null || true
+  fi
   wait "$publisher_pid"
   publisher_status=$?
+  PUBLISHER_PID=""
   set -e
   /bin/rm -f "$done_marker"
   [ "$publisher_status" -eq 0 ] || return "$publisher_status"
