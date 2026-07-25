@@ -34,6 +34,12 @@ const {
   evaluateBasisPair, finite, normalizeKalshiBook, optimizePair,
 } = require('./strategy');
 const {
+  DEFAULT_MIN_PRIOR_CLUSTERS,
+  TERMINAL_CARRY_EXPERIMENT_ID,
+  evaluateTerminalCarry,
+  wilsonLower,
+} = require('./terminal-carry');
+const {
   appendHistory, cloneBooks, selectSynchronizedBooks,
 } = require('./synchronizer');
 const { CURRENT_CROSSVENUE_EXPERIMENT_ID } = require('./experiment');
@@ -76,6 +82,13 @@ const PAPER_SCORE_FLOOR = Math.max(0, Math.min(1,
 const PAPER_APPROVED_AT = process.env.CROSSVENUE_PAPER_APPROVED_AT || null;
 const EXPLORATORY_MONITORED = Math.max(0, Math.min(MAX_MONITORED,
   Number(process.env.CROSSVENUE_EXPLORATORY_MONITORED || 4)));
+const TERMINAL_CARRY_PRIOR_REFRESH_MS = Math.max(60_000,
+  Number(process.env.CROSSVENUE_TERMINAL_CARRY_PRIOR_REFRESH_MS || 900_000));
+const TERMINAL_CARRY_CONTROL_MS = Math.max(60_000,
+  Number(process.env.CROSSVENUE_TERMINAL_CARRY_CONTROL_MS || 300_000));
+const TERMINAL_CARRY_MIN_PRIOR_CLUSTERS = Math.max(1,
+  Number(process.env.CROSSVENUE_TERMINAL_CARRY_MIN_PRIOR_CLUSTERS
+    || DEFAULT_MIN_PRIOR_CLUSTERS));
 
 const MATCH_COLUMNS = [
   'match_id', 'poly_condition_id', 'poly_gamma_id', 'poly_question',
@@ -152,6 +165,16 @@ const BASIS_COLUMNS = [
   'data_quality_grade', 'execution_fidelity_grade', 'book_signature',
   'experiment_id', 'synchronized', 'detail',
 ];
+const TERMINAL_CARRY_COLUMNS = [
+  'mark_id', 'observed_at', 'entry_day', 'experiment_id', 'match_id',
+  'direction', 'poly_outcome', 'kalshi_outcome', 'quantity',
+  'poly_vwap', 'kalshi_vwap', 'poly_fee', 'kalshi_fee', 'total_cost',
+  'expected_payout_lower', 'additional_cost_stress', 'orphan_reserve',
+  'expected_profit_lower', 'expected_roi_lower', 'worst_mismatch_loss',
+  'prior_clusters', 'prior_all_agree_clusters', 'agreement_lower',
+  'books_fresh', 'data_quality_grade', 'execution_fidelity_grade',
+  'eligible', 'entry_armed', 'reason', 'book_signature', 'detail',
+];
 
 function json(value) { return JSON.stringify(value ?? {}); }
 function iso(ms) { return new Date(ms); }
@@ -222,7 +245,23 @@ class CrossVenueLab {
     this.lastControlAt = new Map();
     this.episodes = new Map();
     this.relationEpisodes = new Map();
-    this.buffers = { snapshots: [], opportunities: [], basis: [], makerEpisodes: [], relationEpisodes: new Map() };
+    this.terminalCarryPrior = {
+      clusters: 0,
+      allAgreeClusters: 0,
+      agreementLower: null,
+      updatedAt: null,
+      sourceLatestAt: null,
+    };
+    this.terminalCarryEntries = new Set();
+    this.lastTerminalCarryMark = new Map();
+    this.buffers = {
+      snapshots: [],
+      opportunities: [],
+      basis: [],
+      terminalCarry: [],
+      makerEpisodes: [],
+      relationEpisodes: new Map(),
+    };
     this.makerLab = new MakerLab({
       orphanTimeoutMs: Number(process.env.CROSSVENUE_MAKER_ORPHAN_TIMEOUT_MS || 600_000),
       onEpisode: (row) => {
@@ -258,6 +297,7 @@ class CrossVenueLab {
       kalshiErrors: 0, polyEvents: 0, diagnosticControls: 0,
       kalshiWsEvents: 0, kalshiWsFallbacks: 0,
       synchronizedSnapshots: 0, synchronizationRejects: 0,
+      terminalCarryMarks: 0, terminalCarryEligible: 0, terminalCarryEntries: 0,
       lastMarketAt: null, lastEvaluationAt: null,
     };
     const walOptions = {
@@ -290,6 +330,8 @@ class CrossVenueLab {
     await migrateCrossVenue();
     await this.syncFrozenRelationReviews();
     await this.loadRelationEpisodes();
+    await this.refreshTerminalCarryPrior();
+    await this.loadTerminalCarryEntries();
     await pool.query(`
       INSERT INTO cv_runtime (run_id,started_at,host,pid,paper_only,wallet_loaded,status,metrics,experiment_id)
       VALUES ($1,now(),$2,$3,true,false,'STARTING',$4::jsonb,$5)
@@ -312,6 +354,9 @@ class CrossVenueLab {
       setInterval(() => this.pollKalshi('broad').catch((error) => this.recordError('kalshi_broad_poll', error)), BROAD_POLL_MS),
       setInterval(() => this.flush().catch((error) => this.recordError('flush', error)), 250),
       setInterval(() => this.refreshUniverse().catch((error) => this.recordError('universe', error)), REFRESH_MS),
+      setInterval(() => this.refreshTerminalCarryPrior()
+        .catch((error) => this.recordError('terminal_carry_prior', error)),
+      TERMINAL_CARRY_PRIOR_REFRESH_MS),
       setInterval(() => this.clob.checkStale(), 10_000),
       setInterval(() => this.heartbeat().catch(() => {}), 10_000),
     ];
@@ -326,6 +371,8 @@ class CrossVenueLab {
       kalshiTransport: this.kalshiFeed.transport(),
       kalshiWsConfigured: this.kalshiFeed.configured(),
       experimentId: EXPERIMENT_ID, maxPairSkewMs: MAX_PAIR_SKEW_MS,
+      terminalCarryExperimentId: TERMINAL_CARRY_EXPERIMENT_ID,
+      terminalCarryPrior: this.terminalCarryPrior,
     });
     if (cachedMatches) {
       this.refreshUniverse().catch((error) => this.recordError('background_universe', error));
@@ -384,6 +431,152 @@ class CrossVenueLab {
       const episode = episodeFromDb(row);
       return [episode.episodeId, episode];
     }));
+  }
+
+  async refreshTerminalCarryPrior() {
+    const { rows } = await pool.query(`
+      WITH settled AS (
+        SELECT
+          COALESCE(NULLIF(m.kalshi_event_ticker,''),m.kalshi_ticker) kalshi_event,
+          COALESCE(NULLIF(m.metadata->'poly'->>'eventTitle',''),m.poly_condition_id) poly_event,
+          lower(s.kalshi_result)=lower(s.poly_outcome) agrees,
+          s.last_checked_at
+        FROM cv_settlements s
+        JOIN cv_contract_matches m USING (match_id)
+        WHERE lower(s.kalshi_result) IN ('yes','no')
+          AND lower(s.poly_outcome) IN ('yes','no')
+          AND m.paper_eval_approved=true
+          AND m.relation_approved=false
+      ), event_clusters AS (
+        SELECT kalshi_event,poly_event,bool_and(agrees) all_agree,
+               max(last_checked_at) latest_at
+        FROM settled
+        GROUP BY kalshi_event,poly_event
+      )
+      SELECT count(*)::int clusters,
+             count(*) FILTER (WHERE all_agree)::int all_agree_clusters,
+             max(latest_at) source_latest_at
+      FROM event_clusters
+    `);
+    const row = rows[0] || {};
+    const clusters = parseInt(row.clusters, 10) || 0;
+    const allAgreeClusters = parseInt(row.all_agree_clusters, 10) || 0;
+    this.terminalCarryPrior = {
+      clusters,
+      allAgreeClusters,
+      agreementLower: wilsonLower(allAgreeClusters, clusters),
+      updatedAt: new Date().toISOString(),
+      sourceLatestAt: row.source_latest_at || null,
+      estimator: 'EVENT_CLUSTER_ALL_AGREE_WILSON_95_LOWER',
+    };
+  }
+
+  async loadTerminalCarryEntries() {
+    const { rows } = await pool.query(`
+      SELECT match_id,direction,entry_day
+      FROM cv_terminal_carry_marks
+      WHERE experiment_id=$1 AND entry_armed=true
+    `, [TERMINAL_CARRY_EXPERIMENT_ID]);
+    this.terminalCarryEntries = new Set(rows.map((row) =>
+      `${row.match_id}:${row.direction}:${new Date(row.entry_day).toISOString().slice(0, 10)}`));
+  }
+
+  observeTerminalCarry(match, now, {
+    polyBooks, kalshiBooks, booksFresh, quality, fidelity,
+    bookSignature, triggerVenue, pairSkewMs,
+  }) {
+    const rows = evaluateTerminalCarry({
+      polyBooks,
+      kalshiBooks,
+      prior: this.terminalCarryPrior,
+      paperEvalApproved: match.paperEvalApproved,
+      relationApproved: match.relationApproved,
+      booksFresh,
+      dataQualityGrade: quality,
+      executionFidelityGrade: fidelity,
+      quantities: QUANTITIES,
+      minQuantity: Math.max(1, finite(match.poly.orderMinSize, 5)),
+      maxQuantity: MAX_OPTIMIZED_QUANTITY,
+      totalCapitalUsd: TOTAL_CAPITAL_USD,
+      polyCapitalUsd: CAPITAL_PER_VENUE_USD,
+      kalshiCapitalUsd: CAPITAL_PER_VENUE_USD,
+      polyFeeRate: match.poly.feeRate,
+      polyFeeExponent: match.poly.feeExponent,
+      kalshiFeeMultiplier: 1,
+      polyTick: match.poly.tickSize,
+      kalshiTick: 0.01,
+      minPriorClusters: TERMINAL_CARRY_MIN_PRIOR_CLUSTERS,
+    });
+    const entryDay = new Date(now).toISOString().slice(0, 10);
+    for (const row of rows) {
+      const unitKey = `${match.matchId}:${row.direction}:${entryDay}`;
+      const alreadyEntered = this.terminalCarryEntries.has(unitKey);
+      const entryArmed = row.eligible && !alreadyEntered;
+      const reason = row.eligible && alreadyEntered
+        ? 'DAILY_INDEPENDENT_UNIT_ALREADY_ENTERED' : row.reason;
+      const markSignature = signature([
+        row.direction, row.quantity, row.totalCost, row.expectedProfitLower,
+        row.agreementLower, row.priorClusters, reason, entryArmed,
+      ]);
+      const markKey = `${match.matchId}:${row.direction}`;
+      const priorMark = this.lastTerminalCarryMark.get(markKey);
+      const controlDue = !priorMark || now - priorMark.at >= TERMINAL_CARRY_CONTROL_MS;
+      if (!entryArmed && priorMark?.signature === markSignature && !controlDue) continue;
+      this.lastTerminalCarryMark.set(markKey, { signature: markSignature, at: now });
+      if (entryArmed) this.terminalCarryEntries.add(unitKey);
+
+      const markId = `cvtc:${now}:${crypto.randomUUID()}`;
+      const durable = {
+        markId,
+        observedAt: new Date(now).toISOString(),
+        entryDay,
+        matchId: match.matchId,
+        ...row,
+        reason,
+        entryArmed,
+        bookSignature,
+        triggerVenue,
+        pairSkewMs,
+        dataQualityGrade: quality,
+        executionFidelityGrade: fidelity,
+        booksFresh,
+        priorUpdatedAt: this.terminalCarryPrior.updatedAt,
+        sourceLatestAt: this.terminalCarryPrior.sourceLatestAt,
+        identityStatus: match.identityStatus,
+        matchScore: finite(match.score, 0),
+      };
+      this.decisionWal.append(json(durable), {
+        channel: 'terminal-carry-mark',
+        sourceMs: now,
+      });
+      this.buffers.terminalCarry.push([
+        markId, iso(now), entryDay, TERMINAL_CARRY_EXPERIMENT_ID,
+        match.matchId, row.direction, row.polyOutcome, row.kalshiOutcome,
+        row.quantity, row.polyVwap, row.kalshiVwap, row.polyFee, row.kalshiFee,
+        row.totalCost, row.expectedPayoutLower, row.additionalCostStress,
+        row.orphanReserve, row.expectedProfitLower, row.expectedRoiLower,
+        row.worstMismatchLoss, row.priorClusters, row.priorAllAgreeClusters,
+        row.agreementLower, booksFresh, quality, fidelity, row.eligible,
+        entryArmed, reason, bookSignature,
+        json({
+          triggerVenue,
+          pairSkewMs,
+          priorUpdatedAt: this.terminalCarryPrior.updatedAt,
+          sourceLatestAt: this.terminalCarryPrior.sourceLatestAt,
+          identityStatus: match.identityStatus,
+          matchScore: finite(match.score, 0),
+          polyCashRequired: row.polyCashRequired,
+          kalshiCashRequired: row.kalshiCashRequired,
+          worstImmediateOrphanUnwindPnl: row.worstImmediateOrphanUnwindPnl,
+          immediateOrphanUnwindAvailable: row.immediateOrphanUnwindAvailable,
+          payoutModel: row.payoutModel,
+          warning: 'Statistical resolver-risk carry; contracts are not certified identical and venue legs are non-atomic.',
+        }),
+      ]);
+      this.metrics.terminalCarryMarks += 1;
+      if (row.eligible) this.metrics.terminalCarryEligible += 1;
+      if (entryArmed) this.metrics.terminalCarryEntries += 1;
+    }
   }
 
   queueRelationEpisode(episode) {
@@ -969,7 +1162,7 @@ class CrossVenueLab {
         basis.payoffProofHash, booksFresh, basis.fullEntryDepth, basis.fullExitDepth,
         quality, fidelity, bookSignature, EXPERIMENT_ID, synchronized.synchronized,
         json({ triggerVenue, kalshiTransport: kalshiState.transport || 'public_batch_rest',
-          kalshiSourceMs: kalshiState.sourceMs, entryFills: basis.entryFills, exitFills: basis.exitFills,
+          kalshiSourceMs: kalshiState.sourceMs,
           synchronizationReason: synchronized.reason, pairSkewMs,
           paperStressProfit: basis.paperStressProfit,
           paperEvaluation: {
@@ -986,6 +1179,17 @@ class CrossVenueLab {
       ]);
       this.metrics.basisSamples += 1;
     }
+
+    this.observeTerminalCarry(match, now, {
+      polyBooks,
+      kalshiBooks: kalshiState.books,
+      booksFresh,
+      quality,
+      fidelity,
+      bookSignature,
+      triggerVenue,
+      pairSkewMs,
+    });
 
     const results = optimizePair({
       quantities: QUANTITIES, polyBooks, kalshiBooks: kalshiState.books,
@@ -1022,13 +1226,11 @@ class CrossVenueLab {
         EXPERIMENT_ID, synchronized.synchronized,
         json({ triggerVenue, bookSignature,
           kalshiTransport: kalshiState.transport || 'public_batch_rest',
-          kalshiSourceMs: kalshiState.sourceMs, fills: row.fills,
+          kalshiSourceMs: kalshiState.sourceMs,
           model: 'DETERMINISTIC_PAYOFF_RELATION_V1',
           payoutAssumption: row.payoutAssumption,
           relationId: match.relationProof?.id || null,
           relationStatus: match.relationStatus || 'PENDING_REVIEW',
-          relationAudit: match.relationResolutionAudit || null,
-          stateEvidence: match.stateEvidence || null,
           paperEvaluation: {
             approved: match.paperEvalApproved,
             tradeEligible: row.paperTradeEligible,
@@ -1123,6 +1325,7 @@ class CrossVenueLab {
     const snapshots = this.buffers.snapshots.splice(0, 2000);
     const opportunities = this.buffers.opportunities.splice(0, 2000);
     const basis = this.buffers.basis.splice(0, 2000);
+    const terminalCarry = this.buffers.terminalCarry.splice(0, 2000);
     const makerEpisodes = this.buffers.makerEpisodes.splice(0, 2000);
     const relationEpisodes = [...this.buffers.relationEpisodes.values()];
     this.buffers.relationEpisodes.clear();
@@ -1132,6 +1335,10 @@ class CrossVenueLab {
         'ON CONFLICT (opportunity_id,observed_at) DO NOTHING');
       if (basis.length) await insertRows('cv_basis_samples', BASIS_COLUMNS, basis,
         'ON CONFLICT (sample_id,observed_at) DO NOTHING');
+      if (terminalCarry.length) await insertRows(
+        'cv_terminal_carry_marks', TERMINAL_CARRY_COLUMNS, terminalCarry,
+        'ON CONFLICT DO NOTHING',
+      );
       if (makerEpisodes.length) await insertRows('cv_maker_episodes', MAKER_EPISODE_COLUMNS,
         makerEpisodes, 'ON CONFLICT (episode_id) DO NOTHING');
       if (relationEpisodes.length) await insertRows(
@@ -1165,6 +1372,7 @@ class CrossVenueLab {
       this.buffers.snapshots.unshift(...snapshots);
       this.buffers.opportunities.unshift(...opportunities);
       this.buffers.basis.unshift(...basis);
+      this.buffers.terminalCarry.unshift(...terminalCarry);
       this.buffers.makerEpisodes.unshift(...makerEpisodes);
       for (const episode of relationEpisodes) {
         if (!this.buffers.relationEpisodes.has(episode.episodeId)) {
@@ -1177,7 +1385,8 @@ class CrossVenueLab {
 
   async heartbeat(status = 'RUNNING') {
     const queued = this.buffers.snapshots.length + this.buffers.opportunities.length
-      + this.buffers.basis.length + this.buffers.relationEpisodes.size;
+      + this.buffers.basis.length + this.buffers.terminalCarry.length
+      + this.buffers.relationEpisodes.size;
     const relationLifecycle = [...this.relationEpisodes.values()].reduce((counts, episode) => {
       counts[episode.lifecycleStatus] = (counts[episode.lifecycleStatus] || 0) + 1; return counts;
     }, {});
@@ -1212,6 +1421,16 @@ class CrossVenueLab {
         monitoredMatches: this.metrics.paperMonitoredMatches,
         overflowMatches: this.metrics.paperApprovalOverflow,
         semantics: 'PAPER_ASSUMED_PARITY_ONLY_NOT_IDENTITY_OR_PAYOFF_CERTIFICATION',
+      },
+      terminalCarry: {
+        experimentId: TERMINAL_CARRY_EXPERIMENT_ID,
+        paperOnly: true,
+        liveOrderPath: false,
+        minimumPriorClusters: TERMINAL_CARRY_MIN_PRIOR_CLUSTERS,
+        prior: this.terminalCarryPrior,
+        independentUnit: 'MATCH_DIRECTION_UTC_ENTRY_DAY',
+        mismatchPayoutAssumption: 0,
+        entryHurdle: 'WILSON_LOWER_PAYOUT_MINUS_2X_COSTS_TICKS_AND_FULL_ORPHAN_RESERVE_GT_ZERO',
       },
       jurisdictionBlock: 'DUBLIN_HOST_DO_NOT_TRADE_KALSHI',
       wal: {

@@ -1826,6 +1826,11 @@
     <tbody id="cvConvergenceBody"><tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting fixed-size entry and liquidation marks…</td></tr></tbody>
   </table></div></div></div>
 
+  <div class="panel" style="border-color:var(--yellow);"><div class="panel-header"><span>RESOLVER-RISK TERMINAL CARRY — FORWARD PAPER</span><span id="cvTerminalCarryPrior" style="font-size:10px;color:var(--text-muted);">clustered settlement prior loading…</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
+    <thead><tr><th>Direction</th><th>Entries</th><th>Pairs</th><th>Settled</th><th>Profitable</th><th>Agreed</th><th>Entry cash</th><th>Realized 1×</th><th>Realized 2×</th><th>Full hurdle</th><th>Entry EV lower</th><th>Latest</th></tr></thead>
+    <tbody id="cvTerminalCarryBody"><tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">Waiting for the frozen conservative entry hurdle…</td></tr></tbody>
+  </table></div><div style="padding:9px 12px;font-size:10px;line-height:1.5;color:var(--text-muted);">Not risk-free: score-approved contracts are not certified identical. The arm assumes zero payout on every mismatch, uses the event-family 95% Wilson lower bound, charges two fee layers plus one adverse tick per leg, reserves the full modeled orphan unwind, and permits one paper entry per match/direction/UTC day.</div></div></div>
+
   <div class="panel"><div class="panel-header"><span>CONTRACT-RELATION REVIEW QUEUE</span><span style="font-size:10px;color:var(--text-muted);">equivalence, implication, exclusion and exhaustiveness are distinct proofs</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;max-height:360px;overflow:auto;"><table>
     <thead><tr><th>Polymarket</th><th>Kalshi</th><th>Score</th><th>Status</th><th>Decision</th><th>Time Δ</th><th>Audit flags</th><th>Monitored</th></tr></thead>
     <tbody id="cvMatchesBody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;">Discovering candidate pairs…</td></tr></tbody>
@@ -3127,12 +3132,13 @@
   }
 
   async function loadCrossVenueOnce() {
-    let status, summary, matches, opportunities, convergence, relationEpisodes;
+    let status, summary, matches, opportunities, convergence, relationEpisodes, terminalCarry;
     try {
-      [status, summary, matches, opportunities, convergence, relationEpisodes] = await Promise.all([
+      [status, summary, matches, opportunities, convergence, relationEpisodes, terminalCarry] = await Promise.all([
         labApiGet('/crossvenue/status'), labApiGet('/crossvenue/summary'),
         labApiGet('/crossvenue/matches?limit=500'), labApiGet('/crossvenue/opportunities?limit=100'),
         labApiGet('/crossvenue/convergence?days=30'), labApiGet('/crossvenue/episodes?limit=100'),
+        labApiGet('/crossvenue/terminal-carry?limit=100'),
       ]);
     } catch (error) {
       document.getElementById('cvStatusTitle').textContent = 'CROSS-VENUE: API UNAVAILABLE';
@@ -3188,6 +3194,18 @@
     }).join('');
     const coverageDays = Number(convergence.coverage?.spanDays || 0);
     document.getElementById('cvConvergenceCoverage').textContent = 'four fees · right-censored · ' + Number(convergence.coverage?.samples || 0) + ' samples · ' + coverageDays.toFixed(1) + ' observed days';
+
+    const carryPrior = terminalCarry.prior || {};
+    const carryLower = carryPrior.agreementLower == null
+      ? '—' : (100 * Number(carryPrior.agreementLower)).toFixed(1) + '%';
+    document.getElementById('cvTerminalCarryPrior').textContent =
+      (carryPrior.allAgreeClusters ?? 0) + '/' + (carryPrior.clusters ?? 0) +
+      ' event clusters all-agree · 95% lower ' + carryLower + ' · goal 300 forward units / 30d';
+    document.getElementById('cvTerminalCarryBody').innerHTML = terminalCarry.rows.length
+      ? terminalCarry.rows.map((row) =>
+        '<tr><td style="font-weight:700;">' + escapeHtml(row.direction) + '</td><td>' + row.entries + '</td><td>' + row.matches + '</td><td>' + row.settled + '</td><td>' + row.profitable + '</td><td>' + row.settlements_agreed + '</td><td>' + _bMoney(row.deployed_entry_cash) + '</td><td style="color:' + _bPnlColor(row.realized_pnl) + '">' + _bMoney(row.realized_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_2x_pnl) + '">' + _bMoney(row.realized_2x_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_full_hurdle_pnl) + '">' + _bMoney(row.realized_full_hurdle_pnl) + '</td><td style="color:' + _bPnlColor(row.entry_expected_profit_lower) + '">' + _bMoney(row.entry_expected_profit_lower) + '</td><td style="color:var(--text-muted);">' + (row.latest ? new Date(row.latest).toLocaleString() : '—') + '</td></tr>'
+      ).join('')
+      : '<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">No quote has cleared the conservative forward hurdle. Zero is a valid result.</td></tr>';
 
     document.getElementById('cvMatchesBody').innerHTML = matches.rows.length ? matches.rows.map((row) => {
       const flags = Array.isArray(row.mismatch_reasons) && row.mismatch_reasons.length ? row.mismatch_reasons.join(', ') : 'manual rules review pending';

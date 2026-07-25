@@ -25,6 +25,8 @@ const { createReadThroughCache } = require('../utils/readThroughCache');
 const dashboardReports = createReadThroughCache();
 const { CURRENT_CROSSVENUE_EXPERIMENT_ID: CROSSVENUE_EXPERIMENT_ID } =
   require('../../borg/crossvenue/experiment');
+const { TERMINAL_CARRY_EXPERIMENT_ID } =
+  require('../../borg/crossvenue/terminal-carry');
 const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v4-capacity';
 const PYTH_EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v2';
 
@@ -1055,6 +1057,84 @@ router.get('/crossvenue/convergence', authMiddleware, async (req, res) => {
     });
     return res.json(value);
   } catch (err) { return res.status(500).json({ error: err.message }); }
+});
+
+router.get('/crossvenue/terminal-carry', authMiddleware, async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 100));
+    const value = await dashboardReports.get(`crossvenue-terminal-carry:${limit}`, 15_000,
+      async () => {
+        const [heartbeat, summary, recent] = await Promise.all([
+          pool.query(`SELECT beat_at,meta->'terminalCarry' terminal_carry
+                        FROM system_heartbeats WHERE component='crossvenue_lab'`),
+          pool.query(`
+            WITH entries AS (
+              SELECT t.*,
+                     CASE WHEN lower(s.kalshi_result) IN ('yes','no')
+                                AND lower(s.poly_outcome) IN ('yes','no')
+                       THEN t.quantity * (
+                         CASE WHEN lower(s.poly_outcome)=lower(t.poly_outcome) THEN 1 ELSE 0 END
+                         + CASE WHEN lower(s.kalshi_result)=lower(t.kalshi_outcome) THEN 1 ELSE 0 END
+                       ) ELSE NULL END realized_payout,
+                     CASE WHEN lower(s.kalshi_result) IN ('yes','no')
+                                AND lower(s.poly_outcome) IN ('yes','no')
+                       THEN lower(s.kalshi_result)=lower(s.poly_outcome) ELSE NULL END venues_agreed
+                FROM cv_terminal_carry_marks t
+                LEFT JOIN cv_settlements s USING (match_id)
+               WHERE t.experiment_id=$1 AND t.entry_armed=true
+            ), scored AS (
+              SELECT *,
+                     realized_payout-total_cost realized_pnl,
+                     realized_payout-total_cost-additional_cost_stress realized_2x_pnl,
+                     realized_payout-total_cost-additional_cost_stress-orphan_reserve
+                       realized_full_hurdle_pnl
+                FROM entries
+            )
+            SELECT direction,count(*)::int entries,
+                   count(DISTINCT match_id)::int matches,
+                   count(realized_payout)::int settled,
+                   count(*) FILTER (WHERE realized_pnl>0)::int profitable,
+                   count(*) FILTER (WHERE venues_agreed)::int settlements_agreed,
+                   sum(total_cost)::float deployed_entry_cash,
+                   sum(realized_pnl)::float realized_pnl,
+                   sum(realized_2x_pnl)::float realized_2x_pnl,
+                   sum(realized_full_hurdle_pnl)::float realized_full_hurdle_pnl,
+                   sum(expected_profit_lower)::float entry_expected_profit_lower,
+                   min(agreement_lower)::float minimum_agreement_lower,
+                   min(prior_clusters)::int minimum_prior_clusters,
+                   max(observed_at) latest
+              FROM scored
+             GROUP BY direction ORDER BY direction
+          `, [TERMINAL_CARRY_EXPERIMENT_ID]),
+          pool.query(`
+            SELECT t.mark_id,t.observed_at,t.entry_day,t.match_id,t.direction,
+                   t.quantity::float,t.poly_vwap::float,t.kalshi_vwap::float,
+                   t.total_cost::float,t.expected_profit_lower::float,
+                   t.expected_roi_lower::float,t.orphan_reserve::float,
+                   t.agreement_lower::float,t.prior_clusters,t.eligible,
+                   t.entry_armed,t.reason,t.data_quality_grade,
+                   t.execution_fidelity_grade,t.detail,
+                   m.poly_question,m.kalshi_title
+              FROM cv_terminal_carry_marks t
+              JOIN cv_contract_matches m USING (match_id)
+             WHERE t.experiment_id=$2
+             ORDER BY t.observed_at DESC LIMIT $1
+          `, [limit, TERMINAL_CARRY_EXPERIMENT_ID]),
+        ]);
+        return {
+          experimentId: TERMINAL_CARRY_EXPERIMENT_ID,
+          paperOnly: true,
+          deterministicArbitrage: false,
+          warning: 'These contracts are not rule-certified identities. PnL can be lost to different settlement, non-atomic legs, partial fills, disappearing depth, fees and capital duration.',
+          evidenceRule: 'One entry per match/direction/UTC day; require 300 fresh units and 30 days, positive 2x-cost PnL in both halves, clustered lower bound above zero, multiple-testing correction and 100/250/500ms robustness.',
+          prior: heartbeat.rows[0]?.terminal_carry?.prior || null,
+          heartbeatAt: heartbeat.rows[0]?.beat_at || null,
+          rows: summary.rows,
+          recent: recent.rows,
+        };
+      });
+    res.json(value);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.get('/research/resolver-boundary', authMiddleware, async (req, res) => {

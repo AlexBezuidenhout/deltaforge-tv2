@@ -157,7 +157,9 @@ async function buildPriorityLaneStatus(pool, options = {}) {
       priority: 3, program: 'rule_aware_crossvenue', runMode: 'PAPER_LIVE_DATA',
       active: crossActive,
       status: !crossActive ? 'COLLECTOR_STALE_OR_ERROR'
-        : finite(crossMeta.paperTradeLeads) > 0 ? 'FORWARD_EPISODES_COLLECTING'
+        : finite(crossMeta.terminalCarryEntries) > 0
+          ? 'RISK_PRICED_TERMINAL_CARRY_ENTRIES_COLLECTING'
+          : finite(crossMeta.paperTradeLeads) > 0 ? 'FORWARD_EPISODES_COLLECTING'
           : 'ZERO_TRADE_ELIGIBLE_PROVED_EPISODES',
       evidence: {
         pairs: finite(crossMeta.monitoredMatches), approvedMatches: finite(crossMeta.approvedMatches),
@@ -166,9 +168,14 @@ async function buildPriorityLaneStatus(pool, options = {}) {
         paperTradeLeads: finite(crossMeta.paperTradeLeads),
         economicLeads: finite(crossMeta.economicLeads),
         lockableNonatomic: finite(crossMeta.lockableNonatomic),
+        terminalCarryEntries: finite(crossMeta.terminalCarryEntries),
+        terminalCarryPriorClusters: finite(crossMeta.terminalCarry?.prior?.clusters),
+        terminalCarryAgreementLower: finite(
+          crossMeta.terminalCarry?.prior?.agreementLower, null,
+        ),
         liveness: crossState,
       },
-      nextTest: 'Keep terminal locks and risky convergence separate; require synchronized depth, settlement audit and right-censored capital duration.',
+      nextTest: 'Keep certified locks, early convergence and resolver-risk terminal carry separate; collect 300 fresh match-direction-days over 30 days with synchronized depth and settlement audits.',
     },
     {
       priority: 4, program: 'options_implied_binary_residual',

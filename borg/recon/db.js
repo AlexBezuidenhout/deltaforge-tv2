@@ -1633,6 +1633,50 @@ CREATE TABLE IF NOT EXISTS cv_settlements (
 CREATE INDEX IF NOT EXISTS cv_settlements_pending
   ON cv_settlements (last_checked_at) WHERE kalshi_result IS NULL OR poly_outcome IS NULL;
 
+-- Forward statistical terminal-carry ledger. These rows are explicitly not
+-- deterministic payoff identities: resolver/wording mismatch is priced with
+-- an event-family clustered agreement lower bound and a zero mismatch payout.
+CREATE TABLE IF NOT EXISTS cv_terminal_carry_marks (
+  mark_id TEXT PRIMARY KEY,
+  observed_at TIMESTAMPTZ NOT NULL,
+  entry_day DATE NOT NULL,
+  experiment_id TEXT NOT NULL,
+  match_id TEXT NOT NULL,
+  direction TEXT NOT NULL,
+  poly_outcome TEXT NOT NULL,
+  kalshi_outcome TEXT NOT NULL,
+  quantity NUMERIC,
+  poly_vwap NUMERIC,
+  kalshi_vwap NUMERIC,
+  poly_fee NUMERIC,
+  kalshi_fee NUMERIC,
+  total_cost NUMERIC,
+  expected_payout_lower NUMERIC,
+  additional_cost_stress NUMERIC,
+  orphan_reserve NUMERIC,
+  expected_profit_lower NUMERIC,
+  expected_roi_lower NUMERIC,
+  worst_mismatch_loss NUMERIC,
+  prior_clusters INT NOT NULL DEFAULT 0,
+  prior_all_agree_clusters INT NOT NULL DEFAULT 0,
+  agreement_lower NUMERIC,
+  books_fresh BOOLEAN NOT NULL DEFAULT false,
+  data_quality_grade TEXT NOT NULL,
+  execution_fidelity_grade TEXT NOT NULL,
+  eligible BOOLEAN NOT NULL DEFAULT false,
+  entry_armed BOOLEAN NOT NULL DEFAULT false,
+  reason TEXT NOT NULL,
+  book_signature TEXT,
+  detail JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS cv_terminal_carry_marks_time
+  ON cv_terminal_carry_marks (observed_at DESC);
+CREATE INDEX IF NOT EXISTS cv_terminal_carry_marks_match_time
+  ON cv_terminal_carry_marks (match_id,direction,observed_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS cv_terminal_carry_one_entry_per_day
+  ON cv_terminal_carry_marks (experiment_id,match_id,direction,entry_day)
+  WHERE entry_armed;
+
 CREATE TABLE IF NOT EXISTS cv_book_snapshots (
   id BIGSERIAL PRIMARY KEY,
   observed_at TIMESTAMPTZ NOT NULL,
