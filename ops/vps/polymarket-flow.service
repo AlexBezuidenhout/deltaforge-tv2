@@ -21,6 +21,8 @@ Environment=FLOW_CLOB_SHARDS=2
 Environment=FLOW_GLOBAL_POLL_MS=2000
 Environment=FLOW_DATA_TRADE_PAGE_SIZE=500
 Environment=FLOW_DATA_TRADE_MAX_PAGES=4
+Environment=FLOW_DATA_API_TIMEOUT_MS=20000
+Environment=FLOW_REST_MAX_ATTEMPTS=4
 Environment=FLOW_UNIVERSE_REFRESH_MS=60000
 Environment=FLOW_STRATEGY_SIGNALS_ENABLED=false
 ExecStart=/usr/local/bin/node borg/flow/collector.js

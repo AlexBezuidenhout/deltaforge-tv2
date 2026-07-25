@@ -10,6 +10,7 @@ User=deltaforge
 Group=deltaforge
 WorkingDirectory=/opt/deltaforge/tv2/current
 EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
 Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
 Environment=DELTAFORGE_INSTANCE_ID=tv2
