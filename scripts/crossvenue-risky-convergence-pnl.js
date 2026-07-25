@@ -83,6 +83,26 @@ function classifyReplayRow(row) {
     ? null : finite(row.target_exit_proceeds) - finite(row.entry_total_cost, 0);
   const timeoutPnl = finite(row.timeout_exit_proceeds) == null
     ? null : finite(row.timeout_exit_proceeds) - finite(row.entry_total_cost, 0);
+  const polyOutcome = String(row.poly_outcome || '').toUpperCase();
+  const kalshiOutcome = String(row.kalshi_result || '').toUpperCase();
+  const direction = String(row.direction || '').toUpperCase();
+  const quantity = finite(row.quantity);
+  const terminalScored = ['YES', 'NO'].includes(polyOutcome)
+    && ['YES', 'NO'].includes(kalshiOutcome)
+    && direction.startsWith('POLY_')
+    && direction.includes('+KALSHI_')
+    && quantity > 0;
+  const selectedPoly = direction.startsWith('POLY_YES') ? 'YES' : 'NO';
+  const selectedKalshi = direction.endsWith('KALSHI_YES') ? 'YES' : 'NO';
+  const terminalPnl = terminalScored
+    ? quantity * (Number(polyOutcome === selectedPoly)
+      + Number(kalshiOutcome === selectedKalshi))
+      - finite(row.entry_total_cost, 0)
+    : null;
+  const settlementTimes = [
+    Date.parse(row.poly_resolved_at),
+    Date.parse(row.kalshi_settled_at),
+  ].filter(Number.isFinite);
   let status = 'RIGHT_CENSORED';
   let exitAt = null;
   let pnl = null;
@@ -94,6 +114,10 @@ function classifyReplayRow(row) {
     status = 'TIMEOUT_EXIT';
     exitAt = timeoutAt;
     pnl = timeoutPnl;
+  } else if (terminalPnl != null) {
+    status = 'TERMINAL_FALLBACK';
+    exitAt = settlementTimes.length ? Math.max(...settlementTimes) : coverageAt;
+    pnl = terminalPnl;
   } else if (mature) {
     status = 'NO_EXECUTABLE_TIMEOUT_EXIT';
   }
@@ -155,6 +179,8 @@ function summarize(rows) {
       new Date(row.entryAt).toISOString().slice(0, 10))).size,
     targetExits: ordered.filter((row) => row.status === 'TARGET_EXIT').length,
     timeoutExits: ordered.filter((row) => row.status === 'TIMEOUT_EXIT').length,
+    terminalFallbacks: ordered.filter((row) =>
+      row.status === 'TERMINAL_FALLBACK').length,
     rightCensored: ordered.filter((row) => row.status === 'RIGHT_CENSORED').length,
     noExecutableTimeoutExit: ordered.filter((row) =>
       row.status === 'NO_EXECUTABLE_TIMEOUT_EXIT').length,
@@ -215,11 +241,13 @@ async function queryReplay(pool, { days, experimentId }) {
              b.entry_total_cost::float8,b.terminal_locked_profit::float8,
              b.poly_entry_vwap::float8,b.kalshi_entry_vwap::float8,
              b.poly_entry_fee::float8,b.kalshi_entry_fee::float8,
+             s.poly_outcome,s.kalshi_result,s.poly_resolved_at,s.kalshi_settled_at,
              m.match_score::float8,m.paper_eval_score_at_approval::float8,
              m.mismatch_reasons,m.poly_question,m.kalshi_title,
              m.end_delta_hours::float8,m.metadata
         FROM cv_basis_samples b
         JOIN cv_contract_matches m USING(match_id)
+        LEFT JOIN cv_settlements s USING(match_id)
        WHERE b.experiment_id=$1
          AND b.observed_at >= now()-($2||' days')::interval
          AND b.synchronized=true
@@ -298,11 +326,11 @@ function markdown(report) {
     '',
     'Paper-only synchronized L2 replay. Entry and liquidation VWAPs include both venue taker fees. Unmatured positions are right-censored, never credited as zero-PnL wins.',
     '',
-    '| Match class | Horizon | Exit rule | Entries | Realized | Target | Censored | PnL | ROI | Halves | Mean hold |',
-    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|',
+    '| Match class | Horizon | Exit rule | Entries | Realized | Target | Terminal | Censored | PnL | ROI | Halves | Mean hold |',
+    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
   ];
   for (const row of report.byMismatchClass) {
-    lines.push(`| ${row.mismatchClass} | ${row.horizon_label} | ${row.target_label} | ${row.entries} | ${row.realized} | ${row.targetExits} | ${row.rightCensored} | ${row.pnlUsd == null ? '—' : `$${row.pnlUsd.toFixed(2)}`} | ${row.realizedRoiPct == null ? '—' : `${row.realizedRoiPct.toFixed(2)}%`} | ${row.firstHalfPnlUsd}/${row.secondHalfPnlUsd} | ${row.meanHoldMinutes ?? '—'}m |`);
+    lines.push(`| ${row.mismatchClass} | ${row.horizon_label} | ${row.target_label} | ${row.entries} | ${row.realized} | ${row.targetExits} | ${row.terminalFallbacks} | ${row.rightCensored} | ${row.pnlUsd == null ? '—' : `$${row.pnlUsd.toFixed(2)}`} | ${row.realizedRoiPct == null ? '—' : `${row.realizedRoiPct.toFixed(2)}%`} | ${row.firstHalfPnlUsd}/${row.secondHalfPnlUsd} | ${row.meanHoldMinutes ?? '—'}m |`);
   }
   lines.push(
     '',

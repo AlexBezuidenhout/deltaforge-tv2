@@ -68,3 +68,27 @@ test('summary never turns right-censored positions into profitable exits', () =>
   assert.equal(result.rightCensored, 1);
   assert.equal(result.pnlUsd, 0.1);
 });
+
+test('a vanished executable tape is scored from both settlements when available', () => {
+  const settled = classifyReplayRow({
+    entry_at: '2026-07-25T00:00:00Z',
+    coverage_last_at: '2026-07-25T00:30:00Z',
+    timeout_exit_at: null,
+    timeout_exit_proceeds: null,
+    target_exit_at: null,
+    target_exit_proceeds: null,
+    entry_total_cost: '4.80',
+    terminal_locked_profit: '0.20',
+    horizon_ms: '3600000',
+    mismatch_reasons: ['NUMERIC_OR_THRESHOLD_MISMATCH'],
+    direction: 'POLY_NO+KALSHI_YES',
+    quantity: '5',
+    poly_outcome: 'YES',
+    kalshi_result: 'NO',
+    poly_resolved_at: '2026-07-25T00:45:00Z',
+    kalshi_settled_at: '2026-07-25T01:30:00Z',
+  });
+  assert.equal(settled.status, 'TERMINAL_FALLBACK');
+  assert.ok(Math.abs(settled.pnl + 4.80) < 1e-9);
+  assert.equal(settled.exitAt, Date.parse('2026-07-25T01:30:00Z'));
+});
