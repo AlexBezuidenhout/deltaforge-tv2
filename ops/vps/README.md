@@ -61,6 +61,25 @@ The archive script is installed under `~/.deltaforge-vps`, not run from the
 Desktop checkout, because background launch agents do not have reliable macOS
 TCC access to Desktop.
 
+For an archive independent of the Mac, install
+`deltaforge-object-store-archive.{service,timer}` and create the root-owned,
+mode-`0600` file `/etc/deltaforge/object-store.env`:
+
+```dotenv
+ARCHIVE_S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+ARCHIVE_S3_REGION=auto
+ARCHIVE_S3_BUCKET=deltaforge-research
+ARCHIVE_S3_PREFIX=dublin
+ARCHIVE_S3_ACCESS_KEY_ID=replace_me
+ARCHIVE_S3_SECRET_ACCESS_KEY=replace_me
+```
+
+The timer is inert while that file is absent. It supports any S3-compatible
+store, multipart-uploads large dumps, verifies remote size and SHA-256
+metadata, and publishes the same raw/snapshot receipts as the iCloud pull only
+after a complete traversal. The two transports may coexist; neither may issue
+a receipt from an unverified or partial copy.
+
 `gla-paper.service` runs the G-late-arbitrage mirror with a minimal environment
 containing only `DATABASE_URL` and an explicit `LIVE_TRADING_ENABLED=0`. It
 keeps the dry-run audit and heartbeat alive without putting wallet credentials
