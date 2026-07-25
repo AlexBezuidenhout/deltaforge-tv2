@@ -29,8 +29,8 @@ const REFRESH_MS = Math.max(60_000, Number(process.env.STRUCTURAL_REFRESH_MS || 
 const TARGET_NOTIONAL_USD = Math.max(1, Number(process.env.STRUCTURAL_TARGET_NOTIONAL_USD || 10));
 const MIN_CAPACITY_PROFIT_USD = Math.max(0, Number(process.env.STRUCTURAL_MIN_CAPACITY_PROFIT_USD || 0.05));
 const STALE_MS = Math.max(250, Number(process.env.STRUCTURAL_STALE_MS || 2000));
-const NEGATIVE_SAMPLE_MS = Math.max(1000, Number(process.env.STRUCTURAL_NEGATIVE_SAMPLE_MS || 5000));
-const POSITIVE_SAMPLE_MS = Math.max(25, Number(process.env.STRUCTURAL_POSITIVE_SAMPLE_MS || 100));
+const NEGATIVE_SAMPLE_MS = Math.max(1000, Number(process.env.STRUCTURAL_NEGATIVE_SAMPLE_MS || 60_000));
+const POSITIVE_SAMPLE_MS = Math.max(25, Number(process.env.STRUCTURAL_POSITIVE_SAMPLE_MS || 1000));
 const EVENT_PAGES = Math.max(1, Math.min(20, Number(process.env.STRUCTURAL_EVENT_PAGES || 20)));
 const SPORTS_EVENT_PAGES = Math.max(1, Math.min(10,
   Number(process.env.STRUCTURAL_SPORTS_EVENT_PAGES || 5)));
@@ -145,6 +145,66 @@ function candidatePriority(candidate) {
   const structural = candidate.structureType === 'binary_complement' ? 1 : 0;
   const end = Number.isFinite(Date.parse(candidate.endDate)) ? Date.parse(candidate.endDate) : Number.MAX_SAFE_INTEGER;
   return [structural, end, candidate.legs.length];
+}
+
+function structuralFailureReasons(item) {
+  const checks = [
+    ['passProof', 'PAYOFF_PROOF'],
+    ['passRuleCertification', 'RULE_CERTIFICATION'],
+    ['passStale', 'FRESHNESS'],
+    ['passQuotes', 'EXECUTABLE_QUOTES'],
+    ['passFeeSchedule', 'FEE_SCHEDULE'],
+    ['passVenueMinimum', 'VENUE_MINIMUM'],
+    ['passFees2x', 'DOUBLE_COST_EDGE'],
+    ['passFok', 'FULL_DEPTH_FOK'],
+    ['passCapacity', 'CAPACITY'],
+    ['passOrphanRisk', 'NONATOMIC_ORPHAN_RISK'],
+  ];
+  return checks.filter(([key]) => item?.[key] !== true).map(([, label]) => label);
+}
+
+/**
+ * Full evaluations remain append-before-process in the decision WAL. The hot
+ * SQL row already has typed columns for every economic and execution gate, so
+ * repeating complete books, fill walks, terminal states and leg documents in
+ * JSONB only creates TOAST bloat. Keep content-addressed joins and summaries.
+ */
+function compactEvaluationDetail(item) {
+  return {
+    format: 'structural-hot-detail-v1',
+    dedupKey: item.dedupKey,
+    candidateId: item.candidateId,
+    trigger: {
+      token: item.triggerToken,
+      sourceMs: item.triggerSourceMs,
+      receivedAt: item.triggerReceivedAt,
+      walEventId: item.triggerWalEventId,
+      latencyMs: item.latencyMs,
+      reactionUs: item.reactionUs,
+    },
+    proof: {
+      payoffProofHash: item.payoffProofHash,
+      ruleCertificationHash: item.ruleCertificationHash,
+      relationType: item.payoffRelationType,
+      ruleChecks: item.ruleCertificationChecks,
+    },
+    execution: item.executionOptimization ? {
+      shares: item.executionOptimization.shares,
+      cashRequired: item.executionOptimization.cashRequired,
+      guaranteedProfit: item.executionOptimization.guaranteedProfit,
+      worstOrphanUnwindPnl: item.executionOptimization.worstOrphanUnwindPnl,
+      capacityLimitedBy: item.executionOptimization.capacityLimitedBy,
+    } : null,
+    bregman: item.bregman ? {
+      divergence: item.bregman.divergence,
+      dualGap: item.bregman.dualGap,
+      iterations: item.bregman.iterations,
+      converged: item.bregman.converged,
+    } : null,
+    atomic: item.atomic === true,
+    failureReasons: structuralFailureReasons(item),
+    canonicalPayload: 'structural-scanner decision WAL',
+  };
 }
 
 function boundedPanel(candidates) {
@@ -377,7 +437,7 @@ async function main() {
           item.passRuleCertification, item.ruleCertificationHash,
           item.passStale, item.passQuotes, item.passFees2x,
           item.passFok, item.passCapacity, item.passOrphanRisk, item.orphanLossStressUsd,
-          item.economicCandidate, item.qualified, JSON.stringify(item),
+          item.economicCandidate, item.qualified, JSON.stringify(compactEvaluationDetail(item)),
         ]);
       }
       successfulFlushes += 1;
@@ -411,6 +471,7 @@ async function main() {
       sportsEventPages: SPORTS_EVENT_PAGES, universeVersion: STRUCTURAL_UNIVERSE_VERSION,
       gammaConcurrency: GAMMA_CONCURRENCY, gammaTimeoutMs: GAMMA_TIMEOUT_MS,
       gammaMaxAttempts: GAMMA_MAX_ATTEMPTS,
+      negativeSampleMs: NEGATIVE_SAMPLE_MS, positiveSampleMs: POSITIVE_SAMPLE_MS,
       latencyProfilesMs: LATENCY_PROFILES_MS })]).catch(() => {}), 10_000),
   ];
 
@@ -433,4 +494,7 @@ if (require.main === module) main().catch(async (error) => {
   process.exit(1);
 });
 
-module.exports = { boundedCatalog, boundedPanel, concurrentMap, fetchEventPage, fetchEvents };
+module.exports = {
+  boundedCatalog, boundedPanel, compactEvaluationDetail, concurrentMap,
+  fetchEventPage, fetchEvents, structuralFailureReasons,
+};

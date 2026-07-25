@@ -2,7 +2,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { fetchEventPage, fetchEvents } = require('../borg/structural/scanner');
+const {
+  compactEvaluationDetail, fetchEventPage, fetchEvents,
+} = require('../borg/structural/scanner');
 
 function response(payload, status = 200, headers = {}) {
   return {
@@ -62,4 +64,25 @@ test('structural Gamma page exposes a useful error after retry exhaustion', asyn
     sleep: async () => {},
     fetchImpl: async () => response({ error: 'busy' }, 503),
   }), /Gamma HTTP 503/);
+});
+
+test('structural SQL detail contains joins and failures without repeating full books', () => {
+  const detail = compactEvaluationDetail({
+    dedupKey: 'dedup', candidateId: 'candidate', triggerToken: 'token',
+    triggerSourceMs: 1, triggerReceivedAt: 2, triggerWalEventId: 'wal',
+    latencyMs: 250, reactionUs: 10,
+    payoffProofHash: 'payoff', ruleCertificationHash: 'rules',
+    payoffRelationType: 'nested_threshold', ruleCertificationChecks: ['OK'],
+    passProof: true, passRuleCertification: true, passStale: true,
+    passQuotes: true, passFeeSchedule: true, passVenueMinimum: true,
+    passFees2x: false, passFok: false, passCapacity: false, passOrphanRisk: false,
+    atomic: false,
+    legs: [{ asks: Array.from({ length: 1000 }, () => [0.5, 1]) }],
+  });
+  assert.deepEqual(detail.failureReasons, [
+    'DOUBLE_COST_EDGE', 'FULL_DEPTH_FOK', 'CAPACITY', 'NONATOMIC_ORPHAN_RISK',
+  ]);
+  assert.equal(detail.legs, undefined);
+  assert.equal(detail.canonicalPayload, 'structural-scanner decision WAL');
+  assert.ok(JSON.stringify(detail).length < 2000);
 });

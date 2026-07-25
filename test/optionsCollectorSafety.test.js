@@ -5,8 +5,15 @@ const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  DB_SAMPLE_MS, EXECUTABLE_MARK_SAMPLE_MS, MARK_SAMPLE_MS,
   feeMetadata, isRetryableDbError, retryTransientDb,
 } = require('../borg/options/collector');
+
+test('option query-tier sampling is sparse unless a mark is executable', () => {
+  assert.equal(DB_SAMPLE_MS, 5000);
+  assert.equal(MARK_SAMPLE_MS, 5000);
+  assert.equal(EXECUTABLE_MARK_SAMPLE_MS, 250);
+});
 
 test('option observer parses the current dynamic fee schedule and fails unknown fees closed', () => {
   assert.deepEqual(feeMetadata({

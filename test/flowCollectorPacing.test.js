@@ -10,6 +10,7 @@ const {
   globalCoverageState,
   latestSourceWindow,
   makeNonOverlappingTask,
+  marketMetadataRecord,
   paperArrivalState,
   sourceCursorCutoff,
 } = require('../borg/flow/collector');
@@ -136,6 +137,21 @@ test('scheduled Flow work cannot overlap itself', async () => {
   assert.equal(skips, 1);
   release();
   assert.equal(await first, true);
+});
+
+test('flow market metadata keeps full source in WAL payload but compact SQL metadata', () => {
+  const record = marketMetadataRecord({
+    raw: {
+      active: true, closed: false, accepting_orders: true, enable_order_book: true,
+      minimum_order_size: '5', taker_base_fee: '156',
+      tokens: Array.from({ length: 100 }, (_, index) => ({ token_id: `${index}`, outcome: 'YES' })),
+    },
+  }, Date.parse('2026-07-25T12:00:00Z'));
+  assert.equal(record.raw.tokens.length, 100);
+  assert.equal(record.compact.minimumOrderSize, 5);
+  assert.equal(record.compact.takerBaseFeeBps, 156);
+  assert.equal(record.compact.tokens, undefined);
+  assert.match(record.contentHash, /^[a-f0-9]{64}$/);
 });
 
 test('delayed paper arrival parses numeric strings and caps displayed capacity', () => {

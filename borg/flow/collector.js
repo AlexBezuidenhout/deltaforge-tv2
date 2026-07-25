@@ -103,6 +103,25 @@ function hash(parts) {
   return crypto.createHash('sha256').update(parts.map((value) => value ?? '').join('|')).digest('hex');
 }
 
+function marketMetadataRecord(market, observedAt = Date.now()) {
+  const raw = market?.raw && typeof market.raw === 'object' ? market.raw : {};
+  const serialized = JSON.stringify(raw);
+  const contentHash = crypto.createHash('sha256').update(serialized).digest('hex');
+  const observedAtIso = new Date(observedAt).toISOString();
+  const compact = {
+    format: 'flow-market-hot-v1',
+    source: 'clob-market-endpoint',
+    contentHash,
+    active: raw.active === true,
+    closed: raw.closed === true,
+    acceptingOrders: raw.accepting_orders === true,
+    enableOrderBook: raw.enable_order_book === true,
+    minimumOrderSize: finite(raw.minimum_order_size ?? raw.min_order_size),
+    takerBaseFeeBps: finite(raw.taker_base_fee),
+  };
+  return { contentHash, observedAt: observedAtIso, compact, raw };
+}
+
 function dataTradesUrl(limit, offset = 0) {
   const url = new URL(`${DATA_API}/trades`);
   url.searchParams.set('limit', String(limit));
@@ -387,6 +406,7 @@ class FlowCollector {
       clob: new RawWal('polymarket-flow-clob', walOptions),
       global: new RawWal('polymarket-global-trades', walOptions),
       boundary: new RawWal('polymarket-flow-boundary-intents', walOptions),
+      metadata: new RawWal('polymarket-flow-market-metadata', walOptions),
     };
     this.sockets = Array.from({ length: SOCKET_SHARDS }, (_, shard) => new FlowSocket(
       shard, this.wal.clob,
@@ -401,6 +421,7 @@ class FlowCollector {
     this.touchBuffer = [];
     this.lastTouchKey = new Map();
     this.lastPeriodicTouch = new Map();
+    this.marketMetadataHashes = new Map();
     // The global Data API can trail wall time by minutes. Bootstrap from its
     // bounded latest sample, then advance an API-source cursor; never initialize
     // this cursor from the local clock.
@@ -549,6 +570,17 @@ class FlowCollector {
       await client.query('BEGIN');
       await client.query('UPDATE pm_flow_markets SET selected_realtime=false');
       for (const market of usable) {
+        const metadata = marketMetadataRecord(market);
+        if (this.marketMetadataHashes.get(market.conditionId) !== metadata.contentHash) {
+          this.wal.metadata.append(JSON.stringify({
+            type: 'flow_market_metadata',
+            conditionId: market.conditionId,
+            contentHash: metadata.contentHash,
+            observedAt: metadata.observedAt,
+            raw: metadata.raw,
+          }), { channel: 'clob-market-metadata', receiveWallMs: Date.now() });
+          this.marketMetadataHashes.set(market.conditionId, metadata.contentHash);
+        }
         await client.query(`
           INSERT INTO pm_flow_markets (
             condition_id,gamma_id,slug,question,event_slug,outcomes,token_ids,liquidity,volume_24h,
@@ -561,11 +593,15 @@ class FlowCollector {
             liquidity=EXCLUDED.liquidity,volume_24h=EXCLUDED.volume_24h,
             fees_enabled=EXCLUDED.fees_enabled,fee_rate=EXCLUDED.fee_rate,
             recent_trade_count=EXCLUDED.recent_trade_count,recent_notional=EXCLUDED.recent_notional,
-            active=true,selected_realtime=true,raw=EXCLUDED.raw,refreshed_at=now()`,
+            active=true,selected_realtime=true,
+            raw=CASE
+              WHEN pm_flow_markets.raw->>'contentHash' IS DISTINCT FROM EXCLUDED.raw->>'contentHash'
+              THEN EXCLUDED.raw ELSE pm_flow_markets.raw END,
+            refreshed_at=now()`,
           [market.conditionId, market.gammaId, market.slug, market.question, market.eventSlug,
             JSON.stringify(market.outcomes), JSON.stringify(market.tokenIds), market.liquidity,
             market.volume24h, market.feesEnabled, market.feeRate,
-            market.recentTradeCount, market.recentNotional, JSON.stringify(market.raw)],
+            market.recentTradeCount, market.recentNotional, JSON.stringify(metadata.compact)],
         );
       }
       await client.query('COMMIT');
@@ -1217,7 +1253,7 @@ class FlowCollector {
         .map(([key, bytes]) => [key, Math.round(bytes / 1024 / 1024)])),
       wal: {
         clob: this.wal.clob.health(), global: this.wal.global.health(),
-        boundary: this.wal.boundary.health(),
+        boundary: this.wal.boundary.health(), metadata: this.wal.metadata.health(),
       },
       paper_only: true,
       strategy_signals_enabled: STRATEGY_SIGNALS_ENABLED,
@@ -1241,7 +1277,10 @@ class FlowCollector {
     this.sockets.forEach((socket) => socket.close());
     await this.writeChain;
     await this.flushTouches().catch((error) => this.error(error));
-    await Promise.all([this.wal.clob.close(), this.wal.global.close(), this.wal.boundary.close()]);
+    await Promise.all([
+      this.wal.clob.close(), this.wal.global.close(),
+      this.wal.boundary.close(), this.wal.metadata.close(),
+    ]);
     await pool.end();
   }
 }
@@ -1271,6 +1310,7 @@ module.exports = {
   globalCoverageState,
   latestSourceWindow,
   makeNonOverlappingTask,
+  marketMetadataRecord,
   normLevels,
   paperArrivalState,
   parseArray,

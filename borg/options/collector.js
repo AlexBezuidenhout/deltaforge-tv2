@@ -40,8 +40,10 @@ const OPTIONS_EXPERIMENT_ID = 'options-implied-binary-v2-resolver-exact-expiry';
 const CURRENCIES = String(process.env.OPTIONS_CURRENCIES || 'BTC,ETH')
   .split(',').map((value) => value.trim().toUpperCase()).filter(Boolean);
 const REFRESH_MS = Math.max(60_000, Number(process.env.OPTIONS_REFRESH_MS || 300_000));
-const DB_SAMPLE_MS = Math.max(250, Number(process.env.OPTIONS_DB_SAMPLE_MS || 1000));
-const MARK_SAMPLE_MS = Math.max(100, Number(process.env.OPTIONS_MARK_SAMPLE_MS || 1000));
+const DB_SAMPLE_MS = Math.max(250, Number(process.env.OPTIONS_DB_SAMPLE_MS || 5000));
+const MARK_SAMPLE_MS = Math.max(100, Number(process.env.OPTIONS_MARK_SAMPLE_MS || 5000));
+const EXECUTABLE_MARK_SAMPLE_MS = Math.max(100,
+  Number(process.env.OPTIONS_EXECUTABLE_MARK_SAMPLE_MS || 250));
 const MAX_INSTRUMENTS = Math.max(8, Number(process.env.OPTIONS_MAX_INSTRUMENTS || 160));
 const TARGET_BUDGET_USD = Math.max(1, Number(process.env.OPTIONS_TARGET_BUDGET_USD || 10));
 const HEDGE_COST_BPS = Math.max(0, Number(process.env.OPTIONS_HEDGE_COST_BPS || 5));
@@ -533,7 +535,11 @@ class OptionsObserver {
       });
       const grade = executable ? 'A' : valuation.fidelity === 'D' || !target.fees.known
         ? 'D' : freshBook ? 'B' : 'C';
-      const bucket = Math.floor(now / MARK_SAMPLE_MS) * MARK_SAMPLE_MS;
+      // Sparse diagnostic marks are enough when a target cannot clear its
+      // execution gates. Preserve high-rate marks only for genuinely
+      // executable states; every upstream raw frame remains in the WAL.
+      const markSampleMs = executable ? EXECUTABLE_MARK_SAMPLE_MS : MARK_SAMPLE_MS;
+      const bucket = Math.floor(now / markSampleMs) * markSampleMs;
       const dedupKey = `${this.runId}:${target.id}:${side}:${bucket}`;
       this.markBuffer.set(dedupKey, {
         dedupKey, observedAt: now, marketId: target.id,
@@ -766,6 +772,7 @@ class OptionsObserver {
       polyBookMaxAgeMs: POLY_BOOK_MAX_AGE_MS,
       dbSampleMs: DB_SAMPLE_MS,
       markSampleMs: MARK_SAMPLE_MS,
+      executableMarkSampleMs: EXECUTABLE_MARK_SAMPLE_MS,
       targetBudgetUsd: TARGET_BUDGET_USD,
       archiveAnchors: this.archiveTargets,
       exactExpiry: this.exactExpirySummary,
@@ -892,6 +899,7 @@ if (require.main === module) main().catch(async (error) => {
 });
 
 module.exports = {
+  DB_SAMPLE_MS, EXECUTABLE_MARK_SAMPLE_MS, MARK_SAMPLE_MS,
   OptionsObserver, classifyExecutionBarrier, feeMetadata, fetchIndexPrice,
   fetchThresholdEvents, isRetryableDbError, listedCallExpiries, loadTargets,
   resolverFeed, retryTransientDb,
