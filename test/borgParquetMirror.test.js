@@ -8,7 +8,8 @@ const test = require('node:test');
 const parquet = require('@dsnp/parquetjs');
 const { writeArchiveBatch } = require('../borg/shadow/archive');
 const {
-  canonicalSource, convertFile, decodeSegment, explicitFilesByRoot,
+  DEFAULT_COMPRESSION, canonicalSource, compressionCodec, convertFile,
+  decodeSegment, explicitFilesByRoot,
   isCloudPlaceholderError, recordInvalidSource,
 } = require('../scripts/parquet-mirror');
 
@@ -16,6 +17,12 @@ test('iCloud placeholder stalls are deferred without masking real errors', () =>
   assert.equal(isCloudPlaceholderError({ code: 'EDEADLK' }), true);
   assert.equal(isCloudPlaceholderError({ code: 'EAGAIN' }), true);
   assert.equal(isCloudPlaceholderError({ code: 'EIO' }), false);
+});
+
+test('Parquet derivatives use an explicit supported compression codec', () => {
+  assert.equal(compressionCodec(), DEFAULT_COMPRESSION);
+  assert.equal(compressionCodec('snappy'), 'SNAPPY');
+  assert.throws(() => compressionCodec('uncompressed'), /unsupported/);
 });
 
 test('explicit Parquet input is deduplicated and confined to immutable roots', () => {
@@ -86,6 +93,12 @@ test('immutable parquet mirror preserves row count and refuses source collisions
   ], new Date('2026-07-15T13:00:00.000Z'), { archiveDir: source, minFreeGb: 0 });
   const first = await convertFile(saved.file, source, mirror);
   assert.equal(first.status, 'created');
+  const manifest = JSON.parse(fs.readFileSync(`${first.output}.manifest.json`, 'utf8'));
+  assert.equal(manifest.format, 'borg-parquet-mirror-v2');
+  assert.equal(manifest.compression, DEFAULT_COMPRESSION);
+  assert.ok(Object.values(manifest.schema).every(
+    (definition) => definition.compression === DEFAULT_COMPRESSION,
+  ));
   const reader = await parquet.ParquetReader.openFile(first.output);
   const cursor = reader.getCursor();
   const rows = [];

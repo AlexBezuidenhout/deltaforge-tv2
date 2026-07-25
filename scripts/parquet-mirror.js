@@ -7,8 +7,9 @@
  *   BORG_PARQUET_MIRROR_DIR=/Volumes/research-archive \
  *     node scripts/parquet-mirror.js
  *
- * Existing output is never overwritten. A source-content change at the same
- * relative path is a hard failure, making accidental mutable datasets visible.
+ * A source-content change at the same relative path is a hard failure, making
+ * accidental mutable datasets visible. Reproducible output may be atomically
+ * rewritten only to upgrade its declared compression codec.
  */
 'use strict';
 
@@ -20,6 +21,8 @@ const zlib = require('node:zlib');
 const parquet = require('@dsnp/parquetjs');
 
 const fsp = fs.promises;
+const DEFAULT_COMPRESSION = 'GZIP';
+const SUPPORTED_COMPRESSION = new Set(['GZIP', 'SNAPPY', 'BROTLI']);
 
 class InvalidSegmentError extends Error {
   constructor(message, options) {
@@ -37,6 +40,14 @@ function arg(name) {
 function positiveInt(value, fallback = Infinity) {
   const parsed = parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function compressionCodec(value = process.env.BORG_PARQUET_COMPRESSION) {
+  const codec = String(value || DEFAULT_COMPRESSION).trim().toUpperCase();
+  if (!SUPPORTED_COMPRESSION.has(codec)) {
+    throw new Error(`unsupported Parquet compression codec: ${codec}`);
+  }
+  return codec;
 }
 
 function isCloudPlaceholderError(error) {
@@ -111,24 +122,25 @@ function isTimestampField(key, values) {
   return values.every((value) => typeof value === 'string' && Number.isFinite(Date.parse(value)));
 }
 
-function schemaFor(rows) {
+function schemaFor(rows, options = {}) {
+  const compression = compressionCodec(options.compression);
   const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))].sort();
   const definitions = {};
   const converters = {};
   for (const key of keys) {
     const values = rows.map((row) => row[key]).filter((value) => value != null);
     if (values.length && values.every((value) => typeof value === 'boolean')) {
-      definitions[key] = { type: 'BOOLEAN', optional: true };
+      definitions[key] = { type: 'BOOLEAN', optional: true, compression };
       converters[key] = (value) => value;
     } else if (values.length && values.every((value) => typeof value === 'number' && Number.isFinite(value)) &&
                !/(^id$|_id$|sequence|monotonic)/i.test(key)) {
-      definitions[key] = { type: 'DOUBLE', optional: true };
+      definitions[key] = { type: 'DOUBLE', optional: true, compression };
       converters[key] = (value) => value;
     } else if (values.length && isTimestampField(key, values)) {
-      definitions[key] = { type: 'TIMESTAMP_MILLIS', optional: true };
+      definitions[key] = { type: 'TIMESTAMP_MILLIS', optional: true, compression };
       converters[key] = (value) => new Date(value);
     } else {
-      definitions[key] = { type: 'UTF8', optional: true };
+      definitions[key] = { type: 'UTF8', optional: true, compression };
       converters[key] = (value) => typeof value === 'string' ? value : JSON.stringify(value);
     }
   }
@@ -189,13 +201,15 @@ function canonicalSource(sourceFile, sourceRoot) {
 
 async function fastExistingResult(sourceFile, sourceRoot, mirrorRoot) {
   const { output, manifestFile } = outputFiles(sourceFile, sourceRoot, mirrorRoot);
+  const compression = compressionCodec();
   try {
     const [prior, stat] = await Promise.all([
       fsp.readFile(manifestFile, 'utf8').then(JSON.parse),
       fsp.stat(sourceFile),
       fsp.access(output, fs.constants.R_OK),
     ]);
-    if (Number(prior.source_bytes) === stat.size
+    if (prior.compression === compression
+      && Number(prior.source_bytes) === stat.size
       && Math.abs(Number(prior.source_mtime_ms) - stat.mtimeMs) < 1) {
       return { status: 'verified_existing', output, rows: prior.row_count };
     }
@@ -211,29 +225,32 @@ async function convertFile(sourceFile, sourceRoot, mirrorRoot) {
   const sourceStat = await fsp.stat(sourceFile);
   const packed = await fsp.readFile(sourceFile);
   const sourceSha256 = sha256(packed);
+  const compression = compressionCodec();
   const { relative, output, manifestFile } = outputFiles(sourceFile, sourceRoot, mirrorRoot);
   try {
     const prior = JSON.parse(await fsp.readFile(manifestFile, 'utf8'));
     if (prior.source_sha256 !== sourceSha256) {
       throw new Error(`immutable source collision at ${relative}`);
     }
-    await fsp.access(output, fs.constants.R_OK);
-    if (Number(prior.source_bytes) !== sourceStat.size
-      || Math.abs(Number(prior.source_mtime_ms) - sourceStat.mtimeMs) >= 1) {
-      await atomicJson(manifestFile, {
-        ...prior,
-        source_bytes: sourceStat.size,
-        source_mtime_ms: sourceStat.mtimeMs,
-      });
+    if (prior.compression === compression) {
+      await fsp.access(output, fs.constants.R_OK);
+      if (Number(prior.source_bytes) !== sourceStat.size
+        || Math.abs(Number(prior.source_mtime_ms) - sourceStat.mtimeMs) >= 1) {
+        await atomicJson(manifestFile, {
+          ...prior,
+          source_bytes: sourceStat.size,
+          source_mtime_ms: sourceStat.mtimeMs,
+        });
+      }
+      return { status: 'verified_existing', output, rows: prior.row_count };
     }
-    return { status: 'verified_existing', output, rows: prior.row_count };
   } catch (err) {
     if (err.code !== 'ENOENT' && !/Unexpected end of JSON input/.test(err.message)) throw err;
   }
 
   const { header, rows } = decodeSegment(packed);
   if (!rows.length) return { status: 'empty', output, rows: 0 };
-  const { schema, definitions, converters } = schemaFor(rows);
+  const { schema, definitions, converters } = schemaFor(rows, { compression });
   await fsp.mkdir(path.dirname(output), { recursive: true });
   const temp = `${output}.${process.pid}.${Date.now()}.tmp`;
   const writer = await parquet.ParquetWriter.openFile(schema, temp);
@@ -252,9 +269,10 @@ async function convertFile(sourceFile, sourceRoot, mirrorRoot) {
   await fsp.rename(temp, output);
   const parquetBytes = await fsp.readFile(output);
   const manifest = {
-    format: 'borg-parquet-mirror-v1',
+    format: 'borg-parquet-mirror-v2',
     created_at: new Date().toISOString(),
     host: os.hostname(),
+    compression,
     source: canonicalSource(sourceFile, sourceRoot),
     source_header: header,
     source_sha256: sourceSha256,
@@ -262,6 +280,8 @@ async function convertFile(sourceFile, sourceRoot, mirrorRoot) {
     source_mtime_ms: sourceStat.mtimeMs,
     parquet_sha256: sha256(parquetBytes),
     parquet_bytes: parquetBytes.length,
+    parquet_to_source_ratio: sourceStat.size > 0
+      ? parquetBytes.length / sourceStat.size : null,
     row_count: rows.length,
     schema: definitions,
   };
@@ -332,7 +352,8 @@ async function main() {
 if (require.main === module) main().catch((err) => { console.error(err.message); process.exit(1); });
 
 module.exports = {
-  InvalidSegmentError, canonicalSource, convertFile, decodeSegment,
+  DEFAULT_COMPRESSION, InvalidSegmentError, canonicalSource, compressionCodec,
+  convertFile, decodeSegment,
   fastExistingResult, explicitFilesByRoot, isCloudPlaceholderError,
   outputFiles, positiveInt, recordInvalidSource, schemaFor,
 };
