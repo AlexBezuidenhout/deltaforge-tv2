@@ -28,6 +28,7 @@ const ShadowEngine = require('../shadow/engine');
 const makeStrategies = require('../shadow/strategies');
 const { syncExperimentRegistry } = require('../research/experiment-registry');
 const { loadActiveStrategies } = require('../research/strategy-policy');
+const { createCapturePolicy } = require('./capture-policy');
 const { LegacyPaperAdapter } = require('../shadow/legacy-paper-adapter');
 
 // Standard normal CDF (Abramowitz–Stegun; prior art PhiModel.js)
@@ -103,10 +104,15 @@ async function main() {
   const experimentRegistry = await syncExperimentRegistry(pool);
   const strategyPolicy = await loadActiveStrategies(pool, makeStrategies());
 
-  const { rows: assets } = await pool.query(
+  const capturePolicy = createCapturePolicy(process.env);
+  const { rows: configuredAssets } = await pool.query(
     'SELECT * FROM asset_config WHERE enabled_borg = true ORDER BY asset');
+  const assets = capturePolicy.filterAssets(configuredAssets);
+  if (!assets.length) throw new Error('BORG capture policy selected zero enabled assets');
   await logEvent('INFO', 'collector', 'BORG recon collector starting', {
     pid: process.pid, assets: assets.map((a) => a.asset),
+    configuredAssets: configuredAssets.map((a) => a.asset),
+    capturePolicy: capturePolicy.describe(),
     collectionEpochId: collection.epochId,
     collectionEpochStart: collection.epochStartedAt,
     collectorRunId: collection.runId,
@@ -156,6 +162,7 @@ async function main() {
     onMarketEvent: (event) => enqueueEventEvaluation(event),
   });
   const markets = new MarketsRecon(feeds, chainlink, assets);
+  const evaluationMarkets = () => capturePolicy.filterMarkets(markets.evaluationAll());
   const clob = new ClobMultiplex((assetId) => {
     for (const rec of markets.bySlug.values()) {
       if (rec.up_token_id === assetId || rec.down_token_id === assetId) return rec.id;
@@ -285,9 +292,9 @@ async function main() {
       const trigger = pendingEvents.get(asset);
       pendingEvents.delete(asset);
       if (!trigger) return;
-      const targets = trigger.marketId != null
+      const targets = capturePolicy.filterMarkets(trigger.marketId != null
         ? markets.evaluationForAsset(asset).filter((market) => market.id === trigger.marketId)
-        : markets.evaluationForAsset(asset);
+        : markets.evaluationForAsset(asset));
       if (!targets.length) return;
       try {
         const decisionAt = Date.now();
@@ -315,19 +322,19 @@ async function main() {
     // observations. The 20 s lead spans two 10 s discovery cycles.
     const ids = [];
     const nowMs = Date.now();
-    const warmUpcoming = markets.upcomingAll().filter((rec) => {
+    const warmUpcoming = capturePolicy.filterMarkets(markets.upcomingAll()).filter((rec) => {
       const startMs = rec?.window_start instanceof Date
         ? rec.window_start.getTime()
         : new Date(rec?.window_start).getTime();
       return Number.isFinite(startMs) && startMs - nowMs <= 20000;
     });
-    const warmResearch = markets.upcomingResearch().filter((rec) => {
+    const warmResearch = capturePolicy.filterMarkets(markets.upcomingResearch()).filter((rec) => {
       const startMs = rec?.window_start instanceof Date
         ? rec.window_start.getTime()
         : new Date(rec?.window_start).getTime();
       return Number.isFinite(startMs) && startMs - nowMs <= 30000;
     });
-    for (const rec of [...markets.evaluationAll(), ...warmUpcoming, ...warmResearch]) {
+    for (const rec of [...evaluationMarkets(), ...warmUpcoming, ...warmResearch]) {
       if (rec) ids.push(rec.up_token_id, rec.down_token_id);
     }
     if (ids.length) clob.subscribe(ids.filter(Boolean));
@@ -356,7 +363,7 @@ async function main() {
   // own 15s/token floor and 3/shard concurrency remain the rate-limit guard.
   let backupBookCursor = 0;
   timers.push(setInterval(() => {
-    const ids = markets.evaluationAll()
+    const ids = evaluationMarkets()
       .flatMap((act) => [act.up_token_id, act.down_token_id])
       .filter(Boolean);
     if (!ids.length) return;
@@ -380,12 +387,14 @@ async function main() {
     }
   }, 30000));
 
-  // ── 1s tick: boundary capture + per-asset book snapshot + shadow ────────
+  const bookSnapshotMs = Math.max(1000, Number(process.env.BORG_BOOK_SNAPSHOT_MS || 1000));
+  const lastBookSnapshotAt = new Map();
+  // ── 1s strategy tick + independently paced derived SQL snapshots ────────
   timers.push(setInterval(async () => {
     try {
       await markets.captureBoundaries();
       const now = Date.now();
-      for (const act of markets.evaluationAll()) {
+      for (const act of evaluationMarkets()) {
         const ctx = contextFor(act, now);
         const { tteSec: tte, upBook, downBook, upMid: mid, sigma, btc: px, ref,
           phiFair, gammaUp, rtdsChainlink, resolverDivergence } = ctx;
@@ -398,20 +407,26 @@ async function main() {
           for (const [p, s] of levels) if (Math.abs(p - ref) <= 0.05) usd += p * s;
           return usd;
         };
-        state.snapBuf.push([
-          new Date(now), act.id, tte,
-          JSON.stringify(upBids), JSON.stringify(upAsks),
-          JSON.stringify(top(downBook?.bids)), JSON.stringify(top(downBook?.asks)),
-          bb, ba, mid, bb != null && ba != null ? ba - bb : null,
-          downBook?.bids?.[0]?.[0] ?? null, downBook?.asks?.[0]?.[0] ?? null,
-          depthUsd(upBook?.bids, mid), depthUsd(upBook?.asks, mid),
-          upBook ? (now - upBook.at < 3000 ? upBook.src : `${upBook.src}_stale`) : null,
-          gammaUp,
-          px, ref, sigma, phiFair, act.asset === 'btc' ? chainlink.price : null,
-          rtdsChainlink, resolverDivergence?.absBps ?? null,
-        ]);
-        // shadow strategies see EXACTLY the snapshot being recorded; a shadow
-        // failure must never take down recon
+        if (now - (lastBookSnapshotAt.get(act.id) || 0) >= bookSnapshotMs) {
+          state.snapBuf.push([
+            new Date(now), act.id, tte,
+            JSON.stringify(upBids), JSON.stringify(upAsks),
+            JSON.stringify(top(downBook?.bids)), JSON.stringify(top(downBook?.asks)),
+            bb, ba, mid, bb != null && ba != null ? ba - bb : null,
+            downBook?.bids?.[0]?.[0] ?? null, downBook?.asks?.[0]?.[0] ?? null,
+            depthUsd(upBook?.bids, mid), depthUsd(upBook?.asks, mid),
+            upBook ? (now - upBook.at < 3000 ? upBook.src : `${upBook.src}_stale`) : null,
+            gammaUp,
+            px, ref, sigma, phiFair, act.asset === 'btc' ? chainlink.price : null,
+            rtdsChainlink, resolverDivergence?.absBps ?? null,
+          ]);
+          lastBookSnapshotAt.set(act.id, now);
+          if (lastBookSnapshotAt.size > 5000) {
+            lastBookSnapshotAt.delete(lastBookSnapshotAt.keys().next().value);
+          }
+        }
+        // Strategy decisions remain on the 1s cadence. Canonical feed events
+        // and decisions are in the WAL; SQL snapshots are a sampled query tier.
         if (shadow) {
           try {
             shadow.tick(ctx, 'sampled');
@@ -563,7 +578,9 @@ async function main() {
           .filter((row) => row.diagnostics != null)
           .map((row) => [row.strategy, row.diagnostics])),
         wal: walHealth,
-        active: markets.evaluationAll().map((m) => `${m.asset}:${m.market_type || 'direction_5m'}`).join(',') || null,
+        active: evaluationMarkets().map((m) => `${m.asset}:${m.market_type || 'direction_5m'}`).join(',') || null,
+        capturePolicy: capturePolicy.describe(),
+        bookSnapshotMs,
         researchSelection: markets.researchSelectionMeta });
   }, 60000));
 

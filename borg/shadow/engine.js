@@ -44,6 +44,7 @@ const PHASES = {
   // 2026-07-14 three-candidate commit and must not change before the n=500 read.
   ETH_late_taker: 'eval',
   ETH_late_maker: 'eval',
+  ETH_G_late_exact_forward_v1: 'eval',
 }; // param-freeze commits add entries here
 const PHASE = 'pilot'; // default for strategies not yet frozen
 

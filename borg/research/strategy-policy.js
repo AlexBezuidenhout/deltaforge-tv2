@@ -17,6 +17,27 @@ function includeParkedControls(env = process.env) {
   return String(env.BORG_INCLUDE_PARKED_CONTROLS || 'false').toLowerCase() === 'true';
 }
 
+function activeStrategyAllowlist(env = process.env) {
+  const names = String(env.BORG_ACTIVE_STRATEGIES || '')
+    .split(',').map((value) => value.trim()).filter(Boolean);
+  return names.length ? new Set(names) : null;
+}
+
+function filterStrategiesByAllowlist(strategies, allowlist) {
+  if (!allowlist) return { active: [...(strategies || [])], excluded: [] };
+  const available = new Set((strategies || []).map((strategy) => strategy.name));
+  const unknown = [...allowlist].filter((name) => !available.has(name));
+  if (unknown.length) {
+    throw new Error(`BORG_ACTIVE_STRATEGIES contains unknown strategies: ${unknown.join(', ')}`);
+  }
+  const active = []; const excluded = [];
+  for (const strategy of strategies || []) {
+    if (allowlist.has(strategy.name)) active.push(strategy);
+    else excluded.push({ strategy: strategy.name, status: 'NOT_IN_ACTIVE_RESEARCH_ALLOWLIST' });
+  }
+  return { active, excluded };
+}
+
 function filterStrategiesByDisposition(strategies, dispositions, options = {}) {
   if (options.includeParked === true) return { active: [...strategies], parked: [] };
   const statusByStrategy = new Map((dispositions || []).map((row) =>
@@ -36,13 +57,23 @@ async function loadActiveStrategies(pool, strategies, env = process.env) {
       FROM borg_trial_ledger
      WHERE status=ANY($1::text[])
   `, [[...PARKED_STATUSES]]);
-  return filterStrategiesByDisposition(strategies, rows, {
+  const disposition = filterStrategiesByDisposition(strategies, rows, {
     includeParked: includeParkedControls(env),
   });
+  const allowlist = filterStrategiesByAllowlist(
+    disposition.active,
+    activeStrategyAllowlist(env),
+  );
+  return {
+    active: allowlist.active,
+    parked: [...disposition.parked, ...allowlist.excluded],
+  };
 }
 
 module.exports = {
   PARKED_STATUSES,
+  activeStrategyAllowlist,
+  filterStrategiesByAllowlist,
   filterStrategiesByDisposition,
   includeParkedControls,
   loadActiveStrategies,

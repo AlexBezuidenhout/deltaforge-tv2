@@ -1,0 +1,58 @@
+{
+  "experiment_id": "eth-g-late-exact-forward-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-25T12:00:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "posthoc_eth_late_window_replication",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "exact-original-g-rule-eth-only-v1",
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "hypothesis": "The historically encouraging ETH subset of G_late_arb may reproduce prospectively when the original rule is copied exactly and every prior G/ETH observation is excluded.",
+  "selection_disclosure": {
+    "asset_was_selected_posthoc": true,
+    "historical_eth_pnl_is_discovery_only": true,
+    "historical_rows_count_toward_evidence": false,
+    "multiple_testing_family_includes_all_prior_borg_strategies": true
+  },
+  "frozen_mechanics": {
+    "asset": "eth",
+    "market_type": "direction_5m",
+    "tte_seconds_inclusive": [5, 75],
+    "min_phi_certainty": 0.88,
+    "min_raw_phi_minus_ask": 0.05,
+    "ask_band_inclusive": [0.55, 0.96],
+    "stake_usd": 10,
+    "side_rule": "Buy the side whose Phi probability is at least 0.88.",
+    "frequency": "At most one order per market-side.",
+    "execution": "Displayed ask, taker-intent, latency replay; paper only."
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "ETH_G_late_exact_forward_v1",
+      "family": "posthoc_eth_late_window_replication",
+      "arm": "exact_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "cluster_by": ["Polymarket market/window", "UTC day"],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "require_positive_latency_profiles_ms": [100, 250, 500],
+    "require_realistic_nonfills_partial_fills_and_depth": true,
+    "multiple_testing": "Correct across the full strategy search, including the post-hoc ETH asset choice.",
+    "promotion": "No automatic live path. A passing read triggers a separate authenticated $1-$2 pilot review.",
+    "null_outcome": "The historical ETH result may be selection noise and the measured forward edge may be approximately zero."
+  }
+}

@@ -22,6 +22,7 @@ const makeH53Strategies = require('./research-h53');
 const makeMainV2Strategies = require('./main-v2');
 const makeMainV3Strategies = require('./main-v3');
 const makeMainV4Strategies = require('./main-v4');
+const { EthGLateExactForward } = require('./eth-g-late-forward');
 const {
   RESEARCH_CAPITAL_VERSION,
   STARTING_BANKROLL_USD,
@@ -1468,7 +1469,7 @@ class IdiosyncraticImpulse {
 // Vasili remains above as an audit artifact but is no longer registered:
 // n=983 core fills, -$393.77, and its losing CI excludes zero.
 module.exports = () => [
-  new LateWindowArb(), new EthLateTaker(), new EthLateMaker(),
+  new LateWindowArb(), new EthLateTaker(), new EthLateMaker(), new EthGLateExactForward(),
   new StructuralPairArb(),
   new CadenceExperimentArm(CexImpulseLag, 'sampled'),
   new CadenceExperimentArm(CexImpulseLag, 'event'),
