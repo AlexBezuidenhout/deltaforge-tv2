@@ -1679,15 +1679,17 @@
   </div>
 
   <div class="panel">
-    <div class="panel-header"><span>SHADOW SCOREBOARD</span><span style="color:var(--text-muted);font-size:10px;">back-of-queue fills, current crypto taker-fee curve at 0.5×/1×/2× stress — pilot rows are machinery tuning, not evidence (EVAL_PROTOCOL §3)</span></div>
+    <div class="panel-header"><span>SHADOW SCOREBOARD</span><span style="color:var(--text-muted);font-size:10px;">historical diagnostics are separated from the exact latest frozen trial · current and 6h/24h/3d use joint A/B data + execution rows · hover for doubled-cost P&amp;L</span></div>
     <div class="panel-body" style="padding:0;">
       <div class="table-wrap" style="margin:0;border:none;">
         <table>
           <thead><tr>
-            <th>Strategy</th><th>Phase</th><th>Places</th><th>Cancels</th><th>Scored</th><th>Fills</th><th>Fill %</th>
-            <th>PnL gross</th><th>PnL 0.5×</th><th>PnL 1×</th><th>PnL 2×</th><th>Quality A/B</th><th>Fidelity A/B</th><th>Last</th>
+            <th>Strategy</th><th>Phase / governance</th><th>Places</th><th>Cancels</th><th>Scored</th><th>Historical eligible n</th>
+            <th>Historical 1×</th><th>Historical 2×</th><th>Current trial n</th><th>Current 1×</th><th>Current 2×</th>
+            <th>PnL 6h</th><th>PnL 24h</th><th>PnL 3d</th>
+            <th>Quality A/B</th><th>Fidelity A/B</th><th>Last</th>
           </tr></thead>
-          <tbody id="borgSummaryBody"><tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr></tbody>
+          <tbody id="borgSummaryBody"><tr><td colspan="17" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1747,8 +1749,8 @@
   <div class="panel">
     <div class="panel-header"><span>LATENCY × ARM SCOREBOARD</span><span style="font-size:10px;color:var(--text-muted);">continuation vs fade control · exact entry + exit taker fees · rows overlap, never sum as a portfolio</span></div>
     <div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;"><table>
-      <thead><tr><th>Arm</th><th>Latency</th><th>Sweeps</th><th>Scored</th><th>Fills</th><th>Fill %</th><th>Win 5s</th><th>PnL 1s</th><th>PnL 2s</th><th>PnL 5s</th><th>PnL 10s</th><th>Mean 5s</th><th>Quality A/B</th></tr></thead>
-      <tbody id="flowSummaryBody"><tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting prospective public-flow observations…</td></tr></tbody>
+      <thead><tr><th>Arm</th><th>Latency</th><th>Sweeps</th><th>Scored</th><th>Fills</th><th>Fill %</th><th>Win 5s</th><th>PnL 1s</th><th>PnL 2s</th><th>PnL 5s</th><th>PnL 10s</th><th>PnL 6h</th><th>PnL 24h</th><th>PnL 3d</th><th>Mean 5s</th><th>Quality A/B</th></tr></thead>
+      <tbody id="flowSummaryBody"><tr><td colspan="16" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting prospective public-flow observations…</td></tr></tbody>
     </table></div></div>
   </div>
 
@@ -1788,13 +1790,13 @@
   </div>
 
   <div class="panel"><div class="panel-header"><span>L2 / PASSIVE-MAKER SCOREBOARD</span><span style="font-size:10px;color:var(--text-muted);">full-depth fills + fees · latency arms overlap and must never be summed</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
-    <thead><tr><th>Strategy</th><th>Arm</th><th>Intents</th><th>Fills</th><th>Markets</th><th>Win 5s</th><th>PnL 1s</th><th>PnL 5s</th><th>PnL 30s</th><th>Mean 5s</th><th>Toxicity/share</th><th>Quality A/B</th></tr></thead>
-    <tbody id="bookLabSummaryBody"><tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting forward observations…</td></tr></tbody>
+    <thead><tr><th>Strategy</th><th>Arm</th><th>Intents</th><th>Fills</th><th>Markets</th><th>Win 5s</th><th>PnL 1s</th><th>PnL 5s</th><th>PnL 30s</th><th>PnL 6h</th><th>PnL 24h</th><th>PnL 3d</th><th>Mean 5s</th><th>Toxicity/share</th><th>Quality A/B</th></tr></thead>
+    <tbody id="bookLabSummaryBody"><tr><td colspan="15" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting forward observations…</td></tr></tbody>
   </table></div></div></div>
 
   <div class="panel"><div class="panel-header"><span>PAIRED COMPLETE-SET MAKER</span><span id="pairedMakerStatus" style="font-size:10px;color:var(--text-muted);">checking dedicated paper process…</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
-    <thead><tr><th>Version / arm</th><th>Cycles</th><th>Filled</th><th>Merged</th><th>Markets</th><th>Merged shares</th><th>Locked PnL</th><th>Orphan PnL</th><th>Realized PnL</th><th>Modeled reward*</th><th>Actual + model*</th><th>Open orphans</th><th>Unscored</th></tr></thead>
-    <tbody id="pairedMakerSummaryBody"><tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting queue-realistic complementary fills…</td></tr></tbody>
+    <thead><tr><th>Version / arm</th><th>Cycles</th><th>Filled</th><th>Merged</th><th>Markets</th><th>Merged shares</th><th>Locked PnL</th><th>Orphan PnL</th><th>Realized PnL</th><th>PnL 6h</th><th>PnL 24h</th><th>PnL 3d</th><th>Modeled reward*</th><th>Actual + model*</th><th>Open orphans</th><th>Unscored</th></tr></thead>
+    <tbody id="pairedMakerSummaryBody"><tr><td colspan="16" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting queue-realistic complementary fills…</td></tr></tbody>
   </table></div></div></div>
 
   <div class="panel"><div class="panel-header"><span>RECENT PAIRED CYCLES</span><span style="font-size:10px;color:var(--text-muted);">$1 merge payout · unmatched shares remain directional risk</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;max-height:300px;overflow:auto;"><table>
@@ -1843,8 +1845,8 @@
   </table></div></div></div>
 
   <div class="panel" style="border-color:var(--yellow);"><div class="panel-header"><span>RESOLVER-RISK TERMINAL CARRY V2 — FORWARD PAPER</span><span id="cvTerminalCarryPrior" style="font-size:10px;color:var(--text-muted);">risk-class settlement priors loading…</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
-    <thead><tr><th>Direction</th><th>Entries</th><th>Pairs</th><th>Settled</th><th>Profitable</th><th>Agreed</th><th>Entry cash</th><th>Realized 1×</th><th>Realized 2×</th><th>Full hurdle</th><th>Entry EV lower</th><th>Latest</th></tr></thead>
-    <tbody id="cvTerminalCarryBody"><tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">Waiting for the frozen conservative entry hurdle…</td></tr></tbody>
+    <thead><tr><th>Direction</th><th>Entries</th><th>Pairs</th><th>Settled</th><th>Profitable</th><th>Agreed</th><th>Entry cash</th><th>Realized 1×</th><th>Realized 2×</th><th>Full hurdle</th><th>2× PnL 6h</th><th>2× PnL 24h</th><th>2× PnL 3d</th><th>Entry EV lower</th><th>Latest</th></tr></thead>
+    <tbody id="cvTerminalCarryBody"><tr><td colspan="15" style="text-align:center;color:var(--text-muted);padding:18px;">Waiting for the frozen conservative entry hurdle…</td></tr></tbody>
   </table></div><div style="padding:9px 12px;font-size:10px;line-height:1.5;color:var(--text-muted);">Not risk-free: score-approved contracts are not certified identical. V2 assumes zero payout on every mismatch, uses a same-risk-class event-family 95% Wilson lower bound, charges two fee layers plus one adverse tick per leg, reserves the full modeled orphan unwind, and shares one $500 paper bankroll across unresolved entries. The earlier V1 sample is retained but excluded.</div></div></div>
 
   <div class="panel"><div class="panel-header"><span>CONTRACT-RELATION REVIEW QUEUE</span><span style="font-size:10px;color:var(--text-muted);">equivalence, implication, exclusion and exhaustiveness are distinct proofs</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;max-height:360px;overflow:auto;"><table>
@@ -3021,8 +3023,11 @@
         '<td style="color:' + _bPnlColor(row.pnl_2s) + '">' + _bMoney(row.pnl_2s) + '</td>' +
         '<td style="color:' + _bPnlColor(row.pnl_5s) + ';font-weight:700;">' + _bMoney(row.pnl_5s) + '</td>' +
         '<td style="color:' + _bPnlColor(row.pnl_10s) + '">' + _bMoney(row.pnl_10s) + '</td>' +
+        '<td title="' + Number(row.fills_6h || 0) + ' fills" style="color:' + _bPnlColor(row.pnl_5s_6h) + '">' + _bMoney(row.pnl_5s_6h) + '</td>' +
+        '<td title="' + Number(row.fills_24h || 0) + ' fills" style="color:' + _bPnlColor(row.pnl_5s_24h) + '">' + _bMoney(row.pnl_5s_24h) + '</td>' +
+        '<td title="' + Number(row.fills_3d || 0) + ' fills" style="color:' + _bPnlColor(row.pnl_5s_3d) + '">' + _bMoney(row.pnl_5s_3d) + '</td>' +
         '<td style="color:' + _bPnlColor(row.mean_pnl_5s) + '">' + _bMoney(row.mean_pnl_5s) + '</td><td>' + quality + '</td></tr>';
-    }).join('') : '<tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting prospective public-flow observations…</td></tr>';
+    }).join('') : '<tr><td colspan="16" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting prospective public-flow observations…</td></tr>';
 
     const recent = document.getElementById('flowSignalsBody');
     recent.innerHTML = signals.length ? signals.map((signal) => {
@@ -3119,13 +3124,20 @@
       const quality = row.scored ? Math.round(100 * Number(row.quality_ab || 0) / row.scored) + '%' : '—';
       return '<tr><td style="font-weight:700;">' + escapeHtml(row.strategy) + '</td><td>' + escapeHtml(row.arm) + '</td><td>' + row.intents + '</td><td>' + row.fills + '</td><td>' + row.filled_markets + '</td><td>' + winPct + '</td>' +
         '<td style="color:' + _bPnlColor(row.pnl_1s) + '">' + _bMoney(row.pnl_1s) + '</td><td style="color:' + _bPnlColor(row.pnl_5s) + ';font-weight:700;">' + _bMoney(row.pnl_5s) + '</td><td style="color:' + _bPnlColor(row.pnl_30s) + '">' + _bMoney(row.pnl_30s) + '</td>' +
+        '<td title="' + Number(row.fills_6h || 0) + ' fills" style="color:' + _bPnlColor(row.pnl_5s_6h) + '">' + _bMoney(row.pnl_5s_6h) + '</td>' +
+        '<td title="' + Number(row.fills_24h || 0) + ' fills" style="color:' + _bPnlColor(row.pnl_5s_24h) + '">' + _bMoney(row.pnl_5s_24h) + '</td>' +
+        '<td title="' + Number(row.fills_3d || 0) + ' fills" style="color:' + _bPnlColor(row.pnl_5s_3d) + '">' + _bMoney(row.pnl_5s_3d) + '</td>' +
         '<td style="color:' + _bPnlColor(row.mean_pnl_5s) + '">' + _bMoney(row.mean_pnl_5s) + '</td><td>' + (row.toxicity_5s_per_share == null ? '—' : Number(row.toxicity_5s_per_share).toFixed(4)) + '</td><td>' + quality + '</td></tr>';
-    }).join('') : '<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting forward observations…</td></tr>';
+    }).join('') : '<tr><td colspan="15" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting forward observations…</td></tr>';
 
     document.getElementById('pairedMakerSummaryBody').innerHTML = pairedSummary.rows.length ? pairedSummary.rows.map((row) => {
       return '<tr><td><span style="font-weight:700;">' + escapeHtml(row.strategy) + '</span><div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(row.arm) + '</div></td><td>' + row.cycles + '</td><td>' + row.filled_cycles + '</td><td>' + row.merged_cycles + '</td><td>' + row.independent_markets + '</td><td>' + Number(row.merged_shares || 0).toFixed(2) + '</td>' +
-        '<td style="color:' + _bPnlColor(row.locked_pnl) + '">' + _bMoney(row.locked_pnl) + '</td><td style="color:' + _bPnlColor(row.orphan_pnl) + '">' + _bMoney(row.orphan_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_pnl) + ';font-weight:700;">' + _bMoney(row.realized_pnl) + '</td><td style="color:var(--yellow);">' + _bMoney(row.modeled_reward) + '</td><td style="color:' + _bPnlColor(row.modeled_reward_adjusted_pnl) + '">' + _bMoney(row.modeled_reward_adjusted_pnl) + '</td><td style="color:' + (Number(row.open_orphans) ? 'var(--danger)' : 'var(--text-muted)') + '">' + row.open_orphans + '</td><td>' + row.unscored_interruptions + '</td></tr>';
-    }).join('') : '<tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:18px;">No paired cycles yet; a zero-candidate result is valid.</td></tr>';
+        '<td style="color:' + _bPnlColor(row.locked_pnl) + '">' + _bMoney(row.locked_pnl) + '</td><td style="color:' + _bPnlColor(row.orphan_pnl) + '">' + _bMoney(row.orphan_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_pnl) + ';font-weight:700;">' + _bMoney(row.realized_pnl) + '</td>' +
+        '<td title="' + Number(row.scored_6h || 0) + ' scored cycles" style="color:' + _bPnlColor(row.realized_pnl_6h) + '">' + _bMoney(row.realized_pnl_6h) + '</td>' +
+        '<td title="' + Number(row.scored_24h || 0) + ' scored cycles" style="color:' + _bPnlColor(row.realized_pnl_24h) + '">' + _bMoney(row.realized_pnl_24h) + '</td>' +
+        '<td title="' + Number(row.scored_3d || 0) + ' scored cycles" style="color:' + _bPnlColor(row.realized_pnl_3d) + '">' + _bMoney(row.realized_pnl_3d) + '</td>' +
+        '<td style="color:var(--yellow);">' + _bMoney(row.modeled_reward) + '</td><td style="color:' + _bPnlColor(row.modeled_reward_adjusted_pnl) + '">' + _bMoney(row.modeled_reward_adjusted_pnl) + '</td><td style="color:' + (Number(row.open_orphans) ? 'var(--danger)' : 'var(--text-muted)') + '">' + row.open_orphans + '</td><td>' + row.unscored_interruptions + '</td></tr>';
+    }).join('') : '<tr><td colspan="16" style="text-align:center;color:var(--text-muted);padding:18px;">No paired cycles yet; a zero-candidate result is valid.</td></tr>';
 
     document.getElementById('pairedMakerCyclesBody').innerHTML = pairedCycles.length ? pairedCycles.map((row) => {
       const total = row.total_pnl == null ? '—' : _bMoney(row.total_pnl);
@@ -3226,9 +3238,13 @@
       ' V1 entries excluded · goal 300 V2 units / 30d';
     document.getElementById('cvTerminalCarryBody').innerHTML = terminalCarry.rows.length
       ? terminalCarry.rows.map((row) =>
-        '<tr><td style="font-weight:700;">' + escapeHtml(row.direction) + '</td><td>' + row.entries + '</td><td>' + row.matches + '</td><td>' + row.settled + '</td><td>' + row.profitable + '</td><td>' + row.settlements_agreed + '</td><td>' + _bMoney(row.deployed_entry_cash) + '</td><td style="color:' + _bPnlColor(row.realized_pnl) + '">' + _bMoney(row.realized_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_2x_pnl) + '">' + _bMoney(row.realized_2x_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_full_hurdle_pnl) + '">' + _bMoney(row.realized_full_hurdle_pnl) + '</td><td style="color:' + _bPnlColor(row.entry_expected_profit_lower) + '">' + _bMoney(row.entry_expected_profit_lower) + '</td><td style="color:var(--text-muted);">' + (row.latest ? new Date(row.latest).toLocaleString() : '—') + '</td></tr>'
+        '<tr><td style="font-weight:700;">' + escapeHtml(row.direction) + '</td><td>' + row.entries + '</td><td>' + row.matches + '</td><td>' + row.settled + '</td><td>' + row.profitable + '</td><td>' + row.settlements_agreed + '</td><td>' + _bMoney(row.deployed_entry_cash) + '</td><td style="color:' + _bPnlColor(row.realized_pnl) + '">' + _bMoney(row.realized_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_2x_pnl) + '">' + _bMoney(row.realized_2x_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_full_hurdle_pnl) + '">' + _bMoney(row.realized_full_hurdle_pnl) + '</td>' +
+        '<td title="' + Number(row.settled_6h || 0) + ' settled entries" style="color:' + _bPnlColor(row.realized_2x_pnl_6h) + '">' + _bMoney(row.realized_2x_pnl_6h) + '</td>' +
+        '<td title="' + Number(row.settled_24h || 0) + ' settled entries" style="color:' + _bPnlColor(row.realized_2x_pnl_24h) + '">' + _bMoney(row.realized_2x_pnl_24h) + '</td>' +
+        '<td title="' + Number(row.settled_3d || 0) + ' settled entries" style="color:' + _bPnlColor(row.realized_2x_pnl_3d) + '">' + _bMoney(row.realized_2x_pnl_3d) + '</td>' +
+        '<td style="color:' + _bPnlColor(row.entry_expected_profit_lower) + '">' + _bMoney(row.entry_expected_profit_lower) + '</td><td style="color:var(--text-muted);">' + (row.latest ? new Date(row.latest).toLocaleString() : '—') + '</td></tr>'
       ).join('')
-      : '<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">No quote has cleared the conservative forward hurdle. Zero is a valid result.</td></tr>';
+      : '<tr><td colspan="15" style="text-align:center;color:var(--text-muted);padding:18px;">No quote has cleared the conservative forward hurdle. Zero is a valid result.</td></tr>';
 
     document.getElementById('cvMatchesBody').innerHTML = matches.rows.length ? matches.rows.map((row) => {
       const flags = Array.isArray(row.mismatch_reasons) && row.mismatch_reasons.length ? row.mismatch_reasons.join(', ') : 'manual rules review pending';
@@ -3491,19 +3507,37 @@
     if (summary) {
       const sb = document.getElementById('borgSummaryBody');
       if (!summary.length) {
-        sb.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr>';
+        sb.innerHTML = '<tr><td colspan="17" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr>';
       } else {
         sb.innerHTML = summary.map((s) => {
-          const fillPct = s.scored > 0 ? Math.round((100 * s.fills) / s.scored) + '%' : '—';
+          const eligibleFills = Number(s.eligible_fills || 0);
+          const currentFills = Number(s.current_eligible_fills || 0);
+          const horizon = (label, suffix) => {
+            const pnl1x = Number(s['pnl_1x_' + suffix] || 0);
+            const pnl2x = Number(s['pnl_2x_' + suffix] || 0);
+            const fills = Number(s['fills_' + suffix] || 0);
+            const markets = Number(s['markets_' + suffix] || 0);
+            return '<td title="' + label + ' entry-time cohort · ' + fills + ' eligible fills / ' + markets +
+              ' markets · 2× P&amp;L ' + _bMoney(pnl2x) + '" style="color:' + _bPnlColor(pnl1x) +
+              ';font-weight:700;">' + _bMoney(pnl1x) +
+              '<div style="font-size:8px;color:var(--text-muted);">' + fills + 'f / ' + markets + 'm</div></td>';
+          };
+          const governance = s.trial_status
+            ? '<div title="' + escapeHtml(s.trial_status_reason || '') + '" style="font-size:8px;color:' +
+              (s.trial_status === 'COLLECTING' ? 'var(--cyan)' : 'var(--yellow)') + ';">' +
+              escapeHtml(String(s.trial_status).replaceAll('_', ' ')) + '</div>' : '';
           return '<tr>' +
             '<td style="font-weight:700;">' + escapeHtml(s.strategy) + '</td>' +
-            '<td><span style="color:var(--yellow);">' + escapeHtml(s.phase) + '</span></td>' +
-            '<td>' + s.places + '</td><td>' + s.cancels + '</td><td>' + s.scored + '</td><td>' + s.fills + '</td>' +
-            '<td>' + fillPct + '</td>' +
-            '<td style="color:' + _bPnlColor(s.pnl_gross) + ';">' + _bMoney(s.pnl_gross) + '</td>' +
-            '<td style="color:' + _bPnlColor(s.pnl_05x) + ';">' + _bMoney(s.pnl_05x) + '</td>' +
-            '<td style="color:' + _bPnlColor(s.pnl_1x) + ';font-weight:700;">' + _bMoney(s.pnl_1x) + '</td>' +
-            '<td style="color:' + _bPnlColor(s.pnl_2x) + ';">' + _bMoney(s.pnl_2x) + '</td>' +
+            '<td><span style="color:var(--yellow);">' + escapeHtml(s.phase) + '</span>' + governance + '</td>' +
+            '<td>' + s.places + '</td><td>' + s.cancels + '</td><td>' + s.scored + '</td><td>' + eligibleFills +
+              '<div style="font-size:8px;color:var(--text-muted);">' + Number(s.eligible_markets || 0) + ' markets</div></td>' +
+            '<td style="color:' + _bPnlColor(s.eligible_pnl_1x) + ';font-weight:700;">' + _bMoney(s.eligible_pnl_1x) + '</td>' +
+            '<td style="color:' + _bPnlColor(s.eligible_pnl_2x) + ';">' + _bMoney(s.eligible_pnl_2x) + '</td>' +
+            '<td title="' + escapeHtml(s.current_experiment_id || 'no frozen trial') + '">' + currentFills +
+              '<div style="font-size:8px;color:var(--text-muted);">' + Number(s.current_eligible_markets || 0) + ' markets</div></td>' +
+            '<td style="color:' + _bPnlColor(s.current_pnl_1x) + ';font-weight:700;">' + _bMoney(s.current_pnl_1x) + '</td>' +
+            '<td style="color:' + _bPnlColor(s.current_pnl_2x) + ';">' + _bMoney(s.current_pnl_2x) + '</td>' +
+            horizon('6h', '6h') + horizon('24h', '24h') + horizon('3d', '3d') +
             '<td>' + (s.scored > 0 ? Math.round(100 * s.quality_ab / s.scored) + '%' : '—') + '</td>' +
             '<td>' + (s.scored > 0 ? Math.round(100 * s.fidelity_ab / s.scored) + '%' : '—') + '</td>' +
             '<td style="color:var(--text-muted);">' + _bAge(Math.round((Date.now() - new Date(s.latest).getTime()) / 1000)) + '</td>' +
@@ -4023,6 +4057,13 @@
       const exp = b.experiment;
       const pct = exp ? Math.min(100, Math.round(100 * exp.n / exp.target)) : 0;
       const kindBadge = modeBadge(b);
+      const horizonCell = (label, row) => row ? `
+        <span title="${row.n ?? 0} scored fills${row.markets == null ? '' : ` / ${row.markets} markets`}${row.pnl2x == null ? '' : ` · 2× ${money(row.pnl2x)}`}"
+              style="border:1px solid var(--border);border-radius:3px;padding:3px 6px;min-width:72px;">
+          <span style="font-size:8px;color:var(--text-muted);">${label}</span>
+          <b style="display:block;color:${pnlColor(row.pnl1x)};">${money(row.pnl1x)}</b>
+          <span style="font-size:8px;color:var(--text-muted);">n ${row.n ?? 0}${row.markets == null ? '' : ` · ${row.markets}m`}</span>
+        </span>` : '';
       return `
       <div onclick="showBotHistory('${b.id}', '${escapeHtml(b.name)}')" title="Click for trade history"
            style="border:1px solid var(--border);border-radius:6px;padding:10px 12px;background:var(--bg-2,rgba(255,255,255,0.02));cursor:pointer;">
@@ -4042,6 +4083,11 @@
           <span>n <b>${s.n ?? 0}</b></span>
           <span style="color:var(--text-muted);font-size:9px;align-self:center;">${escapeHtml(s.window || '')}</span>
         </div>
+        ${s.horizons ? `<div style="display:flex;gap:5px;font-size:10px;margin:0 0 ${exp ? '8px' : '4px'} 0;">
+          ${horizonCell('6H', s.horizons.h6)}
+          ${horizonCell('24H', s.horizons.h24)}
+          ${horizonCell('3D', s.horizons.d3)}
+        </div>` : ''}
         ${exp ? `
         <div title="${escapeHtml(exp.label)}">
           <div style="background:var(--bg-3,#1a1a1a);border-radius:3px;height:5px;overflow:hidden;">

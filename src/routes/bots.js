@@ -161,6 +161,21 @@ router.get('/', authMiddleware, async (req, res) => {
       q(`SELECT count(*) FILTER (WHERE status='closed') closed,
                 count(*) FILTER (WHERE status='closed' AND pnl>0) wins,
                 COALESCE(sum(pnl) FILTER (WHERE status='closed' AND ABS(pnl)<100000),0) pnl,
+                count(*) FILTER (WHERE status='closed'
+                  AND closed_at>=now()-interval '6 hours')::int closed_6h,
+                COALESCE(sum(pnl) FILTER (WHERE status='closed'
+                  AND ABS(pnl)<100000
+                  AND closed_at>=now()-interval '6 hours'),0)::float pnl_6h,
+                count(*) FILTER (WHERE status='closed'
+                  AND closed_at>=now()-interval '24 hours')::int closed_24h,
+                COALESCE(sum(pnl) FILTER (WHERE status='closed'
+                  AND ABS(pnl)<100000
+                  AND closed_at>=now()-interval '24 hours'),0)::float pnl_24h,
+                count(*) FILTER (WHERE status='closed'
+                  AND closed_at>=now()-interval '3 days')::int closed_3d,
+                COALESCE(sum(pnl) FILTER (WHERE status='closed'
+                  AND ABS(pnl)<100000
+                  AND closed_at>=now()-interval '3 days'),0)::float pnl_3d,
                 max(created_at) last_order_at
          FROM trades
          WHERE user_id=$1
@@ -169,6 +184,18 @@ router.get('/', authMiddleware, async (req, res) => {
       q(`SELECT count(*) FILTER (WHERE status='closed') closed,
                 count(*) FILTER (WHERE status='closed' AND pnl>0) wins,
                 COALESCE(sum(pnl) FILTER (WHERE status='closed'),0) pnl,
+                count(*) FILTER (WHERE status='closed'
+                  AND closed_at>=now()-interval '6 hours')::int closed_6h,
+                COALESCE(sum(pnl) FILTER (WHERE status='closed'
+                  AND closed_at>=now()-interval '6 hours'),0)::float pnl_6h,
+                count(*) FILTER (WHERE status='closed'
+                  AND closed_at>=now()-interval '24 hours')::int closed_24h,
+                COALESCE(sum(pnl) FILTER (WHERE status='closed'
+                  AND closed_at>=now()-interval '24 hours'),0)::float pnl_24h,
+                count(*) FILTER (WHERE status='closed'
+                  AND closed_at>=now()-interval '3 days')::int closed_3d,
+                COALESCE(sum(pnl) FILTER (WHERE status='closed'
+                  AND closed_at>=now()-interval '3 days'),0)::float pnl_3d,
                 max(created_at) last_order_at
          FROM george_trades WHERE user_id=$1 AND entry_mode='resurrection'`, [req.userId]),
       // AUTO-DISCOVERY: every strategy that ever placed a shadow order.
@@ -182,6 +209,30 @@ router.get('/', authMiddleware, async (req, res) => {
                 count(*) FILTER (WHERE s.filled AND o.phase = 'eval' AND m.asset <> 'hype') eval_core_fills,
                 count(*) FILTER (WHERE s.filled AND o.phase = 'eval' AND m.asset <> 'hype' AND s.pnl_1x > 0) eval_core_wins,
                 COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled AND o.phase = 'eval' AND m.asset <> 'hype'), 0) eval_core_pnl,
+                count(*) FILTER (WHERE s.filled AND o.phase='eval' AND m.asset<>'hype'
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '6 hours')::int eval_core_fills_6h,
+                count(DISTINCT o.market_id) FILTER (WHERE s.filled AND o.phase='eval'
+                  AND m.asset<>'hype'
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '6 hours')::int eval_core_markets_6h,
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled AND o.phase='eval'
+                  AND m.asset<>'hype'
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '6 hours'),0)::float eval_core_pnl_6h,
+                count(*) FILTER (WHERE s.filled AND o.phase='eval' AND m.asset<>'hype'
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '24 hours')::int eval_core_fills_24h,
+                count(DISTINCT o.market_id) FILTER (WHERE s.filled AND o.phase='eval'
+                  AND m.asset<>'hype'
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '24 hours')::int eval_core_markets_24h,
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled AND o.phase='eval'
+                  AND m.asset<>'hype'
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '24 hours'),0)::float eval_core_pnl_24h,
+                count(*) FILTER (WHERE s.filled AND o.phase='eval' AND m.asset<>'hype'
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '3 days')::int eval_core_fills_3d,
+                count(DISTINCT o.market_id) FILTER (WHERE s.filled AND o.phase='eval'
+                  AND m.asset<>'hype'
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '3 days')::int eval_core_markets_3d,
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled AND o.phase='eval'
+                  AND m.asset<>'hype'
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '3 days'),0)::float eval_core_pnl_3d,
                 max(o.ts) FILTER (WHERE o.features->>'research_capital_version' = $1) capital_last_order_at,
                 count(*) FILTER (WHERE s.filled AND o.features->>'research_capital_version' = $1) capital_fills,
                 count(DISTINCT o.market_id) FILTER (WHERE o.features->>'research_capital_version' = $1) capital_independent_markets,
@@ -189,7 +240,34 @@ router.get('/', authMiddleware, async (req, res) => {
                   FILTER (WHERE o.features->>'research_capital_version' = $1) capital_independent_events,
                 count(*) FILTER (WHERE s.filled AND m.asset <> 'hype' AND o.features->>'research_capital_version' = $1) capital_core_fills,
                 count(*) FILTER (WHERE s.filled AND s.pnl_1x > 0 AND o.features->>'research_capital_version' = $1) capital_wins,
-                COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled AND o.features->>'research_capital_version' = $1), 0) capital_pnl
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled AND o.features->>'research_capital_version' = $1), 0) capital_pnl,
+                count(*) FILTER (WHERE s.filled
+                  AND o.features->>'research_capital_version'=$1
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '6 hours')::int capital_fills_6h,
+                count(DISTINCT o.market_id) FILTER (WHERE s.filled
+                  AND o.features->>'research_capital_version'=$1
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '6 hours')::int capital_markets_6h,
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled
+                  AND o.features->>'research_capital_version'=$1
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '6 hours'),0)::float capital_pnl_6h,
+                count(*) FILTER (WHERE s.filled
+                  AND o.features->>'research_capital_version'=$1
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '24 hours')::int capital_fills_24h,
+                count(DISTINCT o.market_id) FILTER (WHERE s.filled
+                  AND o.features->>'research_capital_version'=$1
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '24 hours')::int capital_markets_24h,
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled
+                  AND o.features->>'research_capital_version'=$1
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '24 hours'),0)::float capital_pnl_24h,
+                count(*) FILTER (WHERE s.filled
+                  AND o.features->>'research_capital_version'=$1
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '3 days')::int capital_fills_3d,
+                count(DISTINCT o.market_id) FILTER (WHERE s.filled
+                  AND o.features->>'research_capital_version'=$1
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '3 days')::int capital_markets_3d,
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE s.filled
+                  AND o.features->>'research_capital_version'=$1
+                  AND COALESCE(o.available_at,o.ts)>=now()-interval '3 days'),0)::float capital_pnl_3d
          FROM borg_shadow_orders o
          LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
          LEFT JOIN borg_markets m ON m.id = o.market_id
@@ -218,6 +296,14 @@ router.get('/', authMiddleware, async (req, res) => {
                   frozen_at,evidence_started_at
              FROM borg_trial_ledger
             ORDER BY strategy,frozen_at DESC,id DESC
+         ),
+         active_epoch AS (
+           SELECT r.epoch_id,e.started_at AS epoch_started_at
+             FROM borg_collector_runs r
+             JOIN borg_collection_epochs e ON e.epoch_id=r.epoch_id
+            WHERE r.status='RUNNING'
+            ORDER BY r.started_at DESC
+            LIMIT 1
          )
          SELECT l.*,
                 count(o.id) FILTER (WHERE o.action='place')::int intended_signals,
@@ -228,13 +314,41 @@ router.get('/', authMiddleware, async (req, res) => {
                 count(s.order_id) FILTER (WHERE o.action='place' AND s.filled AND s.pnl_1x>0)::int wins,
                 COALESCE(sum(s.pnl_1x) FILTER (WHERE o.action='place' AND s.filled),0)::float pnl_1x,
                 COALESCE(sum(s.pnl_2x) FILTER (WHERE o.action='place' AND s.filled),0)::float pnl_2x,
+                count(s.order_id) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '6 hours')::int fills_6h,
+                count(DISTINCT o.market_id) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '6 hours')::int markets_6h,
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '6 hours'),0)::float pnl_1x_6h,
+                COALESCE(sum(s.pnl_2x) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '6 hours'),0)::float pnl_2x_6h,
+                count(s.order_id) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '24 hours')::int fills_24h,
+                count(DISTINCT o.market_id) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '24 hours')::int markets_24h,
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '24 hours'),0)::float pnl_1x_24h,
+                COALESCE(sum(s.pnl_2x) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '24 hours'),0)::float pnl_2x_24h,
+                count(s.order_id) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '3 days')::int fills_3d,
+                count(DISTINCT o.market_id) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '3 days')::int markets_3d,
+                COALESCE(sum(s.pnl_1x) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '3 days'),0)::float pnl_1x_3d,
+                COALESCE(sum(s.pnl_2x) FILTER (WHERE o.action='place' AND s.filled
+                  AND o.available_at>=now()-interval '3 days'),0)::float pnl_2x_3d,
                 max(o.available_at) FILTER (WHERE o.action='place') last_signal_at
            FROM latest l
+           LEFT JOIN active_epoch ae ON true
            LEFT JOIN borg_shadow_orders o
              ON o.experiment_id=l.experiment_id AND o.strategy=l.strategy
             AND COALESCE(o.arm,'baseline')=l.variant AND o.phase=l.phase
-            AND o.available_at>=l.evidence_started_at
+            AND o.available_at>=GREATEST(l.evidence_started_at,ae.epoch_started_at)
+            AND o.features->>'collection_epoch_id'=ae.epoch_id
            LEFT JOIN borg_shadow_scores s ON s.order_id=o.id
+            AND s.data_quality_grade IN ('A','B')
+            AND s.execution_fidelity_grade IN ('A','B')
            LEFT JOIN borg_markets m ON m.id=o.market_id
           GROUP BY l.id,l.experiment_id,l.strategy,l.variant,l.family,l.phase,l.status,
                    l.status_reason,l.primary_metric,l.min_independent_markets,l.min_days,
@@ -281,6 +395,14 @@ router.get('/', authMiddleware, async (req, res) => {
         wins: parseInt(ms.wins) || 0,
         winRate: ms.closed > 0 ? +((100 * ms.wins) / ms.closed).toFixed(1) : null,
         pnl: +parseFloat(ms.pnl || 0).toFixed(2),
+        horizons: {
+          h6: { n: parseInt(ms.closed_6h, 10) || 0, markets: null,
+            pnl1x: +parseFloat(ms.pnl_6h || 0).toFixed(2), pnl2x: null },
+          h24: { n: parseInt(ms.closed_24h, 10) || 0, markets: null,
+            pnl1x: +parseFloat(ms.pnl_24h || 0).toFixed(2), pnl2x: null },
+          d3: { n: parseInt(ms.closed_3d, 10) || 0, markets: null,
+            pnl1x: +parseFloat(ms.pnl_3d || 0).toFixed(2), pnl2x: null },
+        },
         window: 'fresh executable-fill cohort',
       },
       experiment: {
@@ -308,6 +430,14 @@ router.get('/', authMiddleware, async (req, res) => {
         wins: parseInt(gr.wins) || 0,
         winRate: gr.closed > 0 ? +((100 * gr.wins) / gr.closed).toFixed(1) : null,
         pnl: +parseFloat(gr.pnl || 0).toFixed(2),
+        horizons: {
+          h6: { n: parseInt(gr.closed_6h, 10) || 0, markets: null,
+            pnl1x: +parseFloat(gr.pnl_6h || 0).toFixed(2), pnl2x: null },
+          h24: { n: parseInt(gr.closed_24h, 10) || 0, markets: null,
+            pnl1x: +parseFloat(gr.pnl_24h || 0).toFixed(2), pnl2x: null },
+          d3: { n: parseInt(gr.closed_3d, 10) || 0, markets: null,
+            pnl1x: +parseFloat(gr.pnl_3d || 0).toFixed(2), pnl2x: null },
+        },
         window: 'resurrection cohort',
       },
       experiment: {
@@ -415,6 +545,25 @@ router.get('/', authMiddleware, async (req, res) => {
         ? parseFloat(trial.pnl_1x || 0)
         : isGla ? parseFloat(row.eval_core_pnl || 0) : parseFloat(row.capital_pnl || 0);
       const scoredPnl2x = trial ? parseFloat(trial.pnl_2x || 0) : null;
+      const scopedHorizons = Object.fromEntries([
+        ['h6', '6h'], ['h24', '24h'], ['d3', '3d'],
+      ].map(([key, suffix]) => {
+        const prefix = trial ? '' : isGla ? 'eval_core_' : 'capital_';
+        return [key, {
+          n: parseInt(trial
+            ? trial[`fills_${suffix}`]
+            : row[`${prefix}fills_${suffix}`], 10) || 0,
+          markets: parseInt(trial
+            ? trial[`markets_${suffix}`]
+            : row[`${prefix}markets_${suffix}`], 10) || 0,
+          pnl1x: +parseFloat(trial
+            ? trial[`pnl_1x_${suffix}`] || 0
+            : row[`${prefix}pnl_${suffix}`] || 0).toFixed(2),
+          pnl2x: trial
+            ? +parseFloat(trial[`pnl_2x_${suffix}`] || 0).toFixed(2)
+            : null,
+        }];
+      }));
       // Runtime registration, not recent historical activity, defines whether
       // a shadow strategy is running. Quiet strategies can go >2h without a
       // valid signal; retired Vasili/A/A2 rows can remain recent after removal.
@@ -500,12 +649,14 @@ router.get('/', authMiddleware, async (req, res) => {
           n: parseInt(gt.live_orders) || 0,
           wins: null, winRate: null,
           pnl: glaLivePnl,
+          horizons: null,
           window: glaLivePnl == null ? 'live session (unfunded — deposit to start)' : 'live session · wallet-based',
         } : {
           n: scoredFills,
           wins: scoredWins,
           winRate: scoredFills > 0 ? +((100 * scoredWins) / scoredFills).toFixed(1) : null,
           pnl: +scoredPnl.toFixed(2),
+          horizons: scopedHorizons,
           window: trial ? `${trial.experiment_id} · ${trial.phase} · 1× P&L; 2× ${Number(scoredPnl2x || 0).toFixed(2)}`
             : isGla ? 'frozen eval core · pilot excluded'
             : isMainV4 ? 'fresh V4 eval only · all V3/discovery rows excluded'

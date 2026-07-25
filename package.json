@@ -22,6 +22,7 @@
     "recover:wal": "node scripts/recover-wal-backlog.js",
     "research:portfolio": "node scripts/portfolio-simulator.js",
     "research:promotion": "node scripts/promotion-report.js",
+    "research:profitability": "node scripts/borg-profitability-audit.js",
     "research:main-v2": "node scripts/main-v2-report.js",
     "research:pairedmaker": "node scripts/paired-maker-report.js",
     "research:wallet": "node scripts/wallet-mechanism-report.js",

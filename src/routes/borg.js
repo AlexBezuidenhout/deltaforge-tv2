@@ -181,6 +181,21 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
   try {
     const value = await dashboardReports.get('borg-shadow-summary', 15_000, async () => {
       const { rows } = await pool.query(`
+        WITH latest_trial AS (
+          SELECT DISTINCT ON (strategy)
+                 strategy,status,status_reason,experiment_id,variant,
+                 phase AS trial_phase,evidence_started_at
+            FROM borg_trial_ledger
+           ORDER BY strategy,frozen_at DESC,id DESC
+        ),
+        active_epoch AS (
+          SELECT r.epoch_id,e.started_at AS epoch_started_at
+            FROM borg_collector_runs r
+            JOIN borg_collection_epochs e ON e.epoch_id=r.epoch_id
+           WHERE r.status='RUNNING'
+           ORDER BY r.started_at DESC
+           LIMIT 1
+        )
         SELECT o.strategy, o.phase,
           count(*) FILTER (WHERE o.action='place')::int places,
           count(*) FILTER (WHERE o.action='cancel')::int cancels,
@@ -190,15 +205,245 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
           COALESCE(sum(s.pnl_05x)  FILTER (WHERE s.filled), 0)::float pnl_05x,
           COALESCE(sum(s.pnl_1x)   FILTER (WHERE s.filled), 0)::float pnl_1x,
           COALESCE(sum(s.pnl_2x)   FILTER (WHERE s.filled), 0)::float pnl_2x,
+          count(s.order_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+          )::int eligible_fills,
+          count(DISTINCT o.market_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+          )::int eligible_markets,
+          COALESCE(sum(s.pnl_gross) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+          ), 0)::float eligible_pnl_gross,
+          COALESCE(sum(s.pnl_05x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+          ), 0)::float eligible_pnl_05x,
+          COALESCE(sum(s.pnl_1x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+          ), 0)::float eligible_pnl_1x,
+          COALESCE(sum(s.pnl_2x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+          ), 0)::float eligible_pnl_2x,
+          count(s.order_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+          )::int current_eligible_fills,
+          count(DISTINCT o.market_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+          )::int current_eligible_markets,
+          COALESCE(sum(s.pnl_1x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+          ), 0)::float current_pnl_1x,
+          COALESCE(sum(s.pnl_2x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+          ), 0)::float current_pnl_2x,
+          count(s.order_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '6 hours'
+          )::int fills_6h,
+          count(DISTINCT o.market_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '6 hours'
+          )::int markets_6h,
+          COALESCE(sum(s.pnl_1x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '6 hours'
+          ), 0)::float pnl_1x_6h,
+          COALESCE(sum(s.pnl_2x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '6 hours'
+          ), 0)::float pnl_2x_6h,
+          count(s.order_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '24 hours'
+          )::int fills_24h,
+          count(DISTINCT o.market_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '24 hours'
+          )::int markets_24h,
+          COALESCE(sum(s.pnl_1x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '24 hours'
+          ), 0)::float pnl_1x_24h,
+          COALESCE(sum(s.pnl_2x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '24 hours'
+          ), 0)::float pnl_2x_24h,
+          count(s.order_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '3 days'
+          )::int fills_3d,
+          count(DISTINCT o.market_id) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '3 days'
+          )::int markets_3d,
+          COALESCE(sum(s.pnl_1x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '3 days'
+          ), 0)::float pnl_1x_3d,
+          COALESCE(sum(s.pnl_2x) FILTER (
+            WHERE s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+              AND o.experiment_id=lt.experiment_id
+              AND COALESCE(o.arm,'baseline')=lt.variant
+              AND o.phase=lt.trial_phase
+              AND COALESCE(o.available_at,o.ts)>=GREATEST(
+                lt.evidence_started_at,ae.epoch_started_at)
+              AND o.features->>'collection_epoch_id'=ae.epoch_id
+              AND COALESCE(o.available_at,o.ts) >= now()-interval '3 days'
+          ), 0)::float pnl_2x_3d,
           count(s.order_id) FILTER (WHERE s.data_quality_grade IN ('A','B'))::int quality_ab,
           count(s.order_id) FILTER (WHERE s.data_quality_grade='F')::int quality_f,
           count(s.order_id) FILTER (WHERE s.execution_fidelity_grade IN ('A','B'))::int fidelity_ab,
           count(s.order_id) FILTER (WHERE s.execution_fidelity_grade='F')::int fidelity_f,
-          max(o.ts) latest
+          max(o.ts) latest,
+          lt.status trial_status,
+          lt.status_reason trial_status_reason,
+          lt.experiment_id current_experiment_id,
+          lt.variant current_trial_variant,
+          lt.trial_phase current_trial_phase,
+          lt.evidence_started_at current_evidence_started_at,
+          ae.epoch_id current_evidence_epoch_id,
+          ae.epoch_started_at current_epoch_started_at
         FROM borg_shadow_orders o
         LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
+        LEFT JOIN latest_trial lt ON lt.strategy=o.strategy
+        LEFT JOIN active_epoch ae ON true
         WHERE o.features->>'research_capital_version' = $1
-        GROUP BY o.strategy, o.phase
+        GROUP BY o.strategy,o.phase,lt.status,lt.status_reason,
+                 lt.experiment_id,lt.variant,lt.trial_phase,lt.evidence_started_at,
+                 ae.epoch_id,ae.epoch_started_at
         ORDER BY o.strategy`, [RESEARCH_CAPITAL_VERSION]);
       return rows;
     });
@@ -600,6 +845,24 @@ router.get('/flow/summary', authMiddleware, async (req, res) => {
                AND sc.data_quality_grade IN ('A','B')),0)::float pnl_5s,
              COALESCE(sum(sc.pnl_10s) FILTER (WHERE sc.filled
                AND sc.data_quality_grade IN ('A','B')),0)::float pnl_10s,
+             count(sc.signal_id) FILTER (WHERE sc.filled
+               AND sc.data_quality_grade IN ('A','B')
+               AND s.available_at>=now()-interval '6 hours')::int fills_6h,
+             COALESCE(sum(sc.pnl_5s) FILTER (WHERE sc.filled
+               AND sc.data_quality_grade IN ('A','B')
+               AND s.available_at>=now()-interval '6 hours'),0)::float pnl_5s_6h,
+             count(sc.signal_id) FILTER (WHERE sc.filled
+               AND sc.data_quality_grade IN ('A','B')
+               AND s.available_at>=now()-interval '24 hours')::int fills_24h,
+             COALESCE(sum(sc.pnl_5s) FILTER (WHERE sc.filled
+               AND sc.data_quality_grade IN ('A','B')
+               AND s.available_at>=now()-interval '24 hours'),0)::float pnl_5s_24h,
+             count(sc.signal_id) FILTER (WHERE sc.filled
+               AND sc.data_quality_grade IN ('A','B')
+               AND s.available_at>=now()-interval '3 days')::int fills_3d,
+             COALESCE(sum(sc.pnl_5s) FILTER (WHERE sc.filled
+               AND sc.data_quality_grade IN ('A','B')
+               AND s.available_at>=now()-interval '3 days'),0)::float pnl_5s_3d,
              avg(sc.pnl_5s) FILTER (WHERE sc.filled
                AND sc.data_quality_grade IN ('A','B'))::float mean_pnl_5s,
              count(sc.signal_id) FILTER (WHERE sc.data_quality_grade IN ('A','B'))::int quality_ab,
@@ -726,6 +989,18 @@ router.get('/allmarket/summary', authMiddleware, async (req, res) => {
              COALESCE(sum(s.pnl_1s) FILTER (WHERE s.filled),0)::float pnl_1s,
              COALESCE(sum(s.pnl_5s) FILTER (WHERE s.filled),0)::float pnl_5s,
              COALESCE(sum(s.pnl_30s) FILTER (WHERE s.filled),0)::float pnl_30s,
+             count(s.intent_id) FILTER (WHERE s.filled
+               AND i.available_at>=now()-interval '6 hours')::int fills_6h,
+             COALESCE(sum(s.pnl_5s) FILTER (WHERE s.filled
+               AND i.available_at>=now()-interval '6 hours'),0)::float pnl_5s_6h,
+             count(s.intent_id) FILTER (WHERE s.filled
+               AND i.available_at>=now()-interval '24 hours')::int fills_24h,
+             COALESCE(sum(s.pnl_5s) FILTER (WHERE s.filled
+               AND i.available_at>=now()-interval '24 hours'),0)::float pnl_5s_24h,
+             count(s.intent_id) FILTER (WHERE s.filled
+               AND i.available_at>=now()-interval '3 days')::int fills_3d,
+             COALESCE(sum(s.pnl_5s) FILTER (WHERE s.filled
+               AND i.available_at>=now()-interval '3 days'),0)::float pnl_5s_3d,
              avg(s.pnl_5s) FILTER (WHERE s.filled)::float mean_pnl_5s,
              avg(GREATEST(0,-s.pnl_5s)/NULLIF(s.fill_size,0))
                FILTER (WHERE s.filled)::float toxicity_5s_per_share,
@@ -842,6 +1117,18 @@ router.get('/pairedmaker/summary', authMiddleware, async (req, res) => {
              COALESCE(sum(locked_pnl),0)::float locked_pnl,
              COALESCE(sum(orphan_pnl),0)::float orphan_pnl,
              COALESCE(sum(total_pnl) FILTER (WHERE total_pnl IS NOT NULL),0)::float realized_pnl,
+             count(*) FILTER (WHERE total_pnl IS NOT NULL
+               AND opened_at>=now()-interval '6 hours')::int scored_6h,
+             COALESCE(sum(total_pnl) FILTER (WHERE total_pnl IS NOT NULL
+               AND opened_at>=now()-interval '6 hours'),0)::float realized_pnl_6h,
+             count(*) FILTER (WHERE total_pnl IS NOT NULL
+               AND opened_at>=now()-interval '24 hours')::int scored_24h,
+             COALESCE(sum(total_pnl) FILTER (WHERE total_pnl IS NOT NULL
+               AND opened_at>=now()-interval '24 hours'),0)::float realized_pnl_24h,
+             count(*) FILTER (WHERE total_pnl IS NOT NULL
+               AND opened_at>=now()-interval '3 days')::int scored_3d,
+             COALESCE(sum(total_pnl) FILTER (WHERE total_pnl IS NOT NULL
+               AND opened_at>=now()-interval '3 days'),0)::float realized_pnl_3d,
              COALESCE(sum(modeled_reward_accrual),0)::float modeled_reward,
              COALESCE(sum(total_pnl + modeled_reward_accrual)
                FILTER (WHERE total_pnl IS NOT NULL),0)::float modeled_reward_adjusted_pnl,
@@ -1194,6 +1481,18 @@ router.get('/crossvenue/terminal-carry', authMiddleware, async (req, res) => {
                    sum(realized_pnl)::float realized_pnl,
                    sum(realized_2x_pnl)::float realized_2x_pnl,
                    sum(realized_full_hurdle_pnl)::float realized_full_hurdle_pnl,
+                   count(realized_payout) FILTER (
+                     WHERE observed_at>=now()-interval '6 hours')::int settled_6h,
+                   COALESCE(sum(realized_2x_pnl) FILTER (
+                     WHERE observed_at>=now()-interval '6 hours'),0)::float realized_2x_pnl_6h,
+                   count(realized_payout) FILTER (
+                     WHERE observed_at>=now()-interval '24 hours')::int settled_24h,
+                   COALESCE(sum(realized_2x_pnl) FILTER (
+                     WHERE observed_at>=now()-interval '24 hours'),0)::float realized_2x_pnl_24h,
+                   count(realized_payout) FILTER (
+                     WHERE observed_at>=now()-interval '3 days')::int settled_3d,
+                   COALESCE(sum(realized_2x_pnl) FILTER (
+                     WHERE observed_at>=now()-interval '3 days'),0)::float realized_2x_pnl_3d,
                    sum(expected_profit_lower)::float entry_expected_profit_lower,
                    min(agreement_lower)::float minimum_agreement_lower,
                    min(prior_clusters)::int minimum_prior_clusters,
