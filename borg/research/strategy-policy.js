@@ -53,10 +53,10 @@ function filterStrategiesByDisposition(strategies, dispositions, options = {}) {
 
 async function loadActiveStrategies(pool, strategies, env = process.env) {
   const { rows } = await pool.query(`
-    SELECT DISTINCT strategy,status
+    SELECT DISTINCT ON (strategy) strategy,status
       FROM borg_trial_ledger
-     WHERE status=ANY($1::text[])
-  `, [[...PARKED_STATUSES]]);
+     ORDER BY strategy,frozen_at DESC,id DESC
+  `);
   const disposition = filterStrategiesByDisposition(strategies, rows, {
     includeParked: includeParkedControls(env),
   });

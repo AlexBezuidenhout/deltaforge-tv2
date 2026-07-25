@@ -1,0 +1,149 @@
+{
+  "experiment_id": "promising-paper-forward-2026-07-25-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-25T16:31:15.000Z",
+  "evidence_started_at": "2026-07-25T16:31:15.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "positive_diagnostic_forward_replication",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "strategy_version": "identity-only-clone-of-frozen-source-rule-v1",
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "interim_checkpoint_hours": 6,
+  "hypothesis": "Rules with a positive doubled-cost diagnostic point estimate may reproduce prospectively when their historical rows, old governance identities and prior PnL are excluded.",
+  "selection_disclosure": {
+    "selected_after_reviewing_historical_results": true,
+    "historical_rows_are_discovery_only": true,
+    "historical_rows_count_toward_evidence": false,
+    "six_hour_read_is_operational_and_interim_only": true,
+    "multiple_testing_family_includes_all_registered_borg_trials": true,
+    "pnl_across_arms_is_not_additive": true
+  },
+  "frozen_mechanics": {
+    "strategy_code_changed": false,
+    "thresholds_changed": false,
+    "asset_selection_changed": false,
+    "market_type_changed": false,
+    "sizing_changed": false,
+    "execution_model_changed": false,
+    "identity_changed": true,
+    "reason": "A new strategy identity prevents positive discovery PnL and old governance dispositions from being pooled into this prospective replication."
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "FWD_H24_hourly_flow_breakout_v1",
+      "family": "hourly_flow_breakout_replication",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "FWD_H40_directional_entropy_breakout_v1",
+      "family": "path_entropy_replication",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "FWD_H44_hourly_midwindow_reversal_v1",
+      "family": "hourly_reversal_replication",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "FWD_H38_passive_flow_divergence_v1",
+      "family": "passive_flow_replication",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "FWD_H15_jump_adjusted_sigma_v1",
+      "family": "jump_adjusted_volatility_replication",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "FWD_H45_threshold_distance_velocity_v1",
+      "family": "threshold_velocity_exploration",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "FWD_H46_range_boundary_migration_v1",
+      "family": "range_boundary_exploration",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "FWD_H20_cross_venue_basis_reversion_v1",
+      "family": "resolver_proxy_basis_exploration",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "FWD_H7_btc_oracle_confirm_v1",
+      "family": "oracle_confirmation_exploration",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "FWD_H1_pair_arb_2x_v1",
+      "family": "complement_lock_exploration",
+      "arm": "unchanged_rule",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "cluster_by": [
+      "Polymarket market/window",
+      "UTC day"
+    ],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "require_positive_latency_profiles_ms": [
+      100,
+      250,
+      500
+    ],
+    "require_realistic_nonfills_partial_fills_and_depth": true,
+    "multiple_testing": "Correct across all registered strategy arms, including every arm rejected before this cohort.",
+    "six_hour_checkpoint": "Operational read only: report evaluations, actions, fills, pending outcomes and PnL, but make no profitability or promotion decision.",
+    "promotion": "No automatic live path. A full pass triggers a separate authenticated $1-$2 live-pilot review.",
+    "null_outcome": "Every historical positive may be selection noise and every forward edge may be approximately zero."
+  }
+}

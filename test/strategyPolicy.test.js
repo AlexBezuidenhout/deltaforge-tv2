@@ -6,6 +6,7 @@ const {
   activeStrategyAllowlist,
   filterStrategiesByAllowlist,
   filterStrategiesByDisposition,
+  loadActiveStrategies,
 } = require('../borg/research/strategy-policy');
 
 test('governance parks rejected strategies without deleting their implementations', () => {
@@ -36,4 +37,30 @@ test('an explicit research allowlist is strict and fail-closed on typos', () => 
     () => filterStrategiesByAllowlist(strategies, new Set(['TYPO'])),
     /unknown strategies: TYPO/,
   );
+});
+
+test('runtime policy reads only the latest trial disposition for each strategy', async () => {
+  let sql = '';
+  const pool = {
+    async query(statement) {
+      sql = statement;
+      return {
+        rows: [
+          { strategy: 'fresh', status: 'COLLECTING' },
+          { strategy: 'failed', status: 'NEGATIVE_CONTROL' },
+        ],
+      };
+    },
+  };
+  const result = await loadActiveStrategies(
+    pool,
+    [{ name: 'fresh' }, { name: 'failed' }],
+    {},
+  );
+  assert.match(sql, /DISTINCT ON \(strategy\)/);
+  assert.match(sql, /ORDER BY strategy,frozen_at DESC,id DESC/);
+  assert.deepEqual(result.active.map((row) => row.name), ['fresh']);
+  assert.deepEqual(result.parked, [
+    { strategy: 'failed', status: 'NEGATIVE_CONTROL' },
+  ]);
 });

@@ -166,12 +166,14 @@ async function syncExperimentRegistry(pool, directory = DEFAULT_MANIFEST_DIR) {
         await client.query(
           `INSERT INTO borg_trial_ledger
             (experiment_id, strategy, variant, family, phase, status, primary_metric,
-             min_independent_markets, min_days, manifest_hash, frozen_at)
-           VALUES ($1,$2,$3,$4,$5,'COLLECTING',$6,$7,$8,$9,$10)
+             min_independent_markets, min_days, manifest_hash, frozen_at,
+             evidence_started_at)
+           VALUES ($1,$2,$3,$4,$5,'COLLECTING',$6,$7,$8,$9,$10,$11)
            ON CONFLICT (experiment_id, strategy, variant) DO NOTHING`,
           [manifest.experiment_id, binding.strategy, binding.arm, binding.family, binding.phase,
             binding.primaryMetric, binding.minIndependentMarkets, binding.minDays,
-            manifest._hash, manifest.frozen_at || new Date().toISOString()],
+            manifest._hash, manifest.frozen_at || new Date().toISOString(),
+            manifest.evidence_started_at || manifest.frozen_at || new Date().toISOString()],
         );
       }
     }
@@ -194,6 +196,7 @@ async function syncExperimentRegistry(pool, directory = DEFAULT_MANIFEST_DIR) {
              SET status=$1, status_reason=$2, status_decided_at=$3,
                  status_manifest_id=$4
            WHERE strategy=$5
+             AND frozen_at <= $3
         `, [
           disposition.status,
           disposition.reason,

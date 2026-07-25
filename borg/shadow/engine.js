@@ -251,6 +251,8 @@ class ShadowEngine {
   _record(strategy, ctx, a, features) {
     // a: {action:'place'|'cancel', side, token, price, size, kind:'maker'|'taker', coid, note}
     const binding = this.experimentRegistry?.resolve(strategy) || null;
+    const strategyDefinition = this._strategyByName.get(strategy);
+    const sourceStrategy = strategyDefinition?.sourceStrategy || strategy;
     const phase = binding?.phase || PHASES[strategy] || PHASE;
     const sourceEventId = features.trigger_wal_event_id
       || (features.trigger_source && features.trigger_event_sequence != null
@@ -298,6 +300,9 @@ class ShadowEngine {
           thesis_version: a.thesisVersion ?? undefined,
           experiment_id: binding?.experimentId ?? null,
           manifest_hash: binding?.manifestHash ?? null,
+          source_strategy: sourceStrategy,
+          forward_cohort: strategyDefinition?.forwardCohort ?? null,
+          forward_tier: strategyDefinition?.forwardTier ?? null,
           intent_contract_version: intent.contractVersion,
         };
     const row = [

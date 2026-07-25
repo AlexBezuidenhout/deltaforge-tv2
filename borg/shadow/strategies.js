@@ -1466,9 +1466,27 @@ class IdiosyncraticImpulse {
   }
 }
 
-// Vasili remains above as an audit artifact but is no longer registered:
-// n=983 core fills, -$393.77, and its losing CI excludes zero.
-module.exports = () => [
+// Fresh forward identities for unchanged rules that produced a positive
+// doubled-cost diagnostic point estimate. The old strategy IDs retain their
+// historical governance disposition; these aliases begin at zero and cannot
+// inherit discovery PnL. Renaming is the only mutation: every threshold,
+// market type, cadence, sizing rule and evaluate() implementation is the
+// original source object's.
+const PROMISING_FORWARD_COHORT = Object.freeze([
+  { source: 'H24_hourly_flow_breakout', name: 'FWD_H24_hourly_flow_breakout_v1', tier: 'A' },
+  { source: 'H40_directional_entropy_breakout', name: 'FWD_H40_directional_entropy_breakout_v1', tier: 'A' },
+  { source: 'H44_hourly_midwindow_reversal', name: 'FWD_H44_hourly_midwindow_reversal_v1', tier: 'A' },
+  { source: 'H38_passive_flow_divergence', name: 'FWD_H38_passive_flow_divergence_v1', tier: 'B' },
+  { source: 'H15_jump_adjusted_sigma', name: 'FWD_H15_jump_adjusted_sigma_v1', tier: 'B' },
+  { source: 'H45_threshold_distance_velocity', name: 'FWD_H45_threshold_distance_velocity_v1', tier: 'C' },
+  { source: 'H46_range_boundary_migration', name: 'FWD_H46_range_boundary_migration_v1', tier: 'C' },
+  { source: 'H20_cross_venue_basis_reversion', name: 'FWD_H20_cross_venue_basis_reversion_v1', tier: 'C' },
+  { source: 'H7_btc_oracle_confirm', name: 'FWD_H7_btc_oracle_confirm_v1', tier: 'C' },
+  { source: 'H1_pair_arb_2x', name: 'FWD_H1_pair_arb_2x_v1', tier: 'C' },
+]);
+
+function makeBaseStrategies() {
+  return [
   new LateWindowArb(), new EthLateTaker(), new EthLateMaker(), new EthGLateExactForward(),
   new StructuralPairArb(),
   new CadenceExperimentArm(CexImpulseLag, 'sampled'),
@@ -1491,6 +1509,37 @@ module.exports = () => [
   ...makeV6Strategies(),
   ...makeH52Strategies(),
   ...makeH53Strategies(),
+  ];
+}
+
+function makePromisingForwardStrategies() {
+  const sources = new Map(makeBaseStrategies().map((strategy) => [strategy.name, strategy]));
+  return PROMISING_FORWARD_COHORT.map((spec) => {
+    const strategy = sources.get(spec.source);
+    if (!strategy) throw new Error(`Missing forward-cohort source strategy: ${spec.source}`);
+    strategy.sourceStrategy = spec.source;
+    strategy.forwardCohort = 'promising-paper-forward-2026-07-25-v1';
+    strategy.forwardTier = spec.tier;
+    strategy.name = spec.name;
+    const sourceDiagnostics = typeof strategy.diagnostics === 'function'
+      ? strategy.diagnostics.bind(strategy)
+      : null;
+    strategy.diagnostics = () => ({
+      ...(sourceDiagnostics ? sourceDiagnostics() : {}),
+      sourceStrategy: spec.source,
+      forwardCohort: strategy.forwardCohort,
+      forwardTier: spec.tier,
+      identityOnlyClone: true,
+    });
+    return strategy;
+  });
+}
+
+// Vasili remains above as an audit artifact but is no longer registered:
+// n=983 core fills, -$393.77, and its losing CI excludes zero.
+module.exports = () => [
+  ...makeBaseStrategies(),
+  ...makePromisingForwardStrategies(),
 ];
 module.exports._test = {
   BtcLeadsAlts,
@@ -1517,4 +1566,9 @@ module.exports._test = {
   qualifyEthLate,
   stableArm,
   cadenceArm,
+};
+module.exports._forward = {
+  PROMISING_FORWARD_COHORT,
+  makeBaseStrategies,
+  makePromisingForwardStrategies,
 };
