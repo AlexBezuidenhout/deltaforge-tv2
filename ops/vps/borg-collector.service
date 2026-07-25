@@ -17,9 +17,15 @@ Environment=BORG_ARCHIVE_DIR=/var/lib/deltaforge/archive/borg-raw
 Environment=BORG_WAL_MIN_FREE_GB=20
 Environment=BORG_ARCHIVE_MIN_FREE_GB=20
 Environment=BORG_CODE_VERSION=dublin-runtime-v3
-Environment=BORG_ACTIVE_STRATEGIES=H43_resolution_boundary_buffer,ETH_G_late_exact_forward_v1
+# Paper/shadow only. The FWD_* identities are unchanged-rule prospective
+# replications; their historical source IDs remain parked and their PnL is
+# never pooled. H43 and the exact ETH arm continue their existing clocks.
+Environment=BORG_ACTIVE_STRATEGIES=H43_resolution_boundary_buffer,ETH_G_late_exact_forward_v1,FWD_H24_hourly_flow_breakout_v1,FWD_H40_directional_entropy_breakout_v1,FWD_H44_hourly_midwindow_reversal_v1,FWD_H38_passive_flow_divergence_v1,FWD_H15_jump_adjusted_sigma_v1,FWD_H45_threshold_distance_velocity_v1,FWD_H46_range_boundary_migration_v1,FWD_H20_cross_venue_basis_reversion_v1,FWD_H7_btc_oracle_confirm_v1,FWD_H1_pair_arb_2x_v1
 Environment=BORG_CAPTURE_ASSETS=btc,eth,sol,xrp
-Environment=BORG_CAPTURE_MARKET_TYPES=direction_5m
+# H24/H44 require hourly books and H45/H46 require the nearest deterministic
+# daily threshold/range panel. Six-hour activation would be false telemetry if
+# the collector continued filtering those market families out.
+Environment=BORG_CAPTURE_MARKET_TYPES=direction_5m,direction_1h,threshold_daily,range_daily
 # Full event fidelity remains in compressed WAL. PostgreSQL stores at most one
 # derived touch per token/250 ms, plus the trailing state, for fast queries.
 Environment=BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS=250

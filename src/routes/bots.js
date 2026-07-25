@@ -91,6 +91,16 @@ const RESEARCH_PILOTS = Object.freeze({
   H49_network_coinbase_chainlink_quorum: 'Coinbase and Chainlink quorum versus a Binance outlier',
   H50_network_hyperliquid_chainlink_arb: 'Hyperliquid and Chainlink consensus before token repricing',
   H51_network_four_feed_median_arb: 'robust four-network median rejects one bad feed',
+  FWD_H24_hourly_flow_breakout_v1: 'fresh unchanged H24 replication · discovery PnL excluded',
+  FWD_H40_directional_entropy_breakout_v1: 'fresh unchanged H40 replication · discovery PnL excluded',
+  FWD_H44_hourly_midwindow_reversal_v1: 'fresh unchanged H44 replication · discovery PnL excluded',
+  FWD_H38_passive_flow_divergence_v1: 'fresh unchanged H38 replication · discovery PnL excluded',
+  FWD_H15_jump_adjusted_sigma_v1: 'fresh unchanged H15 replication · discovery PnL excluded',
+  FWD_H45_threshold_distance_velocity_v1: 'fresh unchanged H45 exploratory replication · discovery PnL excluded',
+  FWD_H46_range_boundary_migration_v1: 'fresh unchanged H46 exploratory replication · discovery PnL excluded',
+  FWD_H20_cross_venue_basis_reversion_v1: 'fresh unchanged H20 exploratory replication · discovery PnL excluded',
+  FWD_H7_btc_oracle_confirm_v1: 'fresh unchanged H7 exploratory replication · discovery PnL excluded',
+  FWD_H1_pair_arb_2x_v1: 'fresh unchanged H1 complement-lock replication · discovery PnL excluded',
 });
 const CAPACITY_SIZED_PILOTS = new Set([
   'H9_dual_book_microprice', 'H10_theta_lag', 'H11_liquidity_vacuum',
@@ -114,6 +124,11 @@ const CAPACITY_SIZED_PILOTS = new Set([
   'H46_range_boundary_migration', 'H47_network_binance_transport_arb',
   'H48_network_chainlink_resolver_basis', 'H49_network_coinbase_chainlink_quorum',
   'H50_network_hyperliquid_chainlink_arb', 'H51_network_four_feed_median_arb',
+  'FWD_H24_hourly_flow_breakout_v1', 'FWD_H40_directional_entropy_breakout_v1',
+  'FWD_H44_hourly_midwindow_reversal_v1', 'FWD_H38_passive_flow_divergence_v1',
+  'FWD_H15_jump_adjusted_sigma_v1', 'FWD_H45_threshold_distance_velocity_v1',
+  'FWD_H46_range_boundary_migration_v1', 'FWD_H20_cross_venue_basis_reversion_v1',
+  'FWD_H7_btc_oracle_confirm_v1', 'FWD_H1_pair_arb_2x_v1',
 ]);
 const INDEPENDENT_EVENT_PILOTS = new Set([
   'H22_hourly_resolver_dislocation', 'H23_hourly_crossvenue_confirmation',
@@ -131,6 +146,11 @@ const INDEPENDENT_EVENT_PILOTS = new Set([
   'H46_range_boundary_migration', 'H47_network_binance_transport_arb',
   'H48_network_chainlink_resolver_basis', 'H49_network_coinbase_chainlink_quorum',
   'H50_network_hyperliquid_chainlink_arb', 'H51_network_four_feed_median_arb',
+  'FWD_H24_hourly_flow_breakout_v1', 'FWD_H40_directional_entropy_breakout_v1',
+  'FWD_H44_hourly_midwindow_reversal_v1', 'FWD_H38_passive_flow_divergence_v1',
+  'FWD_H15_jump_adjusted_sigma_v1', 'FWD_H45_threshold_distance_velocity_v1',
+  'FWD_H46_range_boundary_migration_v1', 'FWD_H20_cross_venue_basis_reversion_v1',
+  'FWD_H7_btc_oracle_confirm_v1', 'FWD_H1_pair_arb_2x_v1',
 ]);
 for (const strategy of Object.keys(RESEARCH_PILOTS)) {
   const cadenceSplit = /__(sampled|event)$/.test(strategy);
