@@ -3786,6 +3786,9 @@
         const beat = h.heartbeats?.[c] || {};
         if (beat.reason === 'feed_degraded') {
           problems.push(`${c} feed degraded (${beat.feedStatus || 'unknown'})`);
+        } else if (beat.reason === 'component_reported_failure') {
+          const status = String(beat.reportedStatus || 'failed').toLowerCase();
+          problems.push(`${c} ${status}${beat.detail ? ` — ${beat.detail}` : ''}`);
         } else if (beat.ageSec == null) {
           problems.push(`${c} heartbeat missing`);
         } else {

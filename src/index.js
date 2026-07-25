@@ -94,19 +94,21 @@ app.get('/api/health', async (req, res) => {
     const [hb, settingsResult] = await Promise.all([
       pool.query(`
         SELECT component, ROUND(EXTRACT(EPOCH FROM now() - beat_at))::int AS age_sec,
-               NULL::text AS msg
+               NULL::text AS msg, meta
           FROM system_heartbeats
         UNION ALL
         SELECT 'borg_collector',
                ROUND(EXTRACT(EPOCH FROM now() - MAX(ts)))::int,
                (SELECT message FROM borg_events
-                 WHERE source='heartbeat' ORDER BY id DESC LIMIT 1)
+                 WHERE source='heartbeat' ORDER BY id DESC LIMIT 1),
+               NULL::jsonb
           FROM borg_events WHERE source='heartbeat'
         UNION ALL
         SELECT 'polymarket_flow',
                ROUND(EXTRACT(EPOCH FROM now() - MAX(ts)))::int,
                (SELECT message FROM borg_events
-                 WHERE source='flow_heartbeat' ORDER BY id DESC LIMIT 1)
+                 WHERE source='flow_heartbeat' ORDER BY id DESC LIMIT 1),
+               NULL::jsonb
           FROM borg_events WHERE source='flow_heartbeat'`),
       pool.query(`
         SELECT is_active,george_is_active,live_gla_enabled,live_h53_enabled,
@@ -129,6 +131,8 @@ app.get('/api/health', async (req, res) => {
     ageSec: heartbeats[component].ageSec,
     maxAgeSec: heartbeats[component].maxAgeSec,
     reason: heartbeats[component].reason,
+    reportedStatus: heartbeats[component].reportedStatus,
+    detail: heartbeats[component].detail,
   }));
   const degraded = !dbWritable || dbHealth.writeErrors > 0
     || heartbeatCheckFailed || staleComponents.length > 0;

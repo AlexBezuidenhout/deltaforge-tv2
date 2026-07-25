@@ -9,6 +9,17 @@ function enabled(value, fallback = false) {
   return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
 }
 
+function parsedMeta(value) {
+  if (value == null || typeof value === 'object') return value || {};
+  try { return JSON.parse(value); } catch (_) { return {}; }
+}
+
+function failureDetail(meta) {
+  const firstError = Array.isArray(meta.errors) ? meta.errors[0] : null;
+  const value = meta.reason || meta.error || firstError?.error || firstError?.message;
+  return value == null ? null : String(value).slice(0, 300);
+}
+
 function heartbeatPolicies(settings = {}, options = {}) {
   const researchRequired = options.researchRequired !== false;
   const runnerRequired = options.runnerRequired !== false;
@@ -103,15 +114,21 @@ function classifyHeartbeats(rows = [], policies = {}) {
     };
     const parsedAge = parseFloat(row?.age_sec);
     const ageSec = Number.isFinite(parsedAge) ? parsedAge : null;
+    const meta = parsedMeta(row?.meta);
+    const reportedStatus = String(meta.status || '').trim().toUpperCase();
+    const reportedFailure = policy.required === true
+      && (['BLOCKED', 'DEGRADED', 'FAIL', 'FAILED'].includes(reportedStatus)
+        || parseFloat(meta.errorCount) > 0);
     const feedDegraded = component === 'borg_collector'
       && row?.msg != null && row.msg !== 'ok';
     const missing = row == null || ageSec == null;
     const stale = policy.required === true
-      && (missing || ageSec > policy.maxAgeSec || feedDegraded);
+      && (missing || ageSec > policy.maxAgeSec || feedDegraded || reportedFailure);
 
     let reason = null;
     if (stale && missing) reason = 'heartbeat_missing';
     else if (stale && feedDegraded) reason = 'feed_degraded';
+    else if (stale && reportedFailure) reason = 'component_reported_failure';
     else if (stale) reason = 'heartbeat_stale';
 
     heartbeats[component] = {
@@ -125,6 +142,10 @@ function classifyHeartbeats(rows = [], policies = {}) {
         : 'inactive',
       ...(reason ? { reason } : {}),
       ...(feedDegraded ? { feedStatus: row.msg } : {}),
+      ...(reportedFailure ? {
+        reportedStatus: reportedStatus || 'ERROR',
+        detail: failureDetail(meta),
+      } : {}),
     };
   }
   return heartbeats;
@@ -135,5 +156,7 @@ module.exports = {
   TIMER_MAX_AGE_SEC,
   classifyHeartbeats,
   enabled,
+  failureDetail,
   heartbeatPolicies,
+  parsedMeta,
 };

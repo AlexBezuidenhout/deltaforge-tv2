@@ -81,3 +81,27 @@ test('collector feed degradation is distinct from process silence', () => {
   assert.equal(heartbeats.borg_collector.reason, 'feed_degraded');
   assert.equal(heartbeats.borg_collector.feedStatus, 'STALE: binance>10s');
 });
+
+test('a fresh maintenance failure is degraded with its explicit reason', () => {
+  const policy = {
+    hot_partition_manager: { required: true, maxAgeSec: TIMER_MAX_AGE_SEC },
+  };
+  const heartbeats = classifyHeartbeats([{
+    component: 'hot_partition_manager',
+    age_sec: 2,
+    msg: null,
+    meta: {
+      status: 'DEGRADED',
+      errorCount: 1,
+      errors: [{ phase: 'retention_authority', error: 'off-host receipt is stale' }],
+    },
+  }], policy);
+
+  assert.equal(heartbeats.hot_partition_manager.stale, true);
+  assert.equal(
+    heartbeats.hot_partition_manager.reason,
+    'component_reported_failure',
+  );
+  assert.equal(heartbeats.hot_partition_manager.reportedStatus, 'DEGRADED');
+  assert.equal(heartbeats.hot_partition_manager.detail, 'off-host receipt is stale');
+});

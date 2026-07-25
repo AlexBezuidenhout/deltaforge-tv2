@@ -267,6 +267,24 @@ function verifyRetentionAuthority(options = {}) {
   return { receipt, sourceCutoffEpoch };
 }
 
+function retentionAuthorityState(required, options = {}) {
+  if (!required) {
+    return { status: 'NOT_REQUESTED', authority: null, error: null };
+  }
+  try {
+    const authority = verifyRetentionAuthority(options);
+    return {
+      status: 'AUTHORIZED',
+      authority,
+      error: null,
+      receiptCompletedAt: authority.receipt.completed_at,
+      sourceCutoffEpoch: authority.sourceCutoffEpoch,
+    };
+  } catch (error) {
+    return { status: 'BLOCKED', authority: null, error };
+  }
+}
+
 function utcDay(value = Date.now()) {
   const date = new Date(value);
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
@@ -432,6 +450,26 @@ async function dropOldPartitions(client, spec, authority, options = {}) {
   return dropped;
 }
 
+async function writeManagerHeartbeat(pool, report) {
+  await pool.query(`
+    INSERT INTO system_heartbeats(component,beat_at,meta)
+    VALUES ('hot_partition_manager',now(),$1::jsonb)
+    ON CONFLICT(component) DO UPDATE SET beat_at=now(),meta=EXCLUDED.meta
+  `, [JSON.stringify({
+    format: report.format,
+    status: report.status,
+    checkedAt: report.checkedAt,
+    completedAt: report.completedAt || new Date().toISOString(),
+    migrated: report.tables.filter((row) => row.status === 'MIGRATED').length,
+    ensured: report.tables.filter((row) => row.status === 'ENSURED').length,
+    droppedPartitions: report.dropped.length,
+    errorCount: report.errors.length,
+    errors: report.errors.slice(0, 5),
+    retention: report.retention || { status: 'NOT_REQUESTED' },
+    paperDataOnly: true,
+  })]).catch(() => {});
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
   const args = new Set(process.argv.slice(2));
@@ -459,11 +497,16 @@ async function main() {
     locked = rows[0]?.acquired === true;
     if (!locked) {
       report.status = 'SKIPPED_LOCKED';
+      report.completedAt = new Date().toISOString();
+      await writeManagerHeartbeat(pool, report);
       console.log(JSON.stringify(report, null, 2));
       return;
     }
     if (migrate) report.migrationAuthority = verifyMigrationAuthority();
-    const authority = dropOld ? verifyRetentionAuthority() : null;
+
+    // Partition creation is non-destructive and must not be starved by a
+    // failed off-host retention prerequisite. Complete it first; authorize
+    // old-partition deletion independently and fail that phase closed.
     for (const spec of SPECS) {
       try {
         if (migrate) {
@@ -478,18 +521,44 @@ async function main() {
             report.tables.push({ table: spec.table, status: 'ENSURED' });
           } finally { client.release(); }
         }
-        if (dropOld) {
-          const client = await pool.connect();
-          try {
-            report.dropped.push(...await dropOldPartitions(client, spec, authority));
-          } finally { client.release(); }
-        }
       } catch (error) {
-        report.errors.push({ table: spec.table, error: error.message });
+        report.errors.push({ phase: migrate ? 'migrate' : 'ensure', table: spec.table,
+          error: error.message });
         if (migrate) break;
       }
     }
+
+    const retention = retentionAuthorityState(dropOld);
+    report.retention = {
+      status: retention.status,
+      ...(retention.receiptCompletedAt
+        ? { receiptCompletedAt: retention.receiptCompletedAt } : {}),
+      ...(retention.sourceCutoffEpoch
+        ? { sourceCutoffEpoch: retention.sourceCutoffEpoch } : {}),
+    };
+    if (retention.error) {
+      report.retention.reason = retention.error.message;
+      report.errors.push({
+        phase: 'retention_authority',
+        operation: 'drop-old',
+        error: retention.error.message,
+      });
+    } else if (dropOld) {
+      for (const spec of SPECS) {
+        try {
+          const client = await pool.connect();
+          try {
+            report.dropped.push(...await dropOldPartitions(
+              client, spec, retention.authority,
+            ));
+          } finally { client.release(); }
+        } catch (error) {
+          report.errors.push({ phase: 'drop-old', table: spec.table, error: error.message });
+        }
+      }
+    }
     report.status = report.errors.length ? 'DEGRADED' : 'PASS';
+    report.completedAt = new Date().toISOString();
     // Avoid leaking the operator's local iCloud path through API/log output.
     if (report.migrationAuthority) {
       report.migrationAuthority = {
@@ -498,20 +567,7 @@ async function main() {
         receiptCompletedAt: report.migrationAuthority.receipt.completed_at,
       };
     }
-    await pool.query(`
-      INSERT INTO system_heartbeats(component,beat_at,meta)
-      VALUES ('hot_partition_manager',now(),$1::jsonb)
-      ON CONFLICT(component) DO UPDATE SET beat_at=now(),meta=EXCLUDED.meta
-    `, [JSON.stringify({
-      format: report.format,
-      status: report.status,
-      checkedAt: report.checkedAt,
-      migrated: report.tables.filter((row) => row.status === 'MIGRATED').length,
-      ensured: report.tables.filter((row) => row.status === 'ENSURED').length,
-      droppedPartitions: report.dropped.length,
-      errorCount: report.errors.length,
-      paperDataOnly: true,
-    })]).catch(() => {});
+    await writeManagerHeartbeat(pool, report);
     console.log(JSON.stringify(report, null, 2));
     if (report.errors.length) process.exitCode = 1;
   } finally {
@@ -530,5 +586,5 @@ if (require.main === module) main().catch((error) => {
 module.exports = {
   DAY_MS, MIGRATION_CONFIRM, PARTITION_LOCK, SPECS,
   dayStamp, partitionName, readReceipt, receiptAgeSeconds,
-  verifyMigrationAuthority, verifyRetentionAuthority,
+  retentionAuthorityState, verifyMigrationAuthority, verifyRetentionAuthority,
 };

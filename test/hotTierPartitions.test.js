@@ -7,7 +7,7 @@ const path = require('node:path');
 const test = require('node:test');
 const {
   MIGRATION_CONFIRM, SPECS, partitionName, verifyMigrationAuthority,
-  verifyRetentionAuthority,
+  retentionAuthorityState, verifyRetentionAuthority,
 } = require('../scripts/hot-tier-partitions');
 
 test('high-rate tables partition by UTC day and retain conflict uniqueness with the time key', () => {
@@ -119,4 +119,23 @@ test('partition retention fails closed without a real immutable archive object',
     () => verifyRetentionAuthority({ archiveReceipt }),
     /contains no immutable object/,
   );
+});
+
+test('stale retention authority is reported as blocked instead of aborting safe upkeep', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'df-retention-blocked-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const archiveReceipt = path.join(root, 'archive.receipt');
+  fs.writeFileSync(archiveReceipt, [
+    'format=deltaforge-offhost-receipt-v1',
+    'scope=raw-wal-and-db-archive',
+    'completed_at=2026-01-01T00:00:00Z',
+    'source_cutoff_epoch=1767225300',
+    'latest_file=wal/verified.ndjson.gz',
+    '',
+  ].join('\n'));
+
+  const state = retentionAuthorityState(true, { archiveReceipt });
+  assert.equal(state.status, 'BLOCKED');
+  assert.equal(state.authority, null);
+  assert.match(state.error.message, /receipt is stale/);
 });
