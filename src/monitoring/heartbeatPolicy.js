@@ -77,6 +77,10 @@ function heartbeatPolicies(settings = {}, options = {}) {
       required: enabled(settings.live_h53_enabled, false),
       maxAgeSec: FAST_MAX_AGE_SEC,
     },
+    eth_g_late_live: {
+      required: enabled(settings.live_eth_g_late_enabled, false),
+      maxAgeSec: FAST_MAX_AGE_SEC,
+    },
     flow_boundary_canary: {
       required: enabled(settings.live_flow_boundary_enabled, false),
       maxAgeSec: FAST_MAX_AGE_SEC,

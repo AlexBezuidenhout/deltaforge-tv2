@@ -1,0 +1,46 @@
+{
+  "experiment_id": "eth-g-late-live-canary-v1",
+  "manifest_format": "borg-live-canary-v1",
+  "frozen_at": "2026-07-25T14:30:00.000Z",
+  "phase": "live_canary",
+  "status": "operator_override_unproven",
+  "paper_only": false,
+  "live_order_path": "borg/live/eth-g-late-executor.js",
+  "family": "posthoc_eth_late_window_live_canary",
+  "source_experiment_id": "eth-g-late-exact-forward-v1",
+  "source_manifest_hash": "561b5cad1fe1338254c63776f41dee8293f3103313a33c8a70449d76de2c9c35",
+  "source_strategy": "ETH_G_late_exact_forward_v1",
+  "source_strategy_version": "exact-original-g-rule-eth-only-v1",
+  "provisional": true,
+  "operator_override": true,
+  "evidence_disposition": "Live fills are an execution pilot only. They do not promote the source strategy and are never pooled into its fresh paper evidence.",
+  "selection_disclosure": {
+    "asset_was_selected_posthoc": true,
+    "historical_daily_rate_is_not_a_forecast": true,
+    "fresh_forward_minimum_not_met_at_creation": true
+  },
+  "execution": {
+    "order_type": "FAK market buy",
+    "worst_price": "exact captured source ask",
+    "price_chase": false,
+    "resting_order": false,
+    "shares": "dynamic venue minimum",
+    "max_order_usd": 5,
+    "max_orders_per_utc_day": 5,
+    "max_spend_per_utc_day": 25,
+    "max_resolved_loss_per_utc_day": 10,
+    "max_total_submissions": 50,
+    "one_live_order_per_market": true,
+    "official_geoblock_must_explicitly_allow": true,
+    "append_before_send_wal_required": true
+  },
+  "independent_gates": [
+    "environment enable",
+    "literal operator acknowledgement",
+    "database enable",
+    "chmod-600 wallet key",
+    "no kill file",
+    "official geoblock blocked=false"
+  ],
+  "null_outcome": "The historical ETH slice may be selection noise; real expectancy may be zero or negative."
+}

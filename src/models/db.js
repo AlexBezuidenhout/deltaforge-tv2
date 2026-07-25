@@ -609,6 +609,9 @@ const initDB = async () => {
       -- Default FALSE; the operator explicitly arms it only in conjunction
       -- with the H53 executor acknowledgement and external key file.
       ALTER TABLE bot_settings ADD COLUMN IF NOT EXISTS live_h53_enabled BOOLEAN DEFAULT false;
+      -- ETH-only G-late live canary has a separate, default-off gate. It never
+      -- changes paper_trading and cannot arm the rejected all-asset G executor.
+      ALTER TABLE bot_settings ADD COLUMN IF NOT EXISTS live_eth_g_late_enabled BOOLEAN DEFAULT false;
       -- Live P&L baseline: wallet USDC at first funded observation after
       -- go-live. Live session pnl = current wallet - baseline. Reset to NULL
       -- after a manual deposit to re-baseline.

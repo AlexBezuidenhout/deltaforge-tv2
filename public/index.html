@@ -1578,15 +1578,15 @@
   </div>
 </div>
 
-<!-- ═══════════════ BORG — shadow research + independently gated H53 live mirror ═══════════════ -->
+<!-- ═══════════════ BORG — shadow research + independently gated live canaries ═══════════════ -->
 <div id="borg" class="page">
-  <div class="page-title"><span>🛰️</span> BORG — SHADOW EDGE DISCOVERY + H53 LIVE OVERRIDE</div>
+  <div class="page-title"><span>🛰️</span> BORG — SHADOW EDGE DISCOVERY + CONTROLLED LIVE CANARIES</div>
 
   <div class="status-banner" id="borgStatusBanner" style="margin-bottom:12px;">
     <div class="status-indicator" id="borgStatusIndicator"></div>
     <div class="status-text">
       <div id="borgStatusTitle">BORG: —</div>
-      <div id="borgStatusSubtitle">Research remains shadow-only except the separately gated, explicitly unproven H53 five-minute live mirror. Every H53 order is reconciled against its shadow source.</div>
+      <div id="borgStatusSubtitle">Research remains shadow-first. H53 and ETH G-late have separate, explicitly unproven canary executors; every live decision is reconciled to its frozen shadow source.</div>
     </div>
     <div id="borgPhaseIndicator" style="border:1px solid var(--yellow); color:var(--yellow); font-size:10px; font-weight:700; padding:4px 8px; border-radius:4px; letter-spacing:1px;">PILOT — NOT EVIDENCE</div>
   </div>
@@ -1659,6 +1659,22 @@
     <div class="table-wrap" style="margin:0;border:none;max-height:220px;overflow:auto;"><table>
       <thead><tr><th>Time</th><th>Token</th><th>Signal</th><th>Requested</th><th>Status</th><th>Matched</th><th>Fill</th><th>Ack</th><th>Outcome</th><th>Realized</th></tr></thead>
       <tbody id="h53LiveBody"><tr><td colspan="10" style="text-align:center;color:var(--text-muted);">Waiting for H53 live decisions</td></tr></tbody>
+    </table></div>
+  </div>
+
+  <div class="panel" style="border-color:var(--yellow);">
+    <div class="panel-header"><span>ETH G-LATE — EXACT FROZEN RULE · LIVE CANARY</span><span style="color:var(--yellow);font-size:10px;">POST-HOC · VENUE-MINIMUM SHARES · $5 MAX · FAK/NO CHASE</span></div>
+    <div class="grid-5col" style="padding:12px;">
+      <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;">Mode</div><div id="ethGLMode" style="font-size:18px;font-weight:700;">—</div><div id="ethGLGeo" style="font-size:10px;color:var(--text-muted);">geo —</div></div>
+      <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;">Fresh evidence</div><div id="ethGLFreshN" style="font-size:18px;font-weight:700;">—</div><div id="ethGLFreshSignals" style="font-size:10px;color:var(--text-muted);">— signals · — days</div></div>
+      <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;">250ms · 2× costs</div><div id="ethGLReplayPnl" style="font-size:18px;font-weight:700;">—</div><div id="ethGLReplayFills" style="font-size:10px;color:var(--text-muted);">— fills</div></div>
+      <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;">Real fills</div><div id="ethGLMatched" style="font-size:18px;font-weight:700;">—</div><div id="ethGLSkipped" style="font-size:10px;color:var(--text-muted);">— skipped · — errors</div></div>
+      <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;">Realized P&amp;L</div><div id="ethGLPnl" style="font-size:18px;font-weight:700;">—</div><div id="ethGLBalance" style="font-size:10px;color:var(--text-muted);">wallet —</div></div>
+    </div>
+    <div style="padding:0 12px 10px;color:var(--text-muted);font-size:10px;" id="ethGLCaveat">The historical ~$22/day discovery rate is not a forecast. Fresh paper and real-money canary evidence are kept separate.</div>
+    <div class="table-wrap" style="margin:0;border:none;max-height:220px;overflow:auto;"><table>
+      <thead><tr><th>Time</th><th>Token</th><th>Signal</th><th>Source $</th><th>Canary $</th><th>Status</th><th>Matched</th><th>Fill</th><th>Outcome</th><th>Realized</th></tr></thead>
+      <tbody id="ethGLLiveBody"><tr><td colspan="10" style="text-align:center;color:var(--text-muted);">Waiting for fresh ETH G-late decisions</td></tr></tbody>
     </table></div>
   </div>
 
@@ -3332,10 +3348,10 @@
   async function loadBorgOnce() {
     const get = (p) => fetch((window.API_BASE || '') + '/api/borg' + p, { headers: { ...authHeaders() } })
       .then((r) => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)));
-    const names = ['status', 'scoreboard', 'orders', 'events', 'portfolio', 'H53'];
+    const names = ['status', 'scoreboard', 'orders', 'events', 'portfolio', 'H53', 'ETH G-late'];
     const settled = await Promise.allSettled([
       get('/status'), get('/shadow/summary'), get('/shadow/orders?limit=40'), get('/events?limit=30'),
-      get('/research/portfolio?phase=pilot'), get('/h53/live'),
+      get('/research/portfolio?phase=pilot'), get('/h53/live'), get('/eth-g-late/live'),
     ]);
     if (settled[0].status === 'rejected') {
       const e = settled[0].reason;
@@ -3347,11 +3363,11 @@
     }
     const status = settled[0].value;
     const optional = settled.slice(1).map((result) => result.status === 'fulfilled' ? result.value : null);
-    const [summary, orders, events, portfolio, h53] = optional;
+    const [summary, orders, events, portfolio, h53, ethGL] = optional;
     const delayed = settled.map((result, index) => result.status === 'rejected' ? names[index] : null).filter(Boolean);
     document.getElementById('borgStatusSubtitle').textContent = delayed.length
       ? 'Collector status is live. Retaining the previous values for delayed panels: ' + delayed.join(', ') + '.'
-      : 'Research remains shadow-only except the separately gated, explicitly unproven H53 five-minute live mirror. Every H53 order is reconciled against its shadow source.';
+      : 'Research remains shadow-first. H53 and ETH G-late have separate, explicitly unproven canary executors; every live decision is reconciled to its frozen shadow source.';
 
     // banner + tiles
     const ind = document.getElementById('borgStatusIndicator');
@@ -3401,6 +3417,53 @@
         '<td>' + escapeHtml(row.resolved_outcome || '—') + '</td>' +
         '<td style="color:' + _bPnlColor(row.realized_pnl) + ';">' + (row.realized_pnl == null ? '—' : _bMoney(row.realized_pnl)) + '</td></tr>'
       ).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);">Waiting for H53 live decisions</td></tr>';
+    }
+
+    // ETH-only exact-rule canary. Historical discovery P&L is never pooled.
+    if (ethGL) {
+      const ethMode = document.getElementById('ethGLMode');
+      ethMode.textContent = ethGL.mode + (ethGL.alive ? '' : ' · STALE');
+      ethMode.style.color = ethGL.mode === 'LIVE' && ethGL.alive
+        ? 'var(--green)'
+        : ethGL.mode === 'DRY' && ethGL.alive ? 'var(--yellow)' : 'var(--danger)';
+      const geo = ethGL.geoblock || {};
+      document.getElementById('ethGLGeo').textContent =
+        'geo ' + (geo.country || 'unknown') + ' · ' +
+        (geo.blocked === false ? 'eligible' : geo.blocked === true ? 'blocked' : 'unverified') +
+        ' · heartbeat ' + _bAge(ethGL.heartbeatAgeSec);
+      const fresh = ethGL.freshEvidence || {};
+      document.getElementById('ethGLFreshN').textContent = fresh.independent_markets ?? 0;
+      document.getElementById('ethGLFreshSignals').textContent =
+        (fresh.shadow_signals ?? 0) + ' signals · ' + (fresh.utc_days ?? 0) + ' UTC days';
+      const replayPnl = Number(fresh.latency_250_pnl_2x || 0);
+      document.getElementById('ethGLReplayPnl').textContent = _bMoney(replayPnl);
+      document.getElementById('ethGLReplayPnl').style.color = _bPnlColor(replayPnl);
+      document.getElementById('ethGLReplayFills').textContent =
+        (fresh.latency_250_fills ?? 0) + ' fills';
+      const totals = ethGL.totals || {};
+      document.getElementById('ethGLMatched').textContent = totals.matched ?? 0;
+      document.getElementById('ethGLSkipped').textContent =
+        (totals.skipped ?? 0) + ' skipped · ' + (totals.errors ?? 0) + ' errors';
+      const realized = Number(totals.realized_pnl || 0);
+      document.getElementById('ethGLPnl').textContent = _bMoney(realized);
+      document.getElementById('ethGLPnl').style.color = _bPnlColor(realized);
+      document.getElementById('ethGLBalance').textContent =
+        'wallet ' + _bMoney(ethGL.walletBalanceUsdc) + ' · ' + (totals.unresolved ?? 0) + ' unresolved';
+      document.getElementById('ethGLCaveat').textContent =
+        (ethGL.executionHaltReason ? 'HALTED: ' + ethGL.executionHaltReason + ' · ' : '') +
+        'The historical ~$22/day discovery rate is not a forecast. Fresh paper and real-money canary evidence are kept separate.';
+      const ethBody = document.getElementById('ethGLLiveBody');
+      ethBody.innerHTML = (ethGL.recent || []).length ? ethGL.recent.map((row) =>
+        '<tr><td style="color:var(--text-muted);">' + new Date(row.created_at).toLocaleTimeString() + '</td>' +
+        '<td>' + escapeHtml(row.token) + '</td><td>' + Number(row.signal_price).toFixed(3) + '</td>' +
+        '<td>' + _bMoney(row.source_notional) + '</td><td>' + _bMoney(row.requested_notional) + '</td>' +
+        '<td>' + escapeHtml(row.status) + '</td>' +
+        '<td>' + (row.matched_shares == null ? '—' : Number(row.matched_shares).toFixed(2)) + '</td>' +
+        '<td>' + (row.average_fill_price == null ? '—' : Number(row.average_fill_price).toFixed(3)) + '</td>' +
+        '<td>' + escapeHtml(row.resolved_outcome || '—') + '</td>' +
+        '<td style="color:' + _bPnlColor(row.realized_pnl) + ';">' +
+        (row.realized_pnl == null ? '—' : _bMoney(row.realized_pnl)) + '</td></tr>'
+      ).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);">Waiting for fresh ETH G-late decisions</td></tr>';
     }
 
     // paper account (scored shadow ledger)

@@ -13,7 +13,7 @@ const BASE_REQUIRED_HEARTBEATS = Object.freeze([
   'pyth_boundary', 'crossvenue_lab', 'allmarket_lab',
 ]);
 const OPTIONAL_EXECUTOR_HEARTBEATS = Object.freeze([
-  'gla_live', 'flow_boundary_canary', 'h53_live',
+  'gla_live', 'flow_boundary_canary', 'h53_live', 'eth_g_late_live',
 ]);
 const HEARTBEAT_COMPONENTS = Object.freeze([
   ...BASE_REQUIRED_HEARTBEATS,
@@ -27,6 +27,7 @@ function requiredHeartbeatComponents(settings = {}) {
   if (settings.live_gla_enabled === true) required.push('gla_live');
   if (settings.live_flow_boundary_enabled === true) required.push('flow_boundary_canary');
   if (settings.live_h53_enabled === true) required.push('h53_live');
+  if (settings.live_eth_g_late_enabled === true) required.push('eth_g_late_live');
   return required;
 }
 
@@ -62,6 +63,7 @@ async function main() {
                          portfolio_bankroll_usdc, override_daily_loss,
                          main_exec_honest_anchor, paper_risk_epoch_anchor,
                          paper_risk_limits_enabled, live_h53_enabled,
+                         live_eth_g_late_enabled,
                          live_gla_enabled, live_flow_boundary_enabled,
                          min_entry_remaining_sec, per_market_cooldown
                     FROM bot_settings ORDER BY user_id LIMIT 1`),
@@ -115,6 +117,7 @@ async function main() {
         perMarketCooldown: settings.per_market_cooldown,
         dailyLossOverride: settings.override_daily_loss,
         h53LiveEnabled: settings.live_h53_enabled,
+        ethGLateLiveEnabled: settings.live_eth_g_late_enabled,
         glaLiveEnabled: settings.live_gla_enabled,
         flowBoundaryLiveEnabled: settings.live_flow_boundary_enabled,
       };
@@ -165,6 +168,16 @@ async function main() {
       const expectedDry = settings?.live_h53_enabled !== true;
       if (beatByName.h53_live.meta?.dryRun !== expectedDry) {
         critical.push(`H53 mode mismatch: DB expects ${expectedDry ? 'paper observer' : 'live'}, heartbeat reports ${beatByName.h53_live.meta?.dryRun ? 'paper observer' : 'live'}`);
+      }
+    }
+    if (beatByName.eth_g_late_live) {
+      const expectedDry = settings?.live_eth_g_late_enabled !== true;
+      if (beatByName.eth_g_late_live.meta?.dryRun !== expectedDry) {
+        critical.push(`ETH G-late mode mismatch: DB expects ${expectedDry ? 'paper observer' : 'live'}, heartbeat reports ${beatByName.eth_g_late_live.meta?.dryRun ? 'paper observer' : 'live'}`);
+      }
+      if (settings?.live_eth_g_late_enabled === true
+        && beatByName.eth_g_late_live.meta?.geoblock?.blocked !== false) {
+        critical.push('ETH G-late live gate is enabled without explicit geographic eligibility');
       }
     }
     if (beatByName.flow_boundary_canary) {

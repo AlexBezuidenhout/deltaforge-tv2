@@ -91,6 +91,16 @@ independent gates are required to arm it; live hard rails are $10/order, three
 orders/$30 spend per UTC day and an exact arrival-ask FAK price guard. Use
 `scripts/flow-boundary-canary-control.sh`; never edit the unit to bypass gates.
 
+`eth-g-late-canary.service` mirrors only fresh
+`ETH_G_late_exact_forward_v1` intents with the frozen manifest hash. It remains
+a dry observer by default. A live override uses venue-minimum shares (hard $5
+cap), exact-ask FAK/no-chase execution, five orders/$25 spend and -$10 resolved
+loss per UTC day, 50 submissions total, an append-before-send WAL, and a
+fail-closed official geoblock check. Historical ETH selection P&L is never
+pooled into the fresh paper trial or the live canary. Use
+`scripts/eth-g-late-canary-control.sh`; the control script refuses to arm when
+the execution IP is not explicitly eligible.
+
 `borg-allmarket.service` is a separate public-data, paper-only process for
 all-market L2 prediction and passive-making research. It has no wallet, signer,
 authenticated CLOB client, or order-posting dependency. Books and simulated
@@ -163,6 +173,7 @@ ssh deltaforge-vps 'systemctl --no-pager --failed'
 ssh deltaforge-vps 'systemctl status deltaforge-tv2 borg-collector'
 ssh deltaforge-vps 'systemctl status gla-paper'
 ssh deltaforge-vps 'systemctl status flow-boundary-canary'
+ssh deltaforge-vps 'systemctl status eth-g-late-canary'
 ssh deltaforge-vps 'systemctl status borg-allmarket borg-paired-maker borg-structural-scanner borg-pyth-boundary'
 ssh deltaforge-vps 'journalctl -u borg-collector -n 100 --no-pager'
 ssh deltaforge-vps 'systemctl list-timers borg-score.timer deltaforge-raw-archive.timer deltaforge-hot-partitions.timer deltaforge-health.timer'

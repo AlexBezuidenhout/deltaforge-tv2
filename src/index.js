@@ -110,7 +110,7 @@ app.get('/api/health', async (req, res) => {
           FROM borg_events WHERE source='flow_heartbeat'`),
       pool.query(`
         SELECT is_active,george_is_active,live_gla_enabled,live_h53_enabled,
-               live_flow_boundary_enabled
+               live_eth_g_late_enabled,live_flow_boundary_enabled
           FROM bot_settings ORDER BY user_id LIMIT 1`),
     ]);
     const settings = settingsResult.rows[0] || {};

@@ -266,6 +266,97 @@ router.get('/h53/live', authMiddleware, async (req, res) => {
   }
 });
 
+// --- ETH-only exact G-late canary (post-hoc hypothesis; independently gated) ---
+router.get('/eth-g-late/live', authMiddleware, async (req, res) => {
+  try {
+    const value = await dashboardReports.get(`borg-eth-g-late-live:${req.userId}`, 5_000, async () => {
+      const client = await pool.connect();
+      try {
+        const [heartbeat, settings, totals, recent, evidence] = await Promise.all([
+          client.query(`SELECT beat_at,meta FROM system_heartbeats
+            WHERE component='eth_g_late_live'`),
+          client.query(`SELECT COALESCE(live_eth_g_late_enabled,false) enabled
+            FROM bot_settings WHERE user_id=$1`, [req.userId]),
+          client.query(`SELECT
+              count(*)::int decisions,
+              count(*) FILTER (WHERE NOT dry_run)::int live_decisions,
+              count(*) FILTER (WHERE NOT dry_run AND matched_shares>0)::int matched,
+              count(*) FILTER (WHERE NOT dry_run AND status IN
+                ('ERROR','ERROR_AFTER_ORDER_ACK','MATCHED_FILL_INVARIANT'))::int errors,
+              count(*) FILTER (WHERE status LIKE 'SKIPPED_%')::int skipped,
+              COALESCE(sum(requested_notional) FILTER
+                (WHERE NOT dry_run AND status NOT LIKE 'SKIPPED_%' AND status<>'ERROR'),0)::float submitted_notional,
+              COALESCE(sum(matched_notional) FILTER (WHERE NOT dry_run),0)::float matched_notional,
+              COALESCE(sum(fee_paid) FILTER (WHERE NOT dry_run),0)::float fees_paid,
+              COALESCE(sum(realized_pnl) FILTER (WHERE NOT dry_run),0)::float realized_pnl,
+              count(*) FILTER (WHERE NOT dry_run AND matched_shares>0
+                AND resolved_outcome IS NULL)::int unresolved,
+              avg(acknowledgement_latency_ms) FILTER (WHERE NOT dry_run)::float avg_ack_ms,
+              max(created_at) latest
+            FROM eth_g_late_live_orders`),
+          client.query(`SELECT id,created_at,token,signal_price::float,
+              source_notional::float,requested_notional::float,worst_price::float,
+              dry_run,status,acknowledgement_latency_ms,matched_shares::float,
+              matched_notional::float,average_fill_price::float,fee_paid::float,
+              resolved_outcome,realized_pnl::float,error
+            FROM eth_g_late_live_orders ORDER BY id DESC LIMIT 40`),
+          client.query(`WITH source AS (
+              SELECT id,market_id,ts FROM borg_shadow_orders
+              WHERE strategy='ETH_G_late_exact_forward_v1' AND action='place'
+            ), base AS (
+              SELECT s.* FROM borg_shadow_scores s JOIN source o ON o.id=s.order_id
+            ), l250 AS (
+              SELECT l.* FROM borg_shadow_latency_scores l JOIN source o ON o.id=l.order_id
+              WHERE l.latency_ms=250
+            )
+            SELECT
+              (SELECT count(*)::int FROM source) shadow_signals,
+              (SELECT count(DISTINCT market_id)::int FROM source) independent_markets,
+              (SELECT count(DISTINCT (ts AT TIME ZONE 'UTC')::date)::int FROM source) utc_days,
+              (SELECT count(*) FILTER (WHERE filled)::int FROM base) base_fills,
+              (SELECT COALESCE(sum(pnl_2x) FILTER (WHERE filled),0)::float FROM base) base_pnl_2x,
+              (SELECT count(*) FILTER (WHERE filled)::int FROM l250) latency_250_fills,
+              (SELECT COALESCE(sum(pnl_2x) FILTER (WHERE filled),0)::float FROM l250) latency_250_pnl_2x`),
+        ]);
+        const beat = heartbeat.rows[0] || null;
+        const ageSec = beat?.beat_at
+          ? Math.max(0, Math.round((Date.now() - new Date(beat.beat_at).getTime()) / 1000))
+          : null;
+        const geo = beat?.meta?.geoblock || null;
+        return {
+          strategy: 'ETH_G_late_exact_forward_v1',
+          evidenceStatus: 'POSTHOC_UNPROVEN_LIVE_CANARY',
+          historicalDiscoveryRateUsdPerDay: 22,
+          historicalRateIsForecast: false,
+          dbEnabled: settings.rows[0]?.enabled === true,
+          alive: ageSec != null && ageSec < 30,
+          heartbeatAgeSec: ageSec,
+          mode: beat?.meta?.mode || (beat?.meta?.dryRun === false ? 'LIVE' : 'OFFLINE'),
+          walletBalanceUsdc: beat?.meta?.balanceUsdc ?? null,
+          geoblock: geo,
+          executionHaltReason: beat?.meta?.executionHaltReason ?? null,
+          errorsObserved: beat?.meta?.errors ?? null,
+          risk: {
+            maxOrderUsd: 5,
+            maxOrdersPerUtcDay: 5,
+            maxSpendPerUtcDay: 25,
+            maxResolvedLossPerUtcDay: 10,
+            maxPilotSubmissions: 50,
+          },
+          freshEvidence: evidence.rows[0] || {},
+          totals: totals.rows[0] || {},
+          recent: recent.rows,
+        };
+      } finally {
+        client.release();
+      }
+    });
+    res.json(value);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Recent shadow orders (places + cancels), scored PnL where available ---
 router.get('/shadow/orders', authMiddleware, async (req, res) => {
   try {

@@ -29,6 +29,7 @@ test('parked experiments and disabled live executors cannot degrade health', () 
   const policy = heartbeatPolicies({
     live_gla_enabled: false,
     live_h53_enabled: false,
+    live_eth_g_late_enabled: false,
     live_flow_boundary_enabled: false,
   }, { researchRequired: true, pairedMakerRequired: false });
   const heartbeats = classifyHeartbeats([
@@ -43,7 +44,10 @@ test('parked experiments and disabled live executors cannot degrade health', () 
 });
 
 test('enabled live executors are required and retain the fast threshold', () => {
-  const policy = heartbeatPolicies({ live_gla_enabled: true }, {
+  const policy = heartbeatPolicies({
+    live_gla_enabled: true,
+    live_eth_g_late_enabled: true,
+  }, {
     researchRequired: true,
   });
   const heartbeats = classifyHeartbeats([
@@ -52,6 +56,7 @@ test('enabled live executors are required and retain the fast threshold', () => 
   assert.equal(heartbeats.gla_live.required, true);
   assert.equal(heartbeats.gla_live.stale, true);
   assert.equal(heartbeats.gla_live.reason, 'heartbeat_stale');
+  assert.equal(policy.eth_g_late_live.required, true);
 });
 
 test('required components are degraded when their heartbeat row is missing', () => {

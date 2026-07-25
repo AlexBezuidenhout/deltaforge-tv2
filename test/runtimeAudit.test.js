@@ -16,20 +16,24 @@ test('runtime health requires optional executors only when their live switch is 
     live_gla_enabled: false,
     live_flow_boundary_enabled: false,
     live_h53_enabled: false,
+    live_eth_g_late_enabled: false,
   });
   assert.ok(paperOnly.includes('main_bot'));
   assert.ok(paperOnly.includes('structural_scanner'));
   assert.equal(paperOnly.includes('gla_live'), false);
   assert.equal(paperOnly.includes('flow_boundary_canary'), false);
   assert.equal(paperOnly.includes('h53_live'), false);
+  assert.equal(paperOnly.includes('eth_g_late_live'), false);
   assert.equal(paperOnly.includes('paired_maker_lab'), false);
 
   const live = requiredHeartbeatComponents({
     live_gla_enabled: true,
     live_flow_boundary_enabled: true,
     live_h53_enabled: true,
+    live_eth_g_late_enabled: true,
   });
   assert.ok(live.includes('gla_live'));
   assert.ok(live.includes('flow_boundary_canary'));
   assert.ok(live.includes('h53_live'));
+  assert.ok(live.includes('eth_g_late_live'));
 });

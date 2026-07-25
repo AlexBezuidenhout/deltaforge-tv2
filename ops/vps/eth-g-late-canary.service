@@ -1,0 +1,39 @@
+[Unit]
+Description=ETH G-late exact-rule canary (dry observer unless independently armed)
+Wants=network-online.target
+Requires=postgresql.service borg-collector.service
+After=network-online.target postgresql.service borg-collector.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
+EnvironmentFile=-/etc/deltaforge/eth-g-late-live.env
+Environment=NODE_ENV=production
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_WAL_MIN_FREE_GB=20
+ExecStart=/usr/local/bin/node borg/live/eth-g-late-executor.js
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=8192
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/deltaforge/wal/borg
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

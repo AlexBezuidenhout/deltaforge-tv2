@@ -44,6 +44,7 @@
     "flow:collect": "node borg/flow/collector.js",
     "flow:boundary-canary": "node borg/live/flow-boundary-executor.js",
     "h53:live": "node borg/live/h53-executor.js",
+    "eth-g-late:live": "node borg/live/eth-g-late-executor.js",
     "allmarket:collect": "node borg/allmarket/collector.js",
     "pairedmaker:collect": "node borg/pairedmaker/collector.js",
     "crossvenue:collect": "node borg/crossvenue/collector.js",
