@@ -1635,13 +1635,15 @@ CREATE INDEX IF NOT EXISTS cv_settlements_pending
 
 -- Forward statistical terminal-carry ledger. These rows are explicitly not
 -- deterministic payoff identities: resolver/wording mismatch is priced with
--- an event-family clustered agreement lower bound and a zero mismatch payout.
+-- a same-risk-class, event-family clustered agreement lower bound and a zero
+-- mismatch payout. Capital fields reserve one shared paper portfolio.
 CREATE TABLE IF NOT EXISTS cv_terminal_carry_marks (
   mark_id TEXT PRIMARY KEY,
   observed_at TIMESTAMPTZ NOT NULL,
   entry_day DATE NOT NULL,
   experiment_id TEXT NOT NULL,
   match_id TEXT NOT NULL,
+  risk_class TEXT,
   direction TEXT NOT NULL,
   poly_outcome TEXT NOT NULL,
   kalshi_outcome TEXT NOT NULL,
@@ -1650,6 +1652,8 @@ CREATE TABLE IF NOT EXISTS cv_terminal_carry_marks (
   kalshi_vwap NUMERIC,
   poly_fee NUMERIC,
   kalshi_fee NUMERIC,
+  poly_cash_required NUMERIC,
+  kalshi_cash_required NUMERIC,
   total_cost NUMERIC,
   expected_payout_lower NUMERIC,
   additional_cost_stress NUMERIC,
@@ -1660,6 +1664,8 @@ CREATE TABLE IF NOT EXISTS cv_terminal_carry_marks (
   prior_clusters INT NOT NULL DEFAULT 0,
   prior_all_agree_clusters INT NOT NULL DEFAULT 0,
   agreement_lower NUMERIC,
+  global_prior_clusters INT NOT NULL DEFAULT 0,
+  global_agreement_lower NUMERIC,
   books_fresh BOOLEAN NOT NULL DEFAULT false,
   data_quality_grade TEXT NOT NULL,
   execution_fidelity_grade TEXT NOT NULL,
@@ -1669,10 +1675,17 @@ CREATE TABLE IF NOT EXISTS cv_terminal_carry_marks (
   book_signature TEXT,
   detail JSONB NOT NULL DEFAULT '{}'::jsonb
 );
+ALTER TABLE cv_terminal_carry_marks ADD COLUMN IF NOT EXISTS risk_class TEXT;
+ALTER TABLE cv_terminal_carry_marks ADD COLUMN IF NOT EXISTS poly_cash_required NUMERIC;
+ALTER TABLE cv_terminal_carry_marks ADD COLUMN IF NOT EXISTS kalshi_cash_required NUMERIC;
+ALTER TABLE cv_terminal_carry_marks ADD COLUMN IF NOT EXISTS global_prior_clusters INT NOT NULL DEFAULT 0;
+ALTER TABLE cv_terminal_carry_marks ADD COLUMN IF NOT EXISTS global_agreement_lower NUMERIC;
 CREATE INDEX IF NOT EXISTS cv_terminal_carry_marks_time
   ON cv_terminal_carry_marks (observed_at DESC);
 CREATE INDEX IF NOT EXISTS cv_terminal_carry_marks_match_time
   ON cv_terminal_carry_marks (match_id,direction,observed_at DESC);
+CREATE INDEX IF NOT EXISTS cv_terminal_carry_marks_risk_class
+  ON cv_terminal_carry_marks (experiment_id,risk_class,observed_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS cv_terminal_carry_one_entry_per_day
   ON cv_terminal_carry_marks (experiment_id,match_id,direction,entry_day)
   WHERE entry_armed;

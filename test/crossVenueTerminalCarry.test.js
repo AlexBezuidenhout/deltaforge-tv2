@@ -3,8 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  TERMINAL_CARRY_V1_EXPERIMENT_ID,
   TERMINAL_CARRY_EXPERIMENT_ID,
   evaluateTerminalCarry,
+  terminalCarryRiskClass,
   wilsonLower,
 } = require('../borg/crossvenue/terminal-carry');
 
@@ -25,10 +27,16 @@ function evaluate(overrides = {}) {
   return evaluateTerminalCarry({
     ...books(),
     prior: {
+      clusters: 96,
+      allAgreeClusters: 85,
+      agreementLower: wilsonLower(85, 96),
+    },
+    globalPrior: {
       clusters: 213,
       allAgreeClusters: 194,
       agreementLower: wilsonLower(194, 213),
     },
+    riskClass: '{"fixture":"crypto-threshold"}',
     paperEvalApproved: true,
     relationApproved: false,
     booksFresh: true,
@@ -55,6 +63,36 @@ test('Wilson prior uses event-cluster sample count rather than raw matches', () 
   assert.equal(wilsonLower(0, 0), null);
 });
 
+test('v2 is isolated from the invalidated v1 forward cohort', () => {
+  assert.equal(TERMINAL_CARRY_EXPERIMENT_ID,
+    'crossvenue-resolver-risk-terminal-carry-v2');
+  assert.equal(TERMINAL_CARRY_V1_EXPERIMENT_ID,
+    'crossvenue-resolver-risk-terminal-carry-v1');
+  assert.notEqual(TERMINAL_CARRY_EXPERIMENT_ID, TERMINAL_CARRY_V1_EXPERIMENT_ID);
+});
+
+test('risk classes are normalized and insensitive to mismatch ordering', () => {
+  const first = terminalCarryRiskClass({
+    polyCategory: ' Crypto ',
+    kalshiCategory: '',
+    structured: { form: 'Threshold' },
+    mismatchReasons: ['Resolver Source Differs', 'Numeric Mismatch',
+      'Resolver Source Differs'],
+  });
+  const second = terminalCarryRiskClass({
+    poly: { category: 'crypto' },
+    structuredEvidence: { form: 'threshold' },
+    mismatches: ['numeric mismatch', 'resolver source differs'],
+  });
+  assert.equal(first, second);
+  assert.deepEqual(JSON.parse(first), {
+    polyCategory: 'crypto',
+    kalshiCategory: 'unknown',
+    structuredForm: 'threshold',
+    mismatchReasons: ['numeric mismatch', 'resolver source differs'],
+  });
+});
+
 test('terminal carry can arm only a conservatively positive direction', () => {
   const rows = evaluate();
   const yesNo = rows.find((row) => row.direction === 'POLY_YES+KALSHI_NO');
@@ -67,6 +105,8 @@ test('terminal carry can arm only a conservatively positive direction', () => {
   assert.equal(yesNo.paperOnly, true);
   assert.equal(yesNo.payoutModel,
     'CLUSTERED_AGREEMENT_WILSON_LOWER; MISMATCH_PAYOUT_ZERO');
+  assert.equal(yesNo.priorClusters, 96);
+  assert.equal(yesNo.globalPriorClusters, 213);
 });
 
 test('mismatch risk, second costs, and orphan reserve all reduce expected value', () => {
@@ -77,15 +117,27 @@ test('mismatch risk, second costs, and orphan reserve all reduce expected value'
   assert.ok(row.expectedProfitLower < row.expectedProfitBeforeOrphan);
 });
 
-test('unapproved pairs and insufficient clustered history fail closed', () => {
+test('unapproved pairs and insufficient same-class history fail closed', () => {
   const unapproved = evaluate({ paperEvalApproved: false });
   assert.ok(unapproved.every((row) =>
     row.reason === 'PAIR_NOT_SCORE_APPROVED_FOR_PAPER_EVALUATION' && !row.eligible));
   const thinPrior = evaluate({
-    prior: { clusters: 99, allAgreeClusters: 99, agreementLower: wilsonLower(99, 99) },
+    prior: { clusters: 29, allAgreeClusters: 29, agreementLower: wilsonLower(29, 29) },
   });
   assert.ok(thinPrior.every((row) =>
-    row.reason === 'INSUFFICIENT_SETTLED_EVENT_CLUSTERS' && !row.eligible));
+    row.reason === 'INSUFFICIENT_SAME_RISK_CLASS_EVENT_CLUSTERS' && !row.eligible));
+});
+
+test('the global history floor is a separate fail-closed prerequisite', () => {
+  const rows = evaluate({
+    globalPrior: {
+      clusters: 99,
+      allAgreeClusters: 99,
+      agreementLower: wilsonLower(99, 99),
+    },
+  });
+  assert.ok(rows.every((row) =>
+    row.reason === 'INSUFFICIENT_GLOBAL_SETTLED_EVENT_CLUSTERS' && !row.eligible));
 });
 
 test('rule-certified identities are kept in the deterministic payoff lane', () => {

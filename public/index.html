@@ -1826,10 +1826,10 @@
     <tbody id="cvConvergenceBody"><tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting fixed-size entry and liquidation marks…</td></tr></tbody>
   </table></div></div></div>
 
-  <div class="panel" style="border-color:var(--yellow);"><div class="panel-header"><span>RESOLVER-RISK TERMINAL CARRY — FORWARD PAPER</span><span id="cvTerminalCarryPrior" style="font-size:10px;color:var(--text-muted);">clustered settlement prior loading…</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
+  <div class="panel" style="border-color:var(--yellow);"><div class="panel-header"><span>RESOLVER-RISK TERMINAL CARRY V2 — FORWARD PAPER</span><span id="cvTerminalCarryPrior" style="font-size:10px;color:var(--text-muted);">risk-class settlement priors loading…</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
     <thead><tr><th>Direction</th><th>Entries</th><th>Pairs</th><th>Settled</th><th>Profitable</th><th>Agreed</th><th>Entry cash</th><th>Realized 1×</th><th>Realized 2×</th><th>Full hurdle</th><th>Entry EV lower</th><th>Latest</th></tr></thead>
     <tbody id="cvTerminalCarryBody"><tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">Waiting for the frozen conservative entry hurdle…</td></tr></tbody>
-  </table></div><div style="padding:9px 12px;font-size:10px;line-height:1.5;color:var(--text-muted);">Not risk-free: score-approved contracts are not certified identical. The arm assumes zero payout on every mismatch, uses the event-family 95% Wilson lower bound, charges two fee layers plus one adverse tick per leg, reserves the full modeled orphan unwind, and permits one paper entry per match/direction/UTC day.</div></div></div>
+  </table></div><div style="padding:9px 12px;font-size:10px;line-height:1.5;color:var(--text-muted);">Not risk-free: score-approved contracts are not certified identical. V2 assumes zero payout on every mismatch, uses a same-risk-class event-family 95% Wilson lower bound, charges two fee layers plus one adverse tick per leg, reserves the full modeled orphan unwind, and shares one $500 paper bankroll across unresolved entries. The earlier V1 sample is retained but excluded.</div></div></div>
 
   <div class="panel"><div class="panel-header"><span>CONTRACT-RELATION REVIEW QUEUE</span><span style="font-size:10px;color:var(--text-muted);">equivalence, implication, exclusion and exhaustiveness are distinct proofs</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;max-height:360px;overflow:auto;"><table>
     <thead><tr><th>Polymarket</th><th>Kalshi</th><th>Score</th><th>Status</th><th>Decision</th><th>Time Δ</th><th>Audit flags</th><th>Monitored</th></tr></thead>
@@ -3198,9 +3198,16 @@
     const carryPrior = terminalCarry.prior || {};
     const carryLower = carryPrior.agreementLower == null
       ? '—' : (100 * Number(carryPrior.agreementLower)).toFixed(1) + '%';
+    const carryCapital = terminalCarry.capital || {};
+    const carryAvailable = carryCapital.totalAvailableUsd == null
+      ? '—' : _bMoney(carryCapital.totalAvailableUsd);
+    const excludedV1Entries = terminalCarry.excludedV1?.entries ?? 0;
     document.getElementById('cvTerminalCarryPrior').textContent =
       (carryPrior.allAgreeClusters ?? 0) + '/' + (carryPrior.clusters ?? 0) +
-      ' event clusters all-agree · 95% lower ' + carryLower + ' · goal 300 forward units / 30d';
+      ' global clusters all-agree (eligibility only) · ' +
+      (terminalCarry.riskClasses ?? 0) + ' same-risk classes price entries · ' +
+      carryAvailable + ' shared cash available · ' + excludedV1Entries +
+      ' V1 entries excluded · goal 300 V2 units / 30d';
     document.getElementById('cvTerminalCarryBody').innerHTML = terminalCarry.rows.length
       ? terminalCarry.rows.map((row) =>
         '<tr><td style="font-weight:700;">' + escapeHtml(row.direction) + '</td><td>' + row.entries + '</td><td>' + row.matches + '</td><td>' + row.settled + '</td><td>' + row.profitable + '</td><td>' + row.settlements_agreed + '</td><td>' + _bMoney(row.deployed_entry_cash) + '</td><td style="color:' + _bPnlColor(row.realized_pnl) + '">' + _bMoney(row.realized_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_2x_pnl) + '">' + _bMoney(row.realized_2x_pnl) + '</td><td style="color:' + _bPnlColor(row.realized_full_hurdle_pnl) + '">' + _bMoney(row.realized_full_hurdle_pnl) + '</td><td style="color:' + _bPnlColor(row.entry_expected_profit_lower) + '">' + _bMoney(row.entry_expected_profit_lower) + '</td><td style="color:var(--text-muted);">' + (row.latest ? new Date(row.latest).toLocaleString() : '—') + '</td></tr>'

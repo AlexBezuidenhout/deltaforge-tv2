@@ -11,6 +11,7 @@ if (!process.env.DATABASE_URL && fs.existsSync(serviceEnv)) {
 const { Pool } = require('pg');
 const {
   TERMINAL_CARRY_EXPERIMENT_ID,
+  TERMINAL_CARRY_V1_EXPERIMENT_ID,
 } = require('../borg/crossvenue/terminal-carry');
 
 function finite(value, fallback = null) {
@@ -95,8 +96,9 @@ async function main() {
     max: 1,
   });
   try {
-    const { rows } = await pool.query(`
+    const [{ rows }, excludedV1Result] = await Promise.all([pool.query(`
       SELECT t.observed_at,t.entry_day,t.match_id,t.direction,
+             t.risk_class,t.poly_cash_required,t.kalshi_cash_required,
              t.poly_outcome selected_poly_outcome,
              t.kalshi_outcome selected_kalshi_outcome,
              t.quantity,t.total_cost,t.additional_cost_stress,t.orphan_reserve,
@@ -109,7 +111,12 @@ async function main() {
         LEFT JOIN cv_settlements s USING (match_id)
        WHERE t.experiment_id=$1 AND t.entry_armed=true
        ORDER BY t.observed_at
-    `, [TERMINAL_CARRY_EXPERIMENT_ID]);
+    `, [TERMINAL_CARRY_EXPERIMENT_ID]), pool.query(`
+      SELECT count(*)::int entries,count(DISTINCT match_id)::int matches,
+             COALESCE(sum(total_cost),0)::float displayed_cash,max(observed_at) latest
+        FROM cv_terminal_carry_marks
+       WHERE experiment_id=$1 AND entry_armed=true
+    `, [TERMINAL_CARRY_V1_EXPERIMENT_ID])]);
     const overall = metrics(rows);
     const byDirection = Object.fromEntries([...new Set(rows.map((row) => row.direction))]
       .map((direction) => [direction, metrics(rows.filter((row) => row.direction === direction))]));
@@ -120,6 +127,7 @@ async function main() {
       clusterDay.set(key, (clusterDay.get(key) || 0) + row.pnl2x);
     }
     const days = new Set(rows.map((row) => String(row.entry_day))).size;
+    const riskClasses = new Set(rows.map((row) => row.risk_class).filter(Boolean)).size;
     const clusterDayPnl = summarize([...clusterDay.values()]);
     const dominantPositiveClusterShare = [...clusterDay.values()]
       .filter((value) => value > 0).sort((left, right) => right - left);
@@ -127,6 +135,21 @@ async function main() {
       .reduce((sum, value) => sum + value, 0);
     const dominantShare = totalPositive > 0
       ? dominantPositiveClusterShare[0] / totalPositive : null;
+    const unresolved = rows.filter((row) =>
+      !['YES', 'NO'].includes(String(row.poly_outcome || '').toUpperCase())
+      || !['YES', 'NO'].includes(String(row.kalshi_result || '').toUpperCase()));
+    const capitalIntegrity = {
+      unresolvedEntries: unresolved.length,
+      totalReservedUsd: unresolved.reduce((sum, row) =>
+        sum + finite(row.total_cost, 0), 0),
+      polyReservedUsd: unresolved.reduce((sum, row) =>
+        sum + finite(row.poly_cash_required, 0), 0),
+      kalshiReservedUsd: unresolved.reduce((sum, row) =>
+        sum + finite(row.kalshi_cash_required, 0), 0),
+    };
+    capitalIntegrity.withinFrozenLimits = capitalIntegrity.totalReservedUsd <= 500 + 1e-9
+      && capitalIntegrity.polyReservedUsd <= 250 + 1e-9
+      && capitalIntegrity.kalshiReservedUsd <= 250 + 1e-9;
     const promotion = {
       minimumFreshUnits: rows.length >= 300,
       minimum30CalendarDays: days >= 30,
@@ -144,6 +167,8 @@ async function main() {
     const report = {
       generatedAt: new Date().toISOString(),
       experimentId: TERMINAL_CARRY_EXPERIMENT_ID,
+      supersedes: TERMINAL_CARRY_V1_EXPERIMENT_ID,
+      excludedV1: excludedV1Result.rows[0],
       paperOnly: true,
       deterministicArbitrage: false,
       independentUnit: 'match + direction + UTC entry day',
@@ -151,6 +176,7 @@ async function main() {
         entries: rows.length,
         settled: overall.settled,
         calendarDays: days,
+        riskClasses,
         eventDayClusters: clusterDay.size,
         firstAt: rows[0]?.observed_at || null,
         lastAt: rows.at(-1)?.observed_at || null,
@@ -179,8 +205,9 @@ async function main() {
       ])),
       clusterDayPnl2x: clusterDayPnl,
       dominantPositiveClusterShare: dominantShare,
+      capitalIntegrity,
       promotion,
-      warning: 'Paper entry assumes both displayed legs fill. It is not a certified terminal identity, venue legs are non-atomic, and the normal cluster-day lower bound is only interpretable after the pre-registered sample minimum.',
+      warning: 'V1 is retained but excluded. V2 assumes both displayed legs fill, uses a same-risk-class settlement lower bound and one shared unresolved paper bankroll. It is not a certified terminal identity, venue legs are non-atomic, and the normal cluster-day lower bound is only interpretable after the pre-registered sample minimum.',
     };
 
     if (process.argv.includes('--json')) {
@@ -191,6 +218,8 @@ async function main() {
     console.log(`Generated: ${report.generatedAt}`);
     console.log('PAPER ONLY · NOT DETERMINISTIC ARBITRAGE');
     console.table([report.coverage]);
+    console.table([{ ...report.excludedV1, cohort: 'V1 EXCLUDED' }]);
+    console.table([report.capitalIntegrity]);
     console.table(Object.entries(report.byDirection).map(([direction, row]) => ({
       direction,
       entries: row.entries,

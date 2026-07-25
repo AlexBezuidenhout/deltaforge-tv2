@@ -1,0 +1,66 @@
+{
+  "experiment_id": "crossvenue-resolver-risk-terminal-carry-v2",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-25T13:50:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "crossvenue_resolver_risk_terminal_carry",
+  "supersedes": "crossvenue-resolver-risk-terminal-carry-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1-shared-open-reservations",
+  "strategy_version": "same-risk-class-lower-bound-shared-capital-v2",
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "hypothesis": "A conservative subset of score-approved, non-certified Polymarket/Kalshi contract pairs can offer positive terminal carry after pricing same-risk-class resolver mismatch and reserving shared portfolio capital.",
+  "v1_exclusion": {
+    "reason": "V1 budgeted each candidate against $500 independently and pooled agreement risk across heterogeneous rule classes.",
+    "forward_entries_excluded": true,
+    "rows_are_retained": true
+  },
+  "selection_disclosure": {
+    "historical_use": "Settled pre-registration matches initialize only the same frozen category/structure/mismatch-class agreement prior.",
+    "historical_pnl_is_evidence": false,
+    "mismatch_treatment": "Every mismatched settlement is assigned zero bundle payout, even where the selected direction would actually pay one or two dollars."
+  },
+  "frozen_mechanics": {
+    "independent_unit": "match_id + direction + UTC entry day; inference clusters again by event family and UTC day",
+    "maximum_entries_per_unit": 1,
+    "requires_paper_score_approval": true,
+    "excludes_rule_certified_relations": true,
+    "minimum_global_prior_event_clusters": 100,
+    "minimum_same_risk_class_event_clusters": 30,
+    "risk_class": "Polymarket category + Kalshi category + structured contract form + sorted mismatch reason codes",
+    "prior_estimator": "95% Wilson lower bound on all-contract agreement within each event-family cluster, estimated inside the same risk class",
+    "book_requirements": "synchronized fresh A/B data and A/B execution fidelity",
+    "portfolio": "$500 total and $250 per venue reserved across every unresolved v2 entry; settlement release may lag by one prior-refresh interval",
+    "sizing": "equal shares over executable full L2 depth using only unreserved portfolio cash",
+    "hurdle": "same-class agreement-lower-bound payout minus executable asks minus entry fees minus a second fee layer minus one adverse tick per leg minus full modeled immediate-orphan unwind reserve must be positive"
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "crossvenue_resolver_risk_terminal_carry_v2",
+      "family": "crossvenue_resolver_risk_terminal_carry",
+      "arm": "same_class_wilson_lower_shared_capital",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "net_pnl_2x_clustered_by_event_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "cluster_by": ["Polymarket/Kalshi event family", "UTC day"],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "require_positive_latency_profiles_ms": [100, 250, 500],
+    "require_realistic_nonfills_partial_fills_and_depth": true,
+    "maximum_dominant_event_share": 0.2,
+    "multiple_testing": "Correct across both terminal-carry versions, the complete cross-venue family, and every prior searched strategy.",
+    "promotion": "No automatic live path. A passing read triggers a separate 50-fill authenticated pilot review at $1-$2.",
+    "null_outcome": "No quote may clear the conservative hurdle, or measured forward edge may be approximately zero."
+  }
+}

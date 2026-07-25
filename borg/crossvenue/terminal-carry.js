@@ -14,8 +14,10 @@ const {
   evaluateCombination, finite,
 } = require('./strategy');
 
-const TERMINAL_CARRY_EXPERIMENT_ID = 'crossvenue-resolver-risk-terminal-carry-v1';
-const DEFAULT_MIN_PRIOR_CLUSTERS = 100;
+const TERMINAL_CARRY_EXPERIMENT_ID = 'crossvenue-resolver-risk-terminal-carry-v2';
+const TERMINAL_CARRY_V1_EXPERIMENT_ID = 'crossvenue-resolver-risk-terminal-carry-v1';
+const DEFAULT_MIN_PRIOR_CLUSTERS = 30;
+const DEFAULT_MIN_GLOBAL_PRIOR_CLUSTERS = 100;
 const DEFAULT_Z_SCORE = 1.959963984540054;
 
 function wilsonLower(successes, trials, z = DEFAULT_Z_SCORE) {
@@ -47,6 +49,30 @@ function cumulativeDepth(levels) {
 function roundDown(value, decimals = 4) {
   const scale = 10 ** decimals;
   return Math.floor((finite(value, 0) + 1e-12) * scale) / scale;
+}
+
+function normalizedLabel(value, fallback = 'unknown') {
+  const output = String(value || '').trim().toLowerCase();
+  return output || fallback;
+}
+
+function terminalCarryRiskClass(input = {}) {
+  const poly = input.poly || {};
+  const kalshi = input.kalshi || {};
+  const structured = input.structuredEvidence || input.structured || {};
+  const mismatchReasons = input.mismatchReasons || input.mismatches || [];
+  return JSON.stringify({
+    polyCategory: normalizedLabel(input.polyCategory || poly.category),
+    kalshiCategory: normalizedLabel(input.kalshiCategory || kalshi.category),
+    structuredForm: normalizedLabel(
+      input.structuredForm || structured.form,
+      'none',
+    ),
+    mismatchReasons: [...new Set((Array.isArray(mismatchReasons)
+      ? mismatchReasons : [])
+      .map((value) => normalizedLabel(value, ''))
+      .filter(Boolean))].sort(),
+  });
 }
 
 function candidateRows({
@@ -145,22 +171,26 @@ function candidateRows({
 
 function blocker({
   paperEvalApproved, relationApproved, booksFresh,
-  dataQualityGrade, executionFidelityGrade, prior, minPriorClusters,
+  dataQualityGrade, executionFidelityGrade, prior, globalPrior,
+  minPriorClusters, minGlobalPriorClusters,
 }) {
   if (relationApproved === true) return 'DETERMINISTIC_RELATION_USES_CERTIFIED_LANE';
   if (paperEvalApproved !== true) return 'PAIR_NOT_SCORE_APPROVED_FOR_PAPER_EVALUATION';
   if (booksFresh !== true) return 'BOOKS_NOT_FRESH_AND_SYNCHRONIZED';
   if (!['A', 'B'].includes(dataQualityGrade)) return 'DATA_QUALITY_BELOW_B';
   if (!['A', 'B'].includes(executionFidelityGrade)) return 'EXECUTION_FIDELITY_BELOW_B';
+  if (!globalPrior || finite(globalPrior.clusters, 0) < minGlobalPriorClusters) {
+    return 'INSUFFICIENT_GLOBAL_SETTLED_EVENT_CLUSTERS';
+  }
   if (!prior || finite(prior.clusters, 0) < minPriorClusters) {
-    return 'INSUFFICIENT_SETTLED_EVENT_CLUSTERS';
+    return 'INSUFFICIENT_SAME_RISK_CLASS_EVENT_CLUSTERS';
   }
   if (!(finite(prior.agreementLower) > 0)) return 'AGREEMENT_LOWER_BOUND_UNAVAILABLE';
   return null;
 }
 
 function evaluateTerminalCarry({
-  polyBooks, kalshiBooks, prior,
+  polyBooks, kalshiBooks, prior, globalPrior, riskClass = null,
   paperEvalApproved = false, relationApproved = false, booksFresh = false,
   dataQualityGrade = 'F', executionFidelityGrade = 'F',
   quantities = [1, 5, 10, 25, 50, 100],
@@ -169,14 +199,19 @@ function evaluateTerminalCarry({
   polyFeeRate = 0, polyFeeExponent = 1, kalshiFeeMultiplier = 1,
   polyTick = 0.01, kalshiTick = 0.01,
   minPriorClusters = DEFAULT_MIN_PRIOR_CLUSTERS,
+  minGlobalPriorClusters = DEFAULT_MIN_GLOBAL_PRIOR_CLUSTERS,
 }) {
   const minimumPrior = Math.max(1, Math.floor(finite(
     minPriorClusters, DEFAULT_MIN_PRIOR_CLUSTERS,
   )));
+  const minimumGlobalPrior = Math.max(1, Math.floor(finite(
+    minGlobalPriorClusters, DEFAULT_MIN_GLOBAL_PRIOR_CLUSTERS,
+  )));
   const priorBlocker = blocker({
     paperEvalApproved, relationApproved, booksFresh,
-    dataQualityGrade, executionFidelityGrade, prior,
+    dataQualityGrade, executionFidelityGrade, prior, globalPrior,
     minPriorClusters: minimumPrior,
+    minGlobalPriorClusters: minimumGlobalPrior,
   });
   const agreementLower = finite(prior?.agreementLower, 0);
   const directions = [
@@ -244,7 +279,12 @@ function evaluateTerminalCarry({
       agreementLower: agreementLower || null,
       priorClusters: Math.floor(finite(prior?.clusters, 0)),
       priorAllAgreeClusters: Math.floor(finite(prior?.allAgreeClusters, 0)),
+      globalAgreementLower: finite(globalPrior?.agreementLower),
+      globalPriorClusters: Math.floor(finite(globalPrior?.clusters, 0)),
+      globalPriorAllAgreeClusters: Math.floor(finite(globalPrior?.allAgreeClusters, 0)),
+      riskClass,
       minPriorClusters: minimumPrior,
+      minGlobalPriorClusters: minimumGlobalPrior,
       payoutModel: 'CLUSTERED_AGREEMENT_WILSON_LOWER; MISMATCH_PAYOUT_ZERO',
       atomic: false,
       paperOnly: true,
@@ -253,8 +293,11 @@ function evaluateTerminalCarry({
 }
 
 module.exports = {
+  DEFAULT_MIN_GLOBAL_PRIOR_CLUSTERS,
   DEFAULT_MIN_PRIOR_CLUSTERS,
   TERMINAL_CARRY_EXPERIMENT_ID,
+  TERMINAL_CARRY_V1_EXPERIMENT_ID,
   evaluateTerminalCarry,
+  terminalCarryRiskClass,
   wilsonLower,
 };

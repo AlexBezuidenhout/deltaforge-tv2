@@ -25,7 +25,10 @@ const { createReadThroughCache } = require('../utils/readThroughCache');
 const dashboardReports = createReadThroughCache();
 const { CURRENT_CROSSVENUE_EXPERIMENT_ID: CROSSVENUE_EXPERIMENT_ID } =
   require('../../borg/crossvenue/experiment');
-const { TERMINAL_CARRY_EXPERIMENT_ID } =
+const {
+  TERMINAL_CARRY_EXPERIMENT_ID,
+  TERMINAL_CARRY_V1_EXPERIMENT_ID,
+} =
   require('../../borg/crossvenue/terminal-carry');
 const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v4-capacity';
 const PYTH_EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v2';
@@ -1064,7 +1067,7 @@ router.get('/crossvenue/terminal-carry', authMiddleware, async (req, res) => {
     const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 100));
     const value = await dashboardReports.get(`crossvenue-terminal-carry:${limit}`, 15_000,
       async () => {
-        const [heartbeat, summary, recent] = await Promise.all([
+        const [heartbeat, summary, recent, excludedV1] = await Promise.all([
           pool.query(`SELECT beat_at,meta->'terminalCarry' terminal_carry
                         FROM system_heartbeats WHERE component='crossvenue_lab'`),
           pool.query(`
@@ -1092,6 +1095,7 @@ router.get('/crossvenue/terminal-carry', authMiddleware, async (req, res) => {
             )
             SELECT direction,count(*)::int entries,
                    count(DISTINCT match_id)::int matches,
+                   count(DISTINCT risk_class)::int risk_classes,
                    count(realized_payout)::int settled,
                    count(*) FILTER (WHERE realized_pnl>0)::int profitable,
                    count(*) FILTER (WHERE venues_agreed)::int settlements_agreed,
@@ -1108,10 +1112,13 @@ router.get('/crossvenue/terminal-carry', authMiddleware, async (req, res) => {
           `, [TERMINAL_CARRY_EXPERIMENT_ID]),
           pool.query(`
             SELECT t.mark_id,t.observed_at,t.entry_day,t.match_id,t.direction,
+                   t.risk_class,
                    t.quantity::float,t.poly_vwap::float,t.kalshi_vwap::float,
+                   t.poly_cash_required::float,t.kalshi_cash_required::float,
                    t.total_cost::float,t.expected_profit_lower::float,
                    t.expected_roi_lower::float,t.orphan_reserve::float,
                    t.agreement_lower::float,t.prior_clusters,t.eligible,
+                   t.global_agreement_lower::float,t.global_prior_clusters,
                    t.entry_armed,t.reason,t.data_quality_grade,
                    t.execution_fidelity_grade,t.detail,
                    m.poly_question,m.kalshi_title
@@ -1120,14 +1127,29 @@ router.get('/crossvenue/terminal-carry', authMiddleware, async (req, res) => {
              WHERE t.experiment_id=$2
              ORDER BY t.observed_at DESC LIMIT $1
           `, [limit, TERMINAL_CARRY_EXPERIMENT_ID]),
+          pool.query(`
+            SELECT count(*)::int entries,
+                   count(DISTINCT match_id)::int matches,
+                   COALESCE(sum(total_cost),0)::float displayed_cash,
+                   max(observed_at) latest
+              FROM cv_terminal_carry_marks
+             WHERE experiment_id=$1 AND entry_armed=true
+          `, [TERMINAL_CARRY_V1_EXPERIMENT_ID]),
         ]);
+        const terminalCarry = heartbeat.rows[0]?.terminal_carry || {};
         return {
           experimentId: TERMINAL_CARRY_EXPERIMENT_ID,
+          supersedes: TERMINAL_CARRY_V1_EXPERIMENT_ID,
           paperOnly: true,
           deterministicArbitrage: false,
-          warning: 'These contracts are not rule-certified identities. PnL can be lost to different settlement, non-atomic legs, partial fills, disappearing depth, fees and capital duration.',
+          warning: 'These contracts are not rule-certified identities. V1 is retained but excluded because it pooled heterogeneous resolver risk and reused $500 for every candidate. V2 uses a same-risk-class lower bound and one shared unresolved paper bankroll; PnL can still be lost to different settlement, non-atomic legs, partial fills, disappearing depth, fees and capital duration.',
           evidenceRule: 'One entry per match/direction/UTC day; require 300 fresh units and 30 days, positive 2x-cost PnL in both halves, clustered lower bound above zero, multiple-testing correction and 100/250/500ms robustness.',
-          prior: heartbeat.rows[0]?.terminal_carry?.prior || null,
+          prior: terminalCarry.prior || null,
+          riskClasses: terminalCarry.riskClasses || 0,
+          capital: terminalCarry.capital || null,
+          excludedV1: excludedV1.rows[0] || {
+            entries: 0, matches: 0, displayed_cash: 0, latest: null,
+          },
           heartbeatAt: heartbeat.rows[0]?.beat_at || null,
           rows: summary.rows,
           recent: recent.rows,

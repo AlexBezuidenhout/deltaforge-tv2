@@ -34,9 +34,11 @@ const {
   evaluateBasisPair, finite, normalizeKalshiBook, optimizePair,
 } = require('./strategy');
 const {
+  DEFAULT_MIN_GLOBAL_PRIOR_CLUSTERS,
   DEFAULT_MIN_PRIOR_CLUSTERS,
   TERMINAL_CARRY_EXPERIMENT_ID,
   evaluateTerminalCarry,
+  terminalCarryRiskClass,
   wilsonLower,
 } = require('./terminal-carry');
 const {
@@ -89,6 +91,9 @@ const TERMINAL_CARRY_CONTROL_MS = Math.max(60_000,
 const TERMINAL_CARRY_MIN_PRIOR_CLUSTERS = Math.max(1,
   Number(process.env.CROSSVENUE_TERMINAL_CARRY_MIN_PRIOR_CLUSTERS
     || DEFAULT_MIN_PRIOR_CLUSTERS));
+const TERMINAL_CARRY_MIN_GLOBAL_PRIOR_CLUSTERS = Math.max(1,
+  Number(process.env.CROSSVENUE_TERMINAL_CARRY_MIN_GLOBAL_PRIOR_CLUSTERS
+    || DEFAULT_MIN_GLOBAL_PRIOR_CLUSTERS));
 
 const MATCH_COLUMNS = [
   'match_id', 'poly_condition_id', 'poly_gamma_id', 'poly_question',
@@ -167,11 +172,13 @@ const BASIS_COLUMNS = [
 ];
 const TERMINAL_CARRY_COLUMNS = [
   'mark_id', 'observed_at', 'entry_day', 'experiment_id', 'match_id',
-  'direction', 'poly_outcome', 'kalshi_outcome', 'quantity',
-  'poly_vwap', 'kalshi_vwap', 'poly_fee', 'kalshi_fee', 'total_cost',
+  'risk_class', 'direction', 'poly_outcome', 'kalshi_outcome', 'quantity',
+  'poly_vwap', 'kalshi_vwap', 'poly_fee', 'kalshi_fee',
+  'poly_cash_required', 'kalshi_cash_required', 'total_cost',
   'expected_payout_lower', 'additional_cost_stress', 'orphan_reserve',
   'expected_profit_lower', 'expected_roi_lower', 'worst_mismatch_loss',
   'prior_clusters', 'prior_all_agree_clusters', 'agreement_lower',
+  'global_prior_clusters', 'global_agreement_lower',
   'books_fresh', 'data_quality_grade', 'execution_fidelity_grade',
   'eligible', 'entry_armed', 'reason', 'book_signature', 'detail',
 ];
@@ -251,6 +258,14 @@ class CrossVenueLab {
       agreementLower: null,
       updatedAt: null,
       sourceLatestAt: null,
+    };
+    this.terminalCarryPriors = new Map();
+    this.terminalCarryCapital = {
+      totalReservedUsd: 0,
+      polyReservedUsd: 0,
+      kalshiReservedUsd: 0,
+      openEntries: 0,
+      refreshedAt: null,
     };
     this.terminalCarryEntries = new Set();
     this.lastTerminalCarryMark = new Map();
@@ -332,6 +347,7 @@ class CrossVenueLab {
     await this.loadRelationEpisodes();
     await this.refreshTerminalCarryPrior();
     await this.loadTerminalCarryEntries();
+    await this.refreshTerminalCarryCapital();
     await pool.query(`
       INSERT INTO cv_runtime (run_id,started_at,host,pid,paper_only,wallet_loaded,status,metrics,experiment_id)
       VALUES ($1,now(),$2,$3,true,false,'STARTING',$4::jsonb,$5)
@@ -354,7 +370,10 @@ class CrossVenueLab {
       setInterval(() => this.pollKalshi('broad').catch((error) => this.recordError('kalshi_broad_poll', error)), BROAD_POLL_MS),
       setInterval(() => this.flush().catch((error) => this.recordError('flush', error)), 250),
       setInterval(() => this.refreshUniverse().catch((error) => this.recordError('universe', error)), REFRESH_MS),
-      setInterval(() => this.refreshTerminalCarryPrior()
+      setInterval(() => Promise.all([
+        this.refreshTerminalCarryPrior(),
+        this.refreshTerminalCarryCapital(),
+      ])
         .catch((error) => this.recordError('terminal_carry_prior', error)),
       TERMINAL_CARRY_PRIOR_REFRESH_MS),
       setInterval(() => this.clob.checkStale(), 10_000),
@@ -435,40 +454,67 @@ class CrossVenueLab {
 
   async refreshTerminalCarryPrior() {
     const { rows } = await pool.query(`
-      WITH settled AS (
-        SELECT
-          COALESCE(NULLIF(m.kalshi_event_ticker,''),m.kalshi_ticker) kalshi_event,
-          COALESCE(NULLIF(m.metadata->'poly'->>'eventTitle',''),m.poly_condition_id) poly_event,
-          lower(s.kalshi_result)=lower(s.poly_outcome) agrees,
-          s.last_checked_at
+      SELECT COALESCE(NULLIF(m.kalshi_event_ticker,''),m.kalshi_ticker) kalshi_event,
+             COALESCE(NULLIF(m.metadata->'poly'->>'eventTitle',''),m.poly_condition_id) poly_event,
+             m.metadata->'poly'->>'category' poly_category,
+             m.metadata->'kalshi'->>'category' kalshi_category,
+             m.metadata->'structured' structured,
+             m.mismatch_reasons,
+             lower(s.kalshi_result)=lower(s.poly_outcome) agrees,
+             s.last_checked_at
         FROM cv_settlements s
         JOIN cv_contract_matches m USING (match_id)
-        WHERE lower(s.kalshi_result) IN ('yes','no')
-          AND lower(s.poly_outcome) IN ('yes','no')
-          AND m.paper_eval_approved=true
-          AND m.relation_approved=false
-      ), event_clusters AS (
-        SELECT kalshi_event,poly_event,bool_and(agrees) all_agree,
-               max(last_checked_at) latest_at
-        FROM settled
-        GROUP BY kalshi_event,poly_event
-      )
-      SELECT count(*)::int clusters,
-             count(*) FILTER (WHERE all_agree)::int all_agree_clusters,
-             max(latest_at) source_latest_at
-      FROM event_clusters
+       WHERE lower(s.kalshi_result) IN ('yes','no')
+         AND lower(s.poly_outcome) IN ('yes','no')
+         AND m.paper_eval_approved=true
+         AND m.relation_approved=false
     `);
-    const row = rows[0] || {};
-    const clusters = parseInt(row.clusters, 10) || 0;
-    const allAgreeClusters = parseInt(row.all_agree_clusters, 10) || 0;
+    const globalClusters = new Map();
+    const classClusters = new Map();
+    let sourceLatestAt = null;
+    for (const row of rows) {
+      const eventKey = `${row.kalshi_event}\u0000${row.poly_event}`;
+      const observedAt = new Date(row.last_checked_at);
+      if (!sourceLatestAt || observedAt > sourceLatestAt) sourceLatestAt = observedAt;
+      const global = globalClusters.get(eventKey) || { allAgree: true };
+      global.allAgree = global.allAgree && row.agrees === true;
+      globalClusters.set(eventKey, global);
+      const riskClass = terminalCarryRiskClass({
+        polyCategory: row.poly_category,
+        kalshiCategory: row.kalshi_category,
+        structured: row.structured,
+        mismatchReasons: row.mismatch_reasons,
+      });
+      if (!classClusters.has(riskClass)) classClusters.set(riskClass, new Map());
+      const clusters = classClusters.get(riskClass);
+      const prior = clusters.get(eventKey) || { allAgree: true };
+      prior.allAgree = prior.allAgree && row.agrees === true;
+      clusters.set(eventKey, prior);
+    }
+    const clusters = globalClusters.size;
+    const allAgreeClusters = [...globalClusters.values()]
+      .filter((row) => row.allAgree).length;
+    const updatedAt = new Date().toISOString();
     this.terminalCarryPrior = {
       clusters,
       allAgreeClusters,
       agreementLower: wilsonLower(allAgreeClusters, clusters),
-      updatedAt: new Date().toISOString(),
-      sourceLatestAt: row.source_latest_at || null,
+      updatedAt,
+      sourceLatestAt: sourceLatestAt?.toISOString() || null,
       estimator: 'EVENT_CLUSTER_ALL_AGREE_WILSON_95_LOWER',
     };
+    this.terminalCarryPriors = new Map([...classClusters].map(([riskClass, eventRows]) => {
+      const classAllAgree = [...eventRows.values()].filter((row) => row.allAgree).length;
+      return [riskClass, {
+        riskClass,
+        clusters: eventRows.size,
+        allAgreeClusters: classAllAgree,
+        agreementLower: wilsonLower(classAllAgree, eventRows.size),
+        updatedAt,
+        sourceLatestAt: sourceLatestAt?.toISOString() || null,
+        estimator: 'SAME_RISK_CLASS_EVENT_CLUSTER_ALL_AGREE_WILSON_95_LOWER',
+      }];
+    }));
   }
 
   async loadTerminalCarryEntries() {
@@ -481,14 +527,49 @@ class CrossVenueLab {
       `${row.match_id}:${row.direction}:${new Date(row.entry_day).toISOString().slice(0, 10)}`));
   }
 
+  async refreshTerminalCarryCapital() {
+    const { rows } = await pool.query(`
+      SELECT count(*)::int open_entries,
+             COALESCE(sum(t.total_cost),0)::float total_reserved_usd,
+             COALESCE(sum(t.poly_cash_required),0)::float poly_reserved_usd,
+             COALESCE(sum(t.kalshi_cash_required),0)::float kalshi_reserved_usd
+        FROM cv_terminal_carry_marks t
+        LEFT JOIN cv_settlements s USING (match_id)
+       WHERE t.experiment_id=$1 AND t.entry_armed=true
+         AND NOT (
+           COALESCE(lower(s.kalshi_result) IN ('yes','no'),false)
+           AND COALESCE(lower(s.poly_outcome) IN ('yes','no'),false)
+         )
+    `, [TERMINAL_CARRY_EXPERIMENT_ID]);
+    const row = rows[0] || {};
+    this.terminalCarryCapital = {
+      totalReservedUsd: finite(row.total_reserved_usd, 0),
+      polyReservedUsd: finite(row.poly_reserved_usd, 0),
+      kalshiReservedUsd: finite(row.kalshi_reserved_usd, 0),
+      openEntries: parseInt(row.open_entries, 10) || 0,
+      refreshedAt: new Date().toISOString(),
+    };
+  }
+
   observeTerminalCarry(match, now, {
     polyBooks, kalshiBooks, booksFresh, quality, fidelity,
     bookSignature, triggerVenue, pairSkewMs,
   }) {
+    const riskClass = terminalCarryRiskClass(match);
+    const classPrior = this.terminalCarryPriors.get(riskClass) || null;
+    const available = {
+      total: Math.max(0, TOTAL_CAPITAL_USD - this.terminalCarryCapital.totalReservedUsd),
+      polymarket: Math.max(0,
+        CAPITAL_PER_VENUE_USD - this.terminalCarryCapital.polyReservedUsd),
+      kalshi: Math.max(0,
+        CAPITAL_PER_VENUE_USD - this.terminalCarryCapital.kalshiReservedUsd),
+    };
     const rows = evaluateTerminalCarry({
       polyBooks,
       kalshiBooks,
-      prior: this.terminalCarryPrior,
+      prior: classPrior,
+      globalPrior: this.terminalCarryPrior,
+      riskClass,
       paperEvalApproved: match.paperEvalApproved,
       relationApproved: match.relationApproved,
       booksFresh,
@@ -497,33 +578,81 @@ class CrossVenueLab {
       quantities: QUANTITIES,
       minQuantity: Math.max(1, finite(match.poly.orderMinSize, 5)),
       maxQuantity: MAX_OPTIMIZED_QUANTITY,
-      totalCapitalUsd: TOTAL_CAPITAL_USD,
-      polyCapitalUsd: CAPITAL_PER_VENUE_USD,
-      kalshiCapitalUsd: CAPITAL_PER_VENUE_USD,
+      totalCapitalUsd: available.total,
+      polyCapitalUsd: available.polymarket,
+      kalshiCapitalUsd: available.kalshi,
       polyFeeRate: match.poly.feeRate,
       polyFeeExponent: match.poly.feeExponent,
       kalshiFeeMultiplier: 1,
       polyTick: match.poly.tickSize,
       kalshiTick: 0.01,
       minPriorClusters: TERMINAL_CARRY_MIN_PRIOR_CLUSTERS,
+      minGlobalPriorClusters: TERMINAL_CARRY_MIN_GLOBAL_PRIOR_CLUSTERS,
+    }).map((row) => {
+      if (row.reason !== 'NO_FULL_DEPTH_WITHIN_BANKROLL') return row;
+      if (available.total > 0 && available.polymarket > 0 && available.kalshi > 0) {
+        return row;
+      }
+      return {
+        ...row,
+        reason: 'SHARED_PORTFOLIO_CAPITAL_RESERVED',
+      };
     });
     const entryDay = new Date(now).toISOString().slice(0, 10);
+    const entryDecisions = new Map();
+    const remaining = { ...available };
+    for (const row of [...rows].sort((left, right) =>
+      finite(right.expectedProfitLower, -Infinity)
+        - finite(left.expectedProfitLower, -Infinity))) {
+      const unitKey = `${match.matchId}:${row.direction}:${entryDay}`;
+      if (!row.eligible) {
+        entryDecisions.set(row.direction, { entryArmed: false, reason: row.reason });
+        continue;
+      }
+      if (this.terminalCarryEntries.has(unitKey)) {
+        entryDecisions.set(row.direction, {
+          entryArmed: false,
+          reason: 'DAILY_INDEPENDENT_UNIT_ALREADY_ENTERED',
+        });
+        continue;
+      }
+      const portfolioFeasible = row.totalCost <= remaining.total + 1e-9
+        && row.polyCashRequired <= remaining.polymarket + 1e-9
+        && row.kalshiCashRequired <= remaining.kalshi + 1e-9;
+      if (!portfolioFeasible) {
+        entryDecisions.set(row.direction, {
+          entryArmed: false,
+          reason: 'SHARED_PORTFOLIO_CAPITAL_RESERVED',
+        });
+        continue;
+      }
+      entryDecisions.set(row.direction, { entryArmed: true, reason: row.reason });
+      remaining.total -= row.totalCost;
+      remaining.polymarket -= row.polyCashRequired;
+      remaining.kalshi -= row.kalshiCashRequired;
+    }
     for (const row of rows) {
       const unitKey = `${match.matchId}:${row.direction}:${entryDay}`;
-      const alreadyEntered = this.terminalCarryEntries.has(unitKey);
-      const entryArmed = row.eligible && !alreadyEntered;
-      const reason = row.eligible && alreadyEntered
-        ? 'DAILY_INDEPENDENT_UNIT_ALREADY_ENTERED' : row.reason;
+      const decision = entryDecisions.get(row.direction)
+        || { entryArmed: false, reason: row.reason };
+      const { entryArmed, reason } = decision;
       const markSignature = signature([
         row.direction, row.quantity, row.totalCost, row.expectedProfitLower,
-        row.agreementLower, row.priorClusters, reason, entryArmed,
+        row.agreementLower, row.priorClusters, row.globalPriorClusters,
+        riskClass, reason, entryArmed,
       ]);
       const markKey = `${match.matchId}:${row.direction}`;
       const priorMark = this.lastTerminalCarryMark.get(markKey);
       const controlDue = !priorMark || now - priorMark.at >= TERMINAL_CARRY_CONTROL_MS;
       if (!entryArmed && priorMark?.signature === markSignature && !controlDue) continue;
       this.lastTerminalCarryMark.set(markKey, { signature: markSignature, at: now });
-      if (entryArmed) this.terminalCarryEntries.add(unitKey);
+      if (entryArmed) {
+        this.terminalCarryEntries.add(unitKey);
+        this.terminalCarryCapital.totalReservedUsd += row.totalCost;
+        this.terminalCarryCapital.polyReservedUsd += row.polyCashRequired;
+        this.terminalCarryCapital.kalshiReservedUsd += row.kalshiCashRequired;
+        this.terminalCarryCapital.openEntries += 1;
+      }
 
       const markId = `cvtc:${now}:${crypto.randomUUID()}`;
       const durable = {
@@ -542,6 +671,8 @@ class CrossVenueLab {
         booksFresh,
         priorUpdatedAt: this.terminalCarryPrior.updatedAt,
         sourceLatestAt: this.terminalCarryPrior.sourceLatestAt,
+        portfolioBefore: available,
+        portfolioAfter: remaining,
         identityStatus: match.identityStatus,
         matchScore: finite(match.score, 0),
       };
@@ -551,22 +682,25 @@ class CrossVenueLab {
       });
       this.buffers.terminalCarry.push([
         markId, iso(now), entryDay, TERMINAL_CARRY_EXPERIMENT_ID,
-        match.matchId, row.direction, row.polyOutcome, row.kalshiOutcome,
+        match.matchId, riskClass, row.direction, row.polyOutcome, row.kalshiOutcome,
         row.quantity, row.polyVwap, row.kalshiVwap, row.polyFee, row.kalshiFee,
+        row.polyCashRequired, row.kalshiCashRequired,
         row.totalCost, row.expectedPayoutLower, row.additionalCostStress,
         row.orphanReserve, row.expectedProfitLower, row.expectedRoiLower,
         row.worstMismatchLoss, row.priorClusters, row.priorAllAgreeClusters,
-        row.agreementLower, booksFresh, quality, fidelity, row.eligible,
+        row.agreementLower, row.globalPriorClusters, row.globalAgreementLower,
+        booksFresh, quality, fidelity, row.eligible,
         entryArmed, reason, bookSignature,
         json({
           triggerVenue,
           pairSkewMs,
           priorUpdatedAt: this.terminalCarryPrior.updatedAt,
           sourceLatestAt: this.terminalCarryPrior.sourceLatestAt,
+          riskClass,
+          portfolioBefore: available,
+          portfolioAfter: remaining,
           identityStatus: match.identityStatus,
           matchScore: finite(match.score, 0),
-          polyCashRequired: row.polyCashRequired,
-          kalshiCashRequired: row.kalshiCashRequired,
           worstImmediateOrphanUnwindPnl: row.worstImmediateOrphanUnwindPnl,
           immediateOrphanUnwindAvailable: row.immediateOrphanUnwindAvailable,
           payoutModel: row.payoutModel,
@@ -1427,7 +1561,20 @@ class CrossVenueLab {
         paperOnly: true,
         liveOrderPath: false,
         minimumPriorClusters: TERMINAL_CARRY_MIN_PRIOR_CLUSTERS,
+        minimumGlobalPriorClusters: TERMINAL_CARRY_MIN_GLOBAL_PRIOR_CLUSTERS,
         prior: this.terminalCarryPrior,
+        riskClasses: this.terminalCarryPriors.size,
+        capital: {
+          ...this.terminalCarryCapital,
+          totalUsd: TOTAL_CAPITAL_USD,
+          perVenueUsd: CAPITAL_PER_VENUE_USD,
+          totalAvailableUsd: Math.max(0,
+            TOTAL_CAPITAL_USD - this.terminalCarryCapital.totalReservedUsd),
+          polyAvailableUsd: Math.max(0,
+            CAPITAL_PER_VENUE_USD - this.terminalCarryCapital.polyReservedUsd),
+          kalshiAvailableUsd: Math.max(0,
+            CAPITAL_PER_VENUE_USD - this.terminalCarryCapital.kalshiReservedUsd),
+        },
         independentUnit: 'MATCH_DIRECTION_UTC_ENTRY_DAY',
         mismatchPayoutAssumption: 0,
         entryHurdle: 'WILSON_LOWER_PAYOUT_MINUS_2X_COSTS_TICKS_AND_FULL_ORPHAN_RESERVE_GT_ZERO',
