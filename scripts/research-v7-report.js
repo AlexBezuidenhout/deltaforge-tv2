@@ -227,15 +227,19 @@ function markdown(report) {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
+  const localSocket = !process.env.DATABASE_URL && fs.existsSync('/var/run/postgresql');
+  if (!process.env.DATABASE_URL && !localSocket) {
     throw new Error(`DATABASE_URL is missing; set it in .env or ${serviceEnv}`);
   }
-  const local = /(?:localhost|127\.0\.0\.1|\/deltaforge)/i.test(process.env.DATABASE_URL);
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: local ? false : { rejectUnauthorized: false },
-    max: 2,
-  });
+  const local = localSocket
+    || /(?:localhost|127\.0\.0\.1|\/deltaforge)/i.test(process.env.DATABASE_URL);
+  const pool = new Pool(localSocket
+    ? { host: '/var/run/postgresql', database: 'deltaforge', max: 2 }
+    : {
+        connectionString: process.env.DATABASE_URL,
+        ssl: local ? false : { rejectUnauthorized: false },
+        max: 2,
+      });
   try {
     const report = await buildReport(pool, arg('since', MANIFEST.evidence_started_at));
     process.stdout.write(process.argv.includes('--json')
