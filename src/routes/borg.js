@@ -750,7 +750,7 @@ router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
           client.query(`
             SELECT o.id,o.ts,o.market_id,o.action,o.side,o.token,
                    o.price::float price,o.size::float size,o.tte_sec::float tte_sec,
-                   o.order_kind,o.note,o.features->>'asset' asset,
+                   o.order_kind,o.features->>'note' note,o.features->>'asset' asset,
                    s.filled,s.pnl_1x::float pnl_1x,s.pnl_2x::float pnl_2x,
                    s.data_quality_grade,s.execution_fidelity_grade
               FROM borg_shadow_orders o
