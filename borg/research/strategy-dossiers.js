@@ -97,6 +97,16 @@ const PREMISES = Object.freeze({
   H61_vol_regime_envelope: 'Price across short- and long-horizon volatility regimes and trade only the conservative overlap.',
   H62_threshold_isotonic_residual: 'Project same-event threshold prices onto a monotone curve and trade only residuals that also agree with analytic resolver-distance fair value.',
   H63_range_simplex_residual: 'Project disjoint range probabilities onto a valid simplex and trade overpriced residuals only when analytic resolver-distance pricing agrees.',
+  H64_multivenue_cusum_break: 'Detect a statistically abrupt shift in a robust multi-venue spot consensus, then trade only a token ask that still fails the conservative terminal-value hurdle.',
+  H65_kalman_latent_consensus: 'Fuse independently timestamped Binance, Chainlink, Coinbase and Hyperliquid observations into an uncertainty-bounded latent spot before pricing the binary.',
+  H66_range_threshold_partition_lock: 'Test exact range-plus-threshold payoff partitions after synchronized depth, doubled fees and non-atomic orphan risk.',
+  H67_queue_depletion_hazard: 'Estimate whether the selected token queue is depleting before it refills, instead of treating a static imbalance as durable liquidity.',
+  H68_multilevel_ofi_impact: 'Learn the causal next-event impact of five-level order flow and use it only to time terminally supported entries.',
+  H69_quarticity_confidence_envelope: 'Use realized quarticity to attach estimator uncertainty to short-horizon volatility and accept only binary edge that survives the full sigma interval.',
+  H70_stationary_block_bootstrap_digital: 'Price a T-120 binary from centered empirical return blocks so skew, tails and short dependence are not forced into a Gaussian Phi model.',
+  H71_token_elasticity_residual: 'Learn each market’s own causal logit response to resolver distance and trade only a statistically exceptional quote residual supported by terminal fair value.',
+  H72_crosshorizon_nested_lock: 'Test the nested payoff identity between same-expiry five- and fifteen-minute Chainlink contracts with different trusted opening boundaries.',
+  H73_market_prior_calibration_residual: 'Apply a pre-cutoff Wilson-bounded calibration map at T-120 and trade only deviations that survive executable asks and doubled fees.',
   ETH_G_late_exact_forward_v1: 'Re-run the exact ETH late-window rule under a fresh evidence clock, with realistic executable arrival and fee stress.',
   ETH_late_taker: 'Take late-window ETH quotes when CEX movement appears to clear the terminal payoff hurdle.',
   ETH_late_maker: 'Quote the same ETH late-window view passively with back-of-queue fill accounting.',
@@ -236,7 +246,9 @@ function dossierFor(strategy, context = {}) {
   const priorOutcome = PRIOR_OUTCOMES[strategy] || null;
   const design = sourceStrategy
     ? 'Prospective identity-only clone: source thresholds, assets, sizing and execution model are unchanged; discovery rows are excluded.'
-    : /^H5[4-9]_/.test(strategy) || /^H6[0-3]_/.test(strategy)
+    : /^H6[4-9]_/.test(strategy) || /^H7[0-3]_/.test(strategy)
+      ? 'New H64–H73 mechanism frozen before its forward results existed; thresholds are provisional and cannot be tuned from this cohort.'
+      : /^H5[4-9]_/.test(strategy) || /^H6[0-3]_/.test(strategy)
       ? 'New mechanism frozen before H54–H63 results existed; thresholds are provisional and cannot be tuned from this cohort.'
       : strategy === 'H43_resolution_boundary_buffer'
         ? 'Original resolver-boundary rule relaunched unchanged; no threshold or sizing edits.'
