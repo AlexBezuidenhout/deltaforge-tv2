@@ -48,7 +48,7 @@ function ctx(overrides = {}) {
   };
 }
 
-test('research portfolio registers the H1-H53 strategies', () => {
+test('research portfolio registers the H1-H63 strategies', () => {
   const names = makeStrategies().map((strategy) => strategy.name);
   const research = names.filter((name) => /^H\d+_/.test(name));
   assert.deepEqual(research, [
@@ -108,6 +108,16 @@ test('research portfolio registers the H1-H53 strategies', () => {
     'H51_network_four_feed_median_arb',
     'H52_15m_neareven_favorite_v2',
     'H53_5m_neareven_favorite_live_v1',
+    'H54_dynamic_ofi_resolver_confirm',
+    'H55_ofi_guarded_passive_maker',
+    'H56_hawkes_excitation_continuation',
+    'H57_adaptive_venue_leader_residual',
+    'H58_resolver_event_stale_quote',
+    'H59_resolver_cross_persistence',
+    'H60_bipower_jump_envelope',
+    'H61_vol_regime_envelope',
+    'H62_threshold_isotonic_residual',
+    'H63_range_simplex_residual',
   ]);
 });
 

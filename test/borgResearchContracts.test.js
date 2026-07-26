@@ -86,4 +86,15 @@ test('experiment registry resolves frozen cadence arms and legacy research famil
   assert.equal(mainV4.phase, 'eval');
   assert.equal(mainV4.primaryMetric, 'net_pnl_2x');
   assert.equal(mainV4.minIndependentMarkets, 500);
+
+  const h54 = registry.resolve('H54_dynamic_ofi_resolver_confirm');
+  assert.equal(h54.experimentId, 'research-v7-h54-h63-paper-v1');
+  assert.equal(h54.phase, 'eval');
+  assert.equal(h54.minIndependentMarkets, 300);
+  assert.equal(h54.minDays, 14);
+
+  const h63 = registry.resolve('H63_range_simplex_residual');
+  assert.equal(h63.experimentId, 'research-v7-h54-h63-paper-v1');
+  assert.equal(h63.phase, 'eval');
+  assert.equal(h63.minDays, 30);
 });
