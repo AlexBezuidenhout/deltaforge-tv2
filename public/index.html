@@ -3949,11 +3949,18 @@
   function closeBorgStrategyDossier() {
     const shell = document.getElementById('borgStrategyDossier');
     if (!shell?.classList.contains('active')) return;
+    const closingStrategy = _borgDossierStrategy;
     shell.classList.remove('active');
     shell.setAttribute('aria-hidden', 'true');
     document.documentElement.style.overflow = '';
     _borgDossierStrategy = null;
-    if (_borgDossierTrigger?.focus) _borgDossierTrigger.focus();
+    const priorTrigger = _borgDossierTrigger;
+    requestAnimationFrame(() => {
+      const currentRow = [...document.querySelectorAll('#borgSummaryBody .borg-strategy-row')]
+        .find((row) => row.dataset.strategy === closingStrategy);
+      const focusTarget = currentRow || (priorTrigger?.isConnected ? priorTrigger : null);
+      if (focusTarget?.focus) focusTarget.focus({ preventScroll: true });
+    });
     _borgDossierTrigger = null;
   }
 
