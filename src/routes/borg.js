@@ -722,7 +722,7 @@ router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
               FROM eligible
           `, cohortParams),
           client.query(`
-            SELECT (COALESCE(o.available_at,o.ts) AT TIME ZONE 'UTC')::date day,
+            SELECT (COALESCE(o.available_at,o.ts) AT TIME ZONE 'UTC')::date AS utc_day,
                    count(*)::int fills,count(DISTINCT o.market_id)::int markets,
                    COALESCE(sum(s.pnl_1x),0)::float pnl_1x,
                    COALESCE(sum(s.pnl_2x),0)::float pnl_2x

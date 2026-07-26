@@ -3827,7 +3827,7 @@
       '</td><td>' + Number(row.fills || 0) + '</td><td style="color:' + _bPnlColor(Number(row.pnl_2x || 0)) + ';">' +
       _bMoney(Number(row.pnl_2x || 0)) + '</td></tr>').join('') : emptyRows(4, 'No eligible asset-level fills yet');
     const dayRows = (data.byDay || []).length ? data.byDay.map((row) =>
-      '<tr><td>' + escapeHtml(String(row.day).slice(0, 10)) + '</td><td>' + Number(row.markets || 0) +
+      '<tr><td>' + escapeHtml(String(row.utc_day).slice(0, 10)) + '</td><td>' + Number(row.markets || 0) +
       '</td><td>' + Number(row.fills || 0) + '</td><td style="color:' + _bPnlColor(Number(row.pnl_2x || 0)) + ';">' +
       _bMoney(Number(row.pnl_2x || 0)) + '</td></tr>').join('') : emptyRows(4, 'No eligible UTC-day fills yet');
     const historyRows = (data.trialHistory || []).length ? data.trialHistory.map((row) =>
