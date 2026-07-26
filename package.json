@@ -15,6 +15,7 @@
     "research:v2": "node scripts/research-v2-backtest.js",
     "research:v4": "node scripts/research-v4-report.js",
     "research:v5": "node scripts/research-v5-report.js",
+    "research:v7": "node scripts/research-v7-report.js",
     "benchmark:infra": "node scripts/infra-benchmark.js",
     "replay:latency": "node scripts/borg-latency-replay.js",
     "replay:latency-sweep": "node scripts/latency-sweep.js",
