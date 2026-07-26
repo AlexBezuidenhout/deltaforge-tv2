@@ -18,6 +18,7 @@
     "research:v7": "node scripts/research-v7-report.js",
     "research:v8": "node scripts/research-v8-report.js",
     "research:v8-development": "node scripts/research-v8-developmental-backtest.js",
+    "research:v9-development": "node scripts/regime-leadlag-research.js --days=30",
     "research:h73-calibration": "node scripts/h73-calibration-train.js",
     "benchmark:infra": "node scripts/infra-benchmark.js",
     "replay:latency": "node scripts/borg-latency-replay.js",

@@ -322,6 +322,54 @@ class BinanceRecon {
     };
   }
 
+  /**
+   * Wall-clock microstructure window for minute-horizon research.
+   *
+   * getMicro() intentionally preserves the frozen legacy interpretation of
+   * its argument as a count of event bars. Less-active symbols can therefore
+   * span more than N seconds. New minute strategies need elapsed time instead:
+   * missing seconds mean no aggregate trade and a carried-forward price, not
+   * permission to reach further into history.
+   */
+  getWallClockMicro(symbol, lookbackSec = 60) {
+    const st = this.bySymbol.get(symbol);
+    const seconds = Math.max(2, Math.trunc(lookbackSec));
+    if (!st) return null;
+    const causal = st._history.slice();
+    if (st._bar && causal[causal.length - 1]?.sec !== st._bar.sec) causal.push(st._bar);
+    const latest = causal.at(-1);
+    if (!latest || !Number.isFinite(Number(latest.sec))) return null;
+    const cutoffSec = Number(latest.sec) - seconds + 1;
+    const bars = causal.filter((bar) => Number(bar.sec) >= cutoffSec);
+    if (!bars.length) return null;
+    const anchor = [...causal].reverse()
+      .find((bar) => Number(bar.sec) < cutoffSec);
+    const first = Number(anchor?.close ?? bars[0]?.open);
+    const last = Number(bars.at(-1)?.close);
+    if (!(first > 0) || !(last > 0)) return null;
+    let buy = 0; let sell = 0; let trades = 0;
+    for (const bar of bars) {
+      buy += Number(bar.buyVol) || 0;
+      sell += Number(bar.sellVol) || 0;
+      trades += Number(bar.n) || 0;
+    }
+    const volume = buy + sell;
+    return {
+      lookbackSec: seconds,
+      returnBps: 10000 * Math.log(last / first),
+      flowImbalance: volume > 0 ? (buy - sell) / volume : null,
+      depthImbalance: Number.isFinite(st.depthImb) ? st.depthImb : null,
+      trades,
+      volume,
+      observedBars: bars.length,
+      firstObservedBarSec: Number(bars[0].sec),
+      lastBarSec: Number(bars.at(-1).sec),
+      lastPriceAgeMs: st.priceAt
+        ? Math.max(0, Date.now() - st.priceAt)
+        : null,
+    };
+  }
+
   freshPrice(symbol, maxAgeMs = 3000) {
     const st = this.bySymbol.get(symbol);
     if (!st || !st.priceAt) return null;

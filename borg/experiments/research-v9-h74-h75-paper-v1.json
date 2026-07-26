@@ -1,0 +1,123 @@
+{
+  "experiment_id": "research-v9-h74-h75-paper-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-26T14:40:42.000Z",
+  "evidence_started_at": "2026-07-26T16:00:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "state_dependent_minute_residual_v9",
+  "strategy_version": "research-v9-h74-h75-paper-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "max_stake_usd": 10,
+  "max_touch_participation": 0.2,
+  "provisional": true,
+  "development_data_cutoff": "2026-07-26T14:16:57.895Z",
+  "discovery_rows_reused": false,
+  "research_design": {
+    "development_result": "A 30-day official-Binance development study found strong same-minute major-coin co-movement, negative BTC-to-ETH/SOL lag-one correlation, and no useful unconditional three-state Markov direction forecast. A sparse dynamic-leader ETH subset was encouraging but statistically unresolved. None of those rows count as forward evidence.",
+    "selection_correction": "No ETH-only arm was selected from the 23-event positive development subset. BTC, ETH, SOL and XRP remain pre-declared reporting arms, and both strategies join the full H1-H75 multiple-testing family.",
+    "minute_integrity": "Only a continuous suffix of complete one-minute snapshots is eligible. A collector gap resets the effective model history; repeated one-second evaluations do not create extra observations.",
+    "common_executable_hurdle": "The mechanism-adjusted conservative selected-side fair lower bound minus executable ask minus 2x crypto taker fees must exceed one token tick. The same quote must not already qualify before the model adjustment.",
+    "capacity_rule": "At most $10 intended notional and 20% of displayed touch; minimum $1 executable notional.",
+    "independent_unit": "One Polymarket fifteen-minute market/window. UTC day and asset are mandatory additional clusters.",
+    "situational_reuse_rule": "Rejected strategies are not retrospectively filtered into profitable regimes. Any future regime overlay requires a fresh strategy ID, an unchanged matched source arm and a new evidence clock.",
+    "no_live_claim": "Both arms are shadow-only. A positive point estimate is not proof and cannot authorize a real-money order path."
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "H74_markov_regime_residual",
+      "family": "markov_state_conditional_residual",
+      "arm": "three_state_four_hour_99pct_incremental",
+      "phase": "eval",
+      "market_types": [
+        "direction_15m"
+      ],
+      "assets": [
+        "btc",
+        "eth",
+        "sol",
+        "xrp"
+      ],
+      "fixed_rules": {
+        "rolling_minutes": 240,
+        "states": "DOWN/NEUTRAL/UP at +/-0.5 trailing standard deviation",
+        "minimum_current_state_transitions": 30,
+        "maximum_normalized_transition_entropy": 0.9,
+        "empirical_forecast_interval": "two-sided 99% normal interval",
+        "decision_tte_seconds": [
+          180,
+          600
+        ]
+      },
+      "development_prior": "negative; retained as a strict falsification arm, not a profitability claim",
+      "min_independent_markets": 1200,
+      "minimum_independent_markets_per_asset": 300,
+      "minimum_days": 14,
+      "primary_metric": "incremental_net_pnl_2x_clustered_by_market_asset_day"
+    },
+    {
+      "strategy": "H75_4h_dynamic_liquidity_leadlag",
+      "family": "dynamic_cross_asset_price_discovery",
+      "arm": "stable_two_half_lag_with_flow_shock",
+      "phase": "eval",
+      "market_types": [
+        "direction_15m"
+      ],
+      "assets": [
+        "btc",
+        "eth",
+        "sol",
+        "xrp"
+      ],
+      "fixed_rules": {
+        "rolling_minutes": 240,
+        "stability": "positive lag slope and Fisher-correlation lower 95% bound in each separate two-hour half",
+        "leader_selection": "largest minimum lower-bound lag correlation; BTC is not privileged",
+        "leader_return_shock": "at or above trailing four-hour absolute-return 95th percentile",
+        "leader_flow_shock": "same sign as return and at or above trailing absolute-flow 75th percentile",
+        "target_underresponse": "at most half fitted contemporaneous response and less absolute flow than leader",
+        "episode_cooldown_minutes": 15,
+        "decision_tte_seconds": [
+          180,
+          600
+        ]
+      },
+      "development_prior": "weak and sparse; ETH 3-minute subset n=23, +2.645 bps signed return, 65.2% hit rate, Wilson 44.9%-81.2%",
+      "min_independent_markets": 1200,
+      "minimum_independent_markets_per_asset": 300,
+      "minimum_days": 14,
+      "primary_metric": "incremental_net_pnl_2x_clustered_by_market_asset_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets_per_asset_arm": 300,
+    "minimum_calendar_days": 14,
+    "cluster_by": [
+      "Polymarket market/window",
+      "asset",
+      "UTC day"
+    ],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_asset_and_day_clustered_lower_bounds_above_zero": true,
+    "require_latency_profiles_ms": [
+      100,
+      250,
+      500
+    ],
+    "require_realistic_execution": [
+      "quote survival",
+      "displayed depth",
+      "partial and non-fills",
+      "one-minute source completeness",
+      "adverse-selection markouts"
+    ],
+    "multiple_testing": "Holm-family correction across H1-H75, forward clones, live-derived variants and every discarded pilot.",
+    "shared_bankroll": "Portfolio replay with one shared $500 bankroll; strategy or asset-arm PnL must not be naively summed.",
+    "promotion": "No live path. Passing the mechanical read only triggers a separate authenticated $1-$2, 50-fill pilot review.",
+    "null_outcome": "No qualifying orders, approximately zero edge, or negative edge are valid outcomes. Thresholds, asset selection and signal direction cannot be changed from this forward cohort."
+  }
+}

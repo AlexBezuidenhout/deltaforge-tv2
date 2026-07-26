@@ -74,6 +74,10 @@ class Feeds {
     const [f, k] = this._route(asset);
     return f?.getMicro ? f.getMicro(k, lookbackSec) : null;
   }
+  getWallClockMicro(asset, lookbackSec = 60) {
+    const [f, k] = this._route(asset);
+    return f?.getWallClockMicro ? f.getWallClockMicro(k, lookbackSec) : null;
+  }
   getReferencePrice(asset) { return this.coinbase.getPrice(asset); }
   getReferenceMicro(asset, lookbackSec = 10) { return this.coinbase.getMicro(asset, lookbackSec); }
   referenceStale(asset, maxAgeMs = 10000) { return this.coinbase.assetStale(asset, maxAgeMs); }

@@ -17,6 +17,7 @@ const PRIORITY_RESEARCH = Object.freeze({
   FWD_H38_passive_flow_divergence_v1: { rank: 7, tier: 'PRIORITY' },
   H54_dynamic_ofi_resolver_confirm: { rank: 8, tier: 'WATCH' },
   H60_bipower_jump_envelope: { rank: 9, tier: 'WATCH' },
+  H75_4h_dynamic_liquidity_leadlag: { rank: 10, tier: 'WATCH' },
 });
 
 const PREMISES = Object.freeze({
@@ -107,6 +108,8 @@ const PREMISES = Object.freeze({
   H71_token_elasticity_residual: 'Learn each market’s own causal logit response to resolver distance and trade only a statistically exceptional quote residual supported by terminal fair value.',
   H72_crosshorizon_nested_lock: 'Test the nested payoff identity between same-expiry five- and fifteen-minute Chainlink contracts with different trusted opening boundaries.',
   H73_market_prior_calibration_residual: 'Apply a pre-cutoff Wilson-bounded calibration map at T-120 and trade only deviations that survive executable asks and doubled fees.',
+  H74_markov_regime_residual: 'Trade only when a four-hour three-state Markov model has an identifiable transition row and creates incremental executable edge beyond the unshifted market-aware fair value.',
+  H75_4h_dynamic_liquidity_leadlag: 'Select the current cross-asset price-discovery leader from two stable two-hour halves, then trade a liquidity-confirmed one-minute target underresponse only when it creates incremental edge.',
   ETH_G_late_exact_forward_v1: 'Re-run the exact ETH late-window rule under a fresh evidence clock, with realistic executable arrival and fee stress.',
   ETH_late_taker: 'Take late-window ETH quotes when CEX movement appears to clear the terminal payoff hurdle.',
   ETH_late_maker: 'Quote the same ETH late-window view passively with back-of-queue fill accounting.',
@@ -144,6 +147,8 @@ const PRIOR_OUTCOMES = Object.freeze({
   MAIN_V2_resolver_quorum: 'The frozen forward cohort was materially negative with its clustered interval below zero.',
   MAIN_V3_robust_source_envelope: 'The conservative source envelope reduced false certainty but did not produce positive executable expectancy.',
   MAIN_V4_warm_vol_temporal_consensus: 'Warm-volatility and temporal agreement did not repair MAIN’s negative forward economics.',
+  H74_markov_regime_residual: 'The 30-day development prior was negative across BTC, ETH, SOL and XRP. H74 is retained as a strict forward falsification arm, not a promising backtest.',
+  H75_4h_dynamic_liquidity_leadlag: 'The only encouraging development cell was ETH over three minutes (23 episodes, +2.645 bps), but its Wilson interval included chance and no Polymarket execution costs were available. All four asset arms remain in the fresh test.',
 });
 
 function humanizeStrategyName(strategy) {
@@ -246,7 +251,9 @@ function dossierFor(strategy, context = {}) {
   const priorOutcome = PRIOR_OUTCOMES[strategy] || null;
   const design = sourceStrategy
     ? 'Prospective identity-only clone: source thresholds, assets, sizing and execution model are unchanged; discovery rows are excluded.'
-    : /^H6[4-9]_/.test(strategy) || /^H7[0-3]_/.test(strategy)
+    : /^H7[4-5]_/.test(strategy)
+      ? 'New H74–H75 minute-horizon mechanism frozen after a development-tape falsification; all development rows are excluded and thresholds cannot be tuned from the forward cohort.'
+      : /^H6[4-9]_/.test(strategy) || /^H7[0-3]_/.test(strategy)
       ? 'New H64–H73 mechanism frozen before its forward results existed; thresholds are provisional and cannot be tuned from this cohort.'
       : /^H5[4-9]_/.test(strategy) || /^H6[0-3]_/.test(strategy)
       ? 'New mechanism frozen before H54–H63 results existed; thresholds are provisional and cannot be tuned from this cohort.'

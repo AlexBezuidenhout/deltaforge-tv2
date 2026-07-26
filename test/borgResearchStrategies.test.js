@@ -48,7 +48,7 @@ function ctx(overrides = {}) {
   };
 }
 
-test('research portfolio registers the H1-H73 strategies', () => {
+test('research portfolio registers the H1-H75 strategies', () => {
   const names = makeStrategies().map((strategy) => strategy.name);
   const research = names.filter((name) => /^H\d+_/.test(name));
   assert.deepEqual(research, [
@@ -128,6 +128,8 @@ test('research portfolio registers the H1-H73 strategies', () => {
     'H71_token_elasticity_residual',
     'H72_crosshorizon_nested_lock',
     'H73_market_prior_calibration_residual',
+    'H74_markov_regime_residual',
+    'H75_4h_dynamic_liquidity_leadlag',
   ]);
 });
 

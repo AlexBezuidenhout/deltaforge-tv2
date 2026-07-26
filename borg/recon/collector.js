@@ -191,6 +191,67 @@ async function main() {
     parkedStrategies: strategyPolicy.parked,
     includeParkedControls: process.env.BORG_INCLUDE_PARKED_CONTROLS === 'true',
   });
+  // Four-hour state models remain in memory on the hot path, but a routine
+  // process restart must not create a four-hour blind spot. Warm them once
+  // from complete, locally persisted minute bars. Binance persistence is
+  // event-bar sparse (quiet seconds are not manufactured), so completeness is
+  // certified by an uninterrupted feed-health log plus at least one observed
+  // trade in every retained minute; model code still rejects minute gaps.
+  const minuteStrategies = shadow?.strategies
+    .filter((strategy) => typeof strategy.hydrateMinuteTape === 'function') || [];
+  if (minuteStrategies.length) {
+    try {
+      const symbols = assets
+        .filter((asset) => asset.binance_symbol)
+        .map((asset) => asset.binance_symbol);
+      const assetByHydrationSymbol = new Map(assets
+        .filter((asset) => asset.binance_symbol)
+        .map((asset) => [asset.binance_symbol, asset.asset]));
+      const feedFaults = await pool.query(`
+        SELECT COUNT(*)::int failures
+          FROM borg_events
+         WHERE ts >= NOW() - INTERVAL '260 minutes'
+           AND level IN ('WARN','ERROR')
+           AND (source='binance' OR message ILIKE '%binance%')
+      `);
+      if (Number(feedFaults.rows[0]?.failures || 0) > 0) {
+        throw new Error('Binance feed warning/error exists inside hydration window');
+      }
+      const { rows } = await pool.query(`
+        SELECT symbol,date_trunc('minute',ts) AS minute_ts,
+               (array_agg(close ORDER BY ts DESC))[1] close,
+               SUM(buy_vol) buy_vol,SUM(sell_vol) sell_vol,
+               SUM(n_trades) n_trades,COUNT(*) observed_seconds
+          FROM borg_binance_1s
+         WHERE symbol = ANY($1::text[])
+           AND ts >= NOW() - INTERVAL '260 minutes'
+           AND ts < date_trunc('minute',NOW())
+         GROUP BY symbol,date_trunc('minute',ts)
+        HAVING SUM(n_trades) > 0
+         ORDER BY minute_ts,symbol
+      `, [symbols]);
+      const hydrationRows = rows.map((row) => ({
+        ...row,
+        asset: assetByHydrationSymbol.get(row.symbol) || null,
+        minute: row.minute_ts,
+      }));
+      const accepted = Object.fromEntries(minuteStrategies.map((strategy) => [
+        strategy.name,
+        strategy.hydrateMinuteTape(hydrationRows),
+      ]));
+      await logEvent('INFO', 'shadow', 'minute-state strategies hydrated from local hot tier', {
+        eligibleMinuteRows: hydrationRows.length,
+        accepted,
+        binanceFeedFaults: 0,
+        minimumObservedTradesPerMinute: 1,
+      });
+    } catch (error) {
+      // Missing or incomplete history means a causal in-memory warm-up, never
+      // a fabricated backfill or a collector boot failure.
+      await logEvent('WARN', 'shadow',
+        `minute-state hydration unavailable; causal warm-up required: ${error.message}`);
+    }
+  }
   const persistStrategyRuntime = async () => {
     if (!shadow) return 0;
     return upsertStrategyRuntime(collection.epochId, collection.runId, shadow.runtimeStatus());
@@ -255,6 +316,10 @@ async function main() {
       volatility: feeds.getVolatilityProfile(act.asset, 120),
       micro10: feeds.getMicro(act.asset, 10),
       micro30: feeds.getMicro(act.asset, 30),
+      // Complete-minute research arms sample this causal rolling minute into
+      // their own four-hour tapes. It is deliberately separate from the
+      // second-scale execution features above.
+      micro60: feeds.getWallClockMicro(act.asset, 60),
       oraclePrice: act.asset === 'btc' ? chainlink.price : null,
       oracleRef: act.asset === 'btc' ? parseFloat(act.chainlink_open) : null,
       rtdsChainlink, rtdsChainlinkAgeMs, resolverDivergence,

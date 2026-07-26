@@ -29,6 +29,34 @@ test('Binance causal micro summary survives persistence-buffer drains', () => {
   assert.equal(feed.getMicro('BTCUSDT', 10).returnBps, before.returnBps);
 });
 
+test('Binance wall-clock micro does not turn sixty sparse event bars into sixty seconds', () => {
+  const feed = new BinanceRecon(() => {}, ['XRPUSDT']);
+  const state = feed.bySymbol.get('XRPUSDT');
+  let price = 1;
+  for (let sec = 0; sec <= 120; sec += 5) {
+    const open = price;
+    price *= Math.exp(0.2 / 10000);
+    state._history.push({
+      sec,
+      open,
+      close: price,
+      n: 2,
+      buyVol: sec >= 65 ? 3 : 1,
+      sellVol: 1,
+    });
+  }
+  const legacy = feed.getMicro('XRPUSDT', 60);
+  const wallClock = feed.getWallClockMicro('XRPUSDT', 60);
+  assert.equal(legacy, null); // only 25 event bars exist
+  assert.ok(wallClock);
+  assert.equal(wallClock.firstObservedBarSec, 65);
+  assert.equal(wallClock.lastBarSec, 120);
+  assert.equal(wallClock.observedBars, 12);
+  assert.equal(wallClock.trades, 24);
+  assert.ok(wallClock.returnBps > 2 && wallClock.returnBps < 3);
+  assert.ok(wallClock.flowImbalance > 0);
+});
+
 test('Binance volatility profile separates a one-off jump from persistent variation', () => {
   const feed = new BinanceRecon(() => {}, ['BTCUSDT']);
   const state = feed.bySymbol.get('BTCUSDT');
