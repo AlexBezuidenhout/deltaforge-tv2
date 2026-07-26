@@ -20,6 +20,7 @@ const { CHALLENGER_STRATEGY_VERSION } = require('../../borg/flow/strategy');
 const { summarizeConvergence } = require('../../borg/crossvenue/convergence');
 const { buildResolverBoundaryPortfolio } = require('../../borg/research/resolver-boundary-portfolio');
 const { buildPriorityLaneStatus } = require('../../borg/research/priority-lane-status');
+const { dossierFor } = require('../../borg/research/strategy-dossiers');
 const { createReadThroughCache } = require('../utils/readThroughCache');
 
 const dashboardReports = createReadThroughCache();
@@ -184,7 +185,8 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
         WITH latest_trial AS (
           SELECT DISTINCT ON (strategy)
                  strategy,status,status_reason,experiment_id,variant,
-                 phase AS trial_phase,evidence_started_at
+                 family,phase AS trial_phase,evidence_started_at,frozen_at,
+                 min_independent_markets,min_days,primary_metric
             FROM borg_trial_ledger
            ORDER BY strategy,frozen_at DESC,id DESC
         ),
@@ -196,7 +198,7 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
            ORDER BY r.started_at DESC
            LIMIT 1
         )
-        SELECT o.strategy, o.phase,
+        SELECT o.strategy, COALESCE(lt.trial_phase,'historical') AS phase,
           count(*) FILTER (WHERE o.action='place')::int places,
           count(*) FILTER (WHERE o.action='cancel')::int cancels,
           count(s.order_id)::int scored,
@@ -427,13 +429,19 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
           count(s.order_id) FILTER (WHERE s.data_quality_grade='F')::int quality_f,
           count(s.order_id) FILTER (WHERE s.execution_fidelity_grade IN ('A','B'))::int fidelity_ab,
           count(s.order_id) FILTER (WHERE s.execution_fidelity_grade='F')::int fidelity_f,
+          min(o.ts) first_seen,
           max(o.ts) latest,
           lt.status trial_status,
           lt.status_reason trial_status_reason,
           lt.experiment_id current_experiment_id,
           lt.variant current_trial_variant,
+          lt.family current_trial_family,
           lt.trial_phase current_trial_phase,
           lt.evidence_started_at current_evidence_started_at,
+          lt.frozen_at current_trial_frozen_at,
+          lt.min_independent_markets current_min_independent_markets,
+          lt.min_days current_min_days,
+          lt.primary_metric current_primary_metric,
           ae.epoch_id current_evidence_epoch_id,
           ae.epoch_started_at current_epoch_started_at
         FROM borg_shadow_orders o
@@ -441,15 +449,329 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
         LEFT JOIN latest_trial lt ON lt.strategy=o.strategy
         LEFT JOIN active_epoch ae ON true
         WHERE o.features->>'research_capital_version' = $1
-        GROUP BY o.strategy,o.phase,lt.status,lt.status_reason,
-                 lt.experiment_id,lt.variant,lt.trial_phase,lt.evidence_started_at,
+        GROUP BY o.strategy,lt.status,lt.status_reason,
+                 lt.experiment_id,lt.variant,lt.family,lt.trial_phase,
+                 lt.evidence_started_at,lt.frozen_at,lt.min_independent_markets,
+                 lt.min_days,lt.primary_metric,
                  ae.epoch_id,ae.epoch_started_at
         ORDER BY o.strategy`, [RESEARCH_CAPITAL_VERSION]);
-      return rows;
+
+      // The order ledger alone cannot tell the operator whether a quiet rule is
+      // still evaluating. Merge in the active-run heartbeat and every latest
+      // frozen trial so zero-signal strategies remain visible.
+      const [runtimeResult, trialResult] = await Promise.all([
+        pool.query(`
+          WITH active_run AS (
+            SELECT run_id,epoch_id,started_at
+              FROM borg_collector_runs
+             WHERE status='RUNNING'
+             ORDER BY started_at DESC
+             LIMIT 1
+          )
+          SELECT r.strategy,r.collector_run_id,r.epoch_id,r.cadence,r.market_types,
+                 r.started_at runtime_started_at,r.last_evaluated_at,
+                 r.evaluations::float evaluations,
+                 r.halted_evaluations::float halted_evaluations,
+                 r.actions::float actions,r.errors::float errors,
+                 r.last_action_at,r.updated_at runtime_updated_at,r.diagnostics
+            FROM borg_strategy_runtime r
+            JOIN active_run a ON a.run_id=r.collector_run_id
+        `),
+        pool.query(`
+          SELECT DISTINCT ON (strategy)
+                 strategy,status trial_status,status_reason trial_status_reason,
+                 experiment_id current_experiment_id,variant current_trial_variant,
+                 family current_trial_family,phase current_trial_phase,
+                 evidence_started_at current_evidence_started_at,
+                 frozen_at current_trial_frozen_at,
+                 min_independent_markets current_min_independent_markets,
+                 min_days current_min_days,primary_metric current_primary_metric
+            FROM borg_trial_ledger
+           ORDER BY strategy,frozen_at DESC,id DESC
+        `),
+      ]);
+
+      const numericFields = [
+        'places', 'cancels', 'scored', 'fills', 'pnl_gross', 'pnl_05x', 'pnl_1x', 'pnl_2x',
+        'eligible_fills', 'eligible_markets', 'eligible_pnl_gross', 'eligible_pnl_05x',
+        'eligible_pnl_1x', 'eligible_pnl_2x', 'current_eligible_fills',
+        'current_eligible_markets', 'current_pnl_1x', 'current_pnl_2x',
+        'fills_6h', 'markets_6h', 'pnl_1x_6h', 'pnl_2x_6h',
+        'fills_24h', 'markets_24h', 'pnl_1x_24h', 'pnl_2x_24h',
+        'fills_3d', 'markets_3d', 'pnl_1x_3d', 'pnl_2x_3d',
+        'quality_ab', 'quality_f', 'fidelity_ab', 'fidelity_f',
+      ];
+      const byStrategy = new Map();
+      for (const row of rows) {
+        const normalized = { ...row };
+        for (const field of numericFields) normalized[field] = parseFloat(row[field] || 0);
+        byStrategy.set(row.strategy, normalized);
+      }
+      for (const trial of trialResult.rows) {
+        const row = byStrategy.get(trial.strategy) || { strategy: trial.strategy, phase: trial.current_trial_phase };
+        Object.assign(row, trial);
+        for (const field of numericFields) {
+          if (!Number.isFinite(row[field])) row[field] = 0;
+        }
+        byStrategy.set(trial.strategy, row);
+      }
+      for (const runtime of runtimeResult.rows) {
+        const row = byStrategy.get(runtime.strategy) || { strategy: runtime.strategy, phase: 'eval' };
+        Object.assign(row, runtime, {
+          runtime_present: true,
+          evaluations: parseFloat(runtime.evaluations || 0),
+          halted_evaluations: parseFloat(runtime.halted_evaluations || 0),
+          actions: parseFloat(runtime.actions || 0),
+          errors: parseFloat(runtime.errors || 0),
+        });
+        for (const field of numericFields) {
+          if (!Number.isFinite(row[field])) row[field] = 0;
+        }
+        byStrategy.set(runtime.strategy, row);
+      }
+
+      return [...byStrategy.values()].map((row) => {
+        const dossier = dossierFor(row.strategy, {
+          trialStatus: row.trial_status,
+          trialStatusReason: row.trial_status_reason,
+          runtimePresent: row.runtime_present === true,
+          runtimeUpdatedAt: row.runtime_updated_at,
+          evaluations: row.evaluations,
+          actions: row.actions,
+        });
+        const activityTimes = [
+          row.runtime_updated_at,
+          row.last_evaluated_at,
+          row.last_action_at,
+          row.latest,
+        ].map((value) => value ? new Date(value).getTime() : NaN).filter(Number.isFinite);
+        return {
+          ...row,
+          ...dossier,
+          deployed_at: row.current_trial_frozen_at || row.first_seen || row.runtime_started_at || null,
+          last_activity_at: activityTimes.length ? new Date(Math.max(...activityTimes)).toISOString() : null,
+        };
+      }).sort((left, right) =>
+        left.lifecycleRank - right.lifecycleRank ||
+        left.priorityRank - right.priorityRank ||
+        String(left.strategy).localeCompare(String(right.strategy)));
     });
     res.json(value);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Strategy evidence dossier: one current frozen cohort, never pooled with discovery ---
+router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
+  const strategy = String(req.params.strategy || '').trim();
+  if (!strategy || strategy.length > 180) {
+    return res.status(400).json({ error: 'Invalid strategy id' });
+  }
+  try {
+    const value = await dashboardReports.get(`borg-strategy-dossier:${strategy}`, 10_000, async () => {
+      const client = await pool.connect();
+      try {
+        const [trialResult, runtimeResult, epochResult, historyResult] = await Promise.all([
+          client.query(`
+            SELECT strategy,status,status_reason,experiment_id,variant,family,phase,
+                   evidence_started_at,frozen_at,min_independent_markets,min_days,
+                   primary_metric,status_decided_at,status_manifest_id
+              FROM borg_trial_ledger
+             WHERE strategy=$1
+             ORDER BY frozen_at DESC,id DESC
+             LIMIT 1
+          `, [strategy]),
+          client.query(`
+            WITH active_run AS (
+              SELECT run_id FROM borg_collector_runs
+               WHERE status='RUNNING' ORDER BY started_at DESC LIMIT 1
+            )
+            SELECT r.strategy,r.collector_run_id,r.epoch_id,r.cadence,r.market_types,
+                   r.started_at,r.last_evaluated_at,r.evaluations::float evaluations,
+                   r.halted_evaluations::float halted_evaluations,
+                   r.actions::float actions,r.errors::float errors,r.last_action_at,
+                   r.updated_at,r.diagnostics
+              FROM borg_strategy_runtime r
+              JOIN active_run a ON a.run_id=r.collector_run_id
+             WHERE r.strategy=$1
+          `, [strategy]),
+          client.query(`
+            SELECT r.epoch_id,e.started_at
+              FROM borg_collector_runs r
+              JOIN borg_collection_epochs e ON e.epoch_id=r.epoch_id
+             WHERE r.status='RUNNING'
+             ORDER BY r.started_at DESC
+             LIMIT 1
+          `),
+          client.query(`
+            SELECT experiment_id,variant,family,phase,status,status_reason,
+                   frozen_at,evidence_started_at,min_independent_markets,min_days,
+                   primary_metric,status_decided_at,status_manifest_id
+              FROM borg_trial_ledger
+             WHERE strategy=$1
+             ORDER BY frozen_at DESC,id DESC
+          `, [strategy]),
+        ]);
+        const trial = trialResult.rows[0] || null;
+        const runtime = runtimeResult.rows[0] || null;
+        const epoch = epochResult.rows[0] || null;
+        const dossier = dossierFor(strategy, {
+          trialStatus: trial?.status,
+          trialStatusReason: trial?.status_reason,
+          runtimePresent: !!runtime,
+          runtimeUpdatedAt: runtime?.updated_at,
+          evaluations: parseFloat(runtime?.evaluations || 0),
+          actions: parseFloat(runtime?.actions || 0),
+        });
+
+        const response = {
+          ...dossier,
+          trial,
+          runtime: runtime ? {
+            ...runtime,
+            evaluations: parseFloat(runtime.evaluations || 0),
+            halted_evaluations: parseFloat(runtime.halted_evaluations || 0),
+            actions: parseFloat(runtime.actions || 0),
+            errors: parseFloat(runtime.errors || 0),
+          } : null,
+          activeEpoch: epoch,
+          trialHistory: historyResult.rows,
+          evidence: null,
+          chronologicalHalves: null,
+          byDay: [],
+          byAsset: [],
+          recent: [],
+        };
+        if (!trial || !epoch) return response;
+
+        const cohortParams = [
+          strategy,
+          trial.experiment_id,
+          trial.variant,
+          trial.phase,
+          epoch.epoch_id,
+          new Date(Math.max(
+            new Date(trial.evidence_started_at).getTime(),
+            new Date(epoch.started_at).getTime(),
+          )),
+          RESEARCH_CAPITAL_VERSION,
+        ];
+        const cohortWhere = `
+          o.strategy=$1
+          AND o.experiment_id=$2
+          AND COALESCE(o.arm,'baseline')=$3
+          AND o.phase=$4
+          AND o.features->>'collection_epoch_id'=$5
+          AND COALESCE(o.available_at,o.ts)>=$6
+          AND o.features->>'research_capital_version'=$7
+        `;
+        const [evidenceResult, halvesResult, dayResult, assetResult, recentResult] = await Promise.all([
+          client.query(`
+            SELECT count(*) FILTER (WHERE o.action='place')::int places,
+                   count(*) FILTER (WHERE o.action='cancel')::int cancels,
+                   count(s.order_id)::int scored,
+                   count(*) FILTER (WHERE s.filled)::int fills,
+                   count(*) FILTER (
+                     WHERE s.filled
+                       AND s.data_quality_grade IN ('A','B')
+                       AND s.execution_fidelity_grade IN ('A','B')
+                   )::int eligible_fills,
+                   count(DISTINCT o.market_id) FILTER (
+                     WHERE s.filled
+                       AND s.data_quality_grade IN ('A','B')
+                       AND s.execution_fidelity_grade IN ('A','B')
+                   )::int independent_markets,
+                   count(DISTINCT (COALESCE(o.available_at,o.ts) AT TIME ZONE 'UTC')::date)
+                     FILTER (WHERE s.filled
+                       AND s.data_quality_grade IN ('A','B')
+                       AND s.execution_fidelity_grade IN ('A','B'))::int utc_days,
+                   COALESCE(sum(s.pnl_1x) FILTER (
+                     WHERE s.filled
+                       AND s.data_quality_grade IN ('A','B')
+                       AND s.execution_fidelity_grade IN ('A','B')),0)::float pnl_1x,
+                   COALESCE(sum(s.pnl_2x) FILTER (
+                     WHERE s.filled
+                       AND s.data_quality_grade IN ('A','B')
+                       AND s.execution_fidelity_grade IN ('A','B')),0)::float pnl_2x,
+                   min(COALESCE(o.available_at,o.ts)) first_observation_at,
+                   max(COALESCE(o.available_at,o.ts)) last_observation_at
+              FROM borg_shadow_orders o
+              LEFT JOIN borg_shadow_scores s ON s.order_id=o.id
+             WHERE ${cohortWhere}
+          `, cohortParams),
+          client.query(`
+            WITH eligible AS (
+              SELECT s.pnl_1x::float pnl_1x,s.pnl_2x::float pnl_2x,
+                     row_number() OVER (
+                       ORDER BY COALESCE(o.available_at,o.ts),o.id
+                     ) sequence,
+                     count(*) OVER () total
+                FROM borg_shadow_orders o
+                JOIN borg_shadow_scores s ON s.order_id=o.id
+               WHERE ${cohortWhere}
+                 AND s.filled
+                 AND s.data_quality_grade IN ('A','B')
+                 AND s.execution_fidelity_grade IN ('A','B')
+            )
+            SELECT count(*)::int n,
+                   COALESCE(sum(pnl_1x) FILTER (WHERE sequence <= CEIL(total/2.0)),0)::float first_half_1x,
+                   COALESCE(sum(pnl_1x) FILTER (WHERE sequence > CEIL(total/2.0)),0)::float second_half_1x,
+                   COALESCE(sum(pnl_2x) FILTER (WHERE sequence <= CEIL(total/2.0)),0)::float first_half_2x,
+                   COALESCE(sum(pnl_2x) FILTER (WHERE sequence > CEIL(total/2.0)),0)::float second_half_2x
+              FROM eligible
+          `, cohortParams),
+          client.query(`
+            SELECT (COALESCE(o.available_at,o.ts) AT TIME ZONE 'UTC')::date day,
+                   count(*)::int fills,count(DISTINCT o.market_id)::int markets,
+                   COALESCE(sum(s.pnl_1x),0)::float pnl_1x,
+                   COALESCE(sum(s.pnl_2x),0)::float pnl_2x
+              FROM borg_shadow_orders o
+              JOIN borg_shadow_scores s ON s.order_id=o.id
+             WHERE ${cohortWhere}
+               AND s.filled
+               AND s.data_quality_grade IN ('A','B')
+               AND s.execution_fidelity_grade IN ('A','B')
+             GROUP BY 1 ORDER BY 1 DESC LIMIT 30
+          `, cohortParams),
+          client.query(`
+            SELECT COALESCE(NULLIF(o.features->>'asset',''),'unknown') asset,
+                   count(*)::int fills,count(DISTINCT o.market_id)::int markets,
+                   COALESCE(sum(s.pnl_1x),0)::float pnl_1x,
+                   COALESCE(sum(s.pnl_2x),0)::float pnl_2x
+              FROM borg_shadow_orders o
+              JOIN borg_shadow_scores s ON s.order_id=o.id
+             WHERE ${cohortWhere}
+               AND s.filled
+               AND s.data_quality_grade IN ('A','B')
+               AND s.execution_fidelity_grade IN ('A','B')
+             GROUP BY 1 ORDER BY pnl_2x DESC
+          `, cohortParams),
+          client.query(`
+            SELECT o.id,o.ts,o.market_id,o.action,o.side,o.token,
+                   o.price::float price,o.size::float size,o.tte_sec::float tte_sec,
+                   o.order_kind,o.note,o.features->>'asset' asset,
+                   s.filled,s.pnl_1x::float pnl_1x,s.pnl_2x::float pnl_2x,
+                   s.data_quality_grade,s.execution_fidelity_grade
+              FROM borg_shadow_orders o
+              LEFT JOIN borg_shadow_scores s ON s.order_id=o.id
+             WHERE ${cohortWhere}
+             ORDER BY o.id DESC LIMIT 12
+          `, cohortParams),
+        ]);
+        response.evidence = evidenceResult.rows[0] || null;
+        response.chronologicalHalves = halvesResult.rows[0] || null;
+        response.byDay = dayResult.rows;
+        response.byAsset = assetResult.rows;
+        response.recent = recentResult.rows;
+        return response;
+      } finally {
+        client.release();
+      }
+    });
+    return res.json(value);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
