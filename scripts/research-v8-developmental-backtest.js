@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Development-only replay for the V8 mechanisms that the normalized one-second
+ * Development-only replay for the V8 mechanisms that the normalized sampled
  * hot tier can reconstruct honestly.
  *
  * H64/H65 require synchronized source age/sequence state and H67/H68 require
  * event-level queue transitions, so this script deliberately reports them as
- * unsupported instead of fabricating a one-second backtest. Their forward
+ * unsupported instead of fabricating an event backtest from sampled rows. Their forward
  * scorer and raw-WAL replay are the valid evidence paths.
  */
 'use strict';
@@ -43,10 +43,6 @@ function integer(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
-}
-
 function topBook(bid, bidSize, ask, askSize, at, source) {
   return {
     bids: bid > 0 && bidSize > 0 ? [[bid, bidSize]] : [],
@@ -59,23 +55,19 @@ function topBook(bid, bidSize, ask, askSize, at, source) {
 
 function normalize(row) {
   const ts = new Date(row.ts).getTime();
-  const upAsks = asArray(row.up_asks);
-  const downAsks = asArray(row.down_asks);
-  const upBids = asArray(row.up_bids);
-  const downBids = asArray(row.down_bids);
   return {
     id: integer(row.id),
     ts,
     marketId: integer(row.market_id),
     tteSec: finite(row.tte_sec),
     upBid: finite(row.up_best_bid),
-    upBidSize: finite(upBids[0]?.[1]),
+    upBidSize: finite(row.up_best_bid_size),
     upAsk: finite(row.up_best_ask),
-    upAskSize: finite(upAsks[0]?.[1]),
-    downBid: finite(downBids[0]?.[0]),
-    downBidSize: finite(downBids[0]?.[1]),
+    upAskSize: finite(row.up_best_ask_size),
+    downBid: finite(row.down_best_bid),
+    downBidSize: finite(row.down_best_bid_size),
     downAsk: finite(row.down_best_ask),
-    downAskSize: finite(downAsks[0]?.[1]),
+    downAskSize: finite(row.down_best_ask_size),
     upMid: finite(row.up_mid),
     price: finite(row.btc_price),
     ref: finite(row.btc_ref),
@@ -203,9 +195,13 @@ async function load(pool) {
     chainlink_open_src: row.chainlink_open_src,
   }]));
   const { rows } = await pool.query(`
-    SELECT b.id,b.ts,b.market_id,b.tte_sec,b.up_bids,b.up_asks,
-           b.down_bids,b.down_asks,b.up_best_bid,b.up_best_ask,b.up_mid,
+    SELECT b.id,b.ts,b.market_id,b.tte_sec,b.up_best_bid,b.up_best_ask,b.up_mid,
            b.down_best_ask,b.book_src,b.btc_price,b.btc_ref,
+           b.up_bids->0->>1 AS up_best_bid_size,
+           b.up_asks->0->>1 AS up_best_ask_size,
+           b.down_bids->0->>0 AS down_best_bid,
+           b.down_bids->0->>1 AS down_best_bid_size,
+           b.down_asks->0->>1 AS down_best_ask_size,
            b.sigma5m_ewma,b.phi_fair,b.rtds_chainlink
       FROM borg_book_snaps b
       JOIN borg_markets m ON m.id=b.market_id
