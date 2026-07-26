@@ -52,16 +52,23 @@ async function fetchJson(url, timeoutMs = 5000) {
   }
 }
 
+function usesChainlinkResolver(rec) {
+  const source = String(rec?.resolution_source || '');
+  return /chainlink/i.test(source)
+    || (rec?.market_type === 'direction_5m' && source === 'polymarket_crypto_5m');
+}
+
 class MarketsRecon {
   /**
    * @param feeds     Feeds facade (asset-keyed)
    * @param chainlink ChainlinkRecon (BTC mainnet control series only)
    * @param assets    asset_config rows with enabled_borg=true
    */
-  constructor(feeds, chainlink, assets) {
+  constructor(feeds, chainlink, assets, rtds = null) {
     this.feeds = feeds;
     this.chainlink = chainlink;
     this.assets = assets;
+    this.rtds = rtds;
     this.bySlug = new Map();        // slug -> market rec (in-memory mirror)
     this.gammaByAsset = new Map();  // asset -> { up, at } latest Gamma UP price
     this.gammaByMarket = new Map(); // market id -> positive-token Gamma price
@@ -197,7 +204,7 @@ class MarketsRecon {
              ON CONFLICT (slug) DO UPDATE SET raw = EXCLUDED.raw, asset = EXCLUDED.asset,
                accepting_orders = EXCLUDED.accepting_orders
              RETURNING id, binance_open, binance_open_src, binance_close, binance_close_src,
-               chainlink_open, outcome`,
+               chainlink_open, chainlink_open_src, outcome`,
             [rec.slug, rec.asset, rec.gamma_id, rec.condition_id, rec.question, rec.window_start,
              rec.window_end, rec.up_token_id, rec.down_token_id, rec.market_type, rec.timeframe_sec,
              rec.positive_label, rec.negative_label, rec.positive_outcome_index,
@@ -209,6 +216,7 @@ class MarketsRecon {
           rec.binance_close = res.rows[0].binance_close == null ? null : parseFloat(res.rows[0].binance_close);
           rec.binance_close_src = res.rows[0].binance_close_src;
           rec.chainlink_open = res.rows[0].chainlink_open == null ? null : parseFloat(res.rows[0].chainlink_open);
+          rec.chainlink_open_src = res.rows[0].chainlink_open_src;
           rec.outcome = res.rows[0].outcome;
           this.bySlug.set(slug, rec);
           await logEvent('INFO', 'markets', `discovered ${slug} (id ${rec.id})`);
@@ -270,7 +278,7 @@ class MarketsRecon {
              negative_outcome_index=EXCLUDED.negative_outcome_index,
              resolution_source=EXCLUDED.resolution_source
            RETURNING id, binance_open, binance_open_src, binance_close, binance_close_src,
-             chainlink_open, outcome`,
+             chainlink_open, chainlink_open_src, outcome`,
           [rec.slug, rec.asset, rec.gamma_id, rec.condition_id, rec.question,
             rec.window_start, rec.window_end, rec.up_token_id, rec.down_token_id,
             rec.market_type, rec.timeframe_sec, rec.event_id, rec.event_slug,
@@ -286,6 +294,7 @@ class MarketsRecon {
           binance_close: row.binance_close == null ? null : parseFloat(row.binance_close),
           binance_close_src: row.binance_close_src,
           chainlink_open: row.chainlink_open == null ? null : parseFloat(row.chainlink_open),
+          chainlink_open_src: row.chainlink_open_src,
           outcome: row.outcome,
         });
         this.bySlug.set(rec.slug, rec);
@@ -312,6 +321,19 @@ class MarketsRecon {
       const startMs = rec.window_start.getTime();
       const endMs = rec.window_end.getTime();
       const isDirection = String(rec.market_type || 'direction_5m').startsWith('direction_');
+      if (isDirection && usesChainlinkResolver(rec)
+          && rec.chainlink_open_src !== 'chainlink_rtds_nearest_3s'
+          && now >= startMs && now - startMs <= 20 * 60 * 1000) {
+        const resolverOpen = this.rtds?.getPriceAtMs(rec.asset, startMs, 3000, 'chainlink');
+        if (resolverOpen != null) {
+          rec.chainlink_open = resolverOpen;
+          rec.chainlink_open_src = 'chainlink_rtds_nearest_3s';
+          await pool.query(
+            'UPDATE borg_markets SET chainlink_open=$1,chainlink_open_src=$2 WHERE id=$3',
+            [resolverOpen, rec.chainlink_open_src, rec.id],
+          );
+        }
+      }
       if (isDirection && rec.binance_open == null && now >= startMs) {
         if (now - startMs <= 3000 && px != null) {
           rec.binance_open = px;
@@ -321,12 +343,20 @@ class MarketsRecon {
           rec.binance_open_src = rec.binance_open != null ? 'kline_backfill' : null;
         }
         if (rec.binance_open != null) {
-          const clOpen = rec.market_type === 'direction_5m' && rec.asset === 'btc'
-            ? this.chainlink.getPriceAtMs(startMs) : null;
+          const rtdsOpen = usesChainlinkResolver(rec)
+            ? this.rtds?.getPriceAtMs(rec.asset, startMs, 3000, 'chainlink') : null;
+          const controlOpen = rec.asset === 'btc' ? this.chainlink.getPriceAtMs(startMs) : null;
+          const clOpen = rec.chainlink_open ?? rtdsOpen ?? controlOpen;
+          const clOpenSrc = rec.chainlink_open_src
+            ?? (rtdsOpen != null ? 'chainlink_rtds_nearest_3s'
+              : controlOpen != null ? 'mainnet_push_control' : null);
           rec.chainlink_open = clOpen;
+          rec.chainlink_open_src = clOpenSrc;
           await pool.query(
-            `UPDATE borg_markets SET binance_open=$1, binance_open_src=$2, chainlink_open=$3 WHERE id=$4`,
-            [rec.binance_open, rec.binance_open_src, clOpen, rec.id]
+            `UPDATE borg_markets
+                SET binance_open=$1,binance_open_src=$2,chainlink_open=$3,chainlink_open_src=$4
+              WHERE id=$5`,
+            [rec.binance_open, rec.binance_open_src, clOpen, clOpenSrc, rec.id]
           );
         }
       }
@@ -477,4 +507,5 @@ class MarketsRecon {
 }
 
 module.exports = MarketsRecon;
+module.exports.usesChainlinkResolver = usesChainlinkResolver;
 module.exports.buildResearchEventsUrl = buildResearchEventsUrl;

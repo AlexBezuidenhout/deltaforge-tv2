@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS borg_markets (
   binance_open_src TEXT,     -- 'live' | 'kline_backfill' | NULL
   binance_close NUMERIC,     -- live-captured at window_end
   binance_close_src TEXT,    -- 'live' | 'kline_backfill' | 'kline_repair' | NULL
-  chainlink_open NUMERIC,    -- mainnet push-feed round in force at start (control only)
+  chainlink_open NUMERIC,    -- Chainlink reference at start; source column is authoritative
+  chainlink_open_src TEXT,   -- 'chainlink_rtds_nearest_3s' | 'mainnet_push_control' | NULL
   discovered_at TIMESTAMPTZ DEFAULT now(),
   outcome TEXT,              -- 'UP' | 'DOWN'
   outcome_prices TEXT,
@@ -634,6 +635,7 @@ ALTER TABLE borg_markets ADD COLUMN IF NOT EXISTS positive_outcome_index INT DEF
 ALTER TABLE borg_markets ADD COLUMN IF NOT EXISTS negative_outcome_index INT DEFAULT 1;
 ALTER TABLE borg_markets ADD COLUMN IF NOT EXISTS resolution_source TEXT;
 ALTER TABLE borg_markets ADD COLUMN IF NOT EXISTS accepting_orders BOOLEAN DEFAULT true;
+ALTER TABLE borg_markets ADD COLUMN IF NOT EXISTS chainlink_open_src TEXT;
 CREATE INDEX IF NOT EXISTS borg_markets_event_type_end
   ON borg_markets (event_id, market_type, window_end);
 ALTER TABLE borg_book_snaps ADD COLUMN IF NOT EXISTS rtds_chainlink NUMERIC;

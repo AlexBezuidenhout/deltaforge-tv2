@@ -199,7 +199,9 @@ class ShadowEngine {
       research_risk_per_trade_pct: RISK_PER_TRADE_PCT,
       research_target_stake_usd: TARGET_STAKE_USD,
       phi_fair: ctx.phiFair, model_fair_positive: ctx.modelFairPositive,
-      sigma: ctx.sigma, btc: ctx.btc, ref: ctx.ref, cex_ref: ctx.cexRef,
+      sigma: ctx.sigma, btc: ctx.btc, ref: ctx.ref, resolver_ref: ctx.resolverRef,
+      resolver_ref_source: ctx.resolverRefSource ?? null,
+      cex_ref: ctx.cexRef,
       gamma_up: ctx.gammaUp,
       cex_ret_10s_bps: ctx.micro10?.returnBps ?? null,
       cex_ret_30s_bps: ctx.micro30?.returnBps ?? null,
@@ -215,6 +217,7 @@ class ShadowEngine {
       oracle_price: ctx.oraclePrice ?? null,
       oracle_ref: ctx.oracleRef ?? null,
       rtds_chainlink: ctx.rtdsChainlink ?? null,
+      rtds_chainlink_age_ms: ctx.rtdsChainlinkAgeMs ?? null,
       rtds_chainlink_ret_10s_bps: ctx.rtdsChainlink10?.returnBps ?? null,
       rtds_chainlink_ret_30s_bps: ctx.rtdsChainlink30?.returnBps ?? null,
       rtds_binance: ctx.rtdsBinance ?? null,
@@ -235,6 +238,8 @@ class ShadowEngine {
       up_bb: upBb, up_bb_sz: upBbSz, up_ba: upBa, up_ba_sz: upBaSz,
       down_bb: dnBb, down_bb_sz: dnBbSz, down_ba: dnBa, down_ba_sz: dnBaSz,
       book_src: ctx.upBook?.src ?? null, book_age_ms: ctx.upBook ? ctx.now - ctx.upBook.at : null,
+      up_book_source_ts: ctx.upBook?.sourceAt ?? null,
+      down_book_source_ts: ctx.downBook?.sourceAt ?? null,
       halted: this.halted,
     };
   }

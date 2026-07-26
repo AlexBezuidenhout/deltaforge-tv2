@@ -63,3 +63,16 @@ test('RTDS records the separately transported Binance topic without replacing Ch
   assert.ok(feed.getMicro('btc', 'binance', 10).returnBps > 4.9);
   assert.equal(feed.drainRows().length, 3);
 });
+
+test('RTDS retains and retrieves the nearest resolver opening tick causally', () => {
+  const feed = new RtdsRecon(() => {}, { assets: ['eth'] });
+  const base = Date.now() - 5000;
+  for (const [offset, value] of [[-1000, 1900], [100, 1901], [2500, 1902]]) {
+    feed._onMessage(Buffer.from(JSON.stringify({
+      topic: 'crypto_prices_chainlink',
+      payload: { symbol: 'eth/usd', timestamp: base + offset, value },
+    })));
+  }
+  assert.equal(feed.getPriceAtMs('eth', base, 500), 1901);
+  assert.equal(feed.getPriceAtMs('eth', base - 10000, 500), null);
+});

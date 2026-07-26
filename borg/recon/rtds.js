@@ -12,6 +12,7 @@ const WebSocket = require('ws');
 
 const WS_URL = 'wss://ws-live-data.polymarket.com';
 const SUPPORTED = ['btc', 'eth', 'sol', 'xrp'];
+const HISTORY_RETENTION_MS = 20 * 60 * 1000;
 
 function epochMs(value) {
   if (value == null) return null;
@@ -148,7 +149,10 @@ class RtdsRecon {
         receiveWallMs,
         value,
       });
-      const cutoff = (sourceMs || receiveWallMs) - 120000;
+      // Keep enough resolver history to recover the exact opening reference
+      // after a mid-window collector restart. Four assets × two feeds ×
+      // roughly one tick/second is small compared with the raw WAL.
+      const cutoff = (sourceMs || receiveWallMs) - HISTORY_RETENTION_MS;
       while (history.length && history[0].at < cutoff) history.shift();
       this.history.set(key, history);
       this.rows.push(row);
@@ -172,6 +176,23 @@ class RtdsRecon {
   getAgeMs(asset, source = 'chainlink') {
     const tick = this.latest.get(`${source}:${asset}`);
     return tick ? Math.max(0, Date.now() - tick.receiveWallMs) : null;
+  }
+
+  getPriceAtMs(asset, targetMs, toleranceMs = 3000, source = 'chainlink') {
+    const target = Number(targetMs);
+    const tolerance = Math.max(0, Number(toleranceMs) || 0);
+    if (!Number.isFinite(target)) return null;
+    const rows = this.history.get(`${source}:${asset}`) || [];
+    let best = null;
+    let bestDistance = Infinity;
+    for (const row of rows) {
+      const distance = Math.abs(row.at - target);
+      if (distance <= tolerance && distance < bestDistance) {
+        best = row;
+        bestDistance = distance;
+      }
+    }
+    return best?.value ?? null;
   }
 
   getMicro(asset, source = 'chainlink', lookbackSec = 10) {

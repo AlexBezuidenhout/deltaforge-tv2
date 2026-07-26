@@ -161,7 +161,7 @@ async function main() {
     assets: assets.map((a) => a.asset),
     onMarketEvent: (event) => enqueueEventEvaluation(event),
   });
-  const markets = new MarketsRecon(feeds, chainlink, assets);
+  const markets = new MarketsRecon(feeds, chainlink, assets, rtds);
   const evaluationMarkets = () => capturePolicy.filterMarkets(markets.evaluationAll());
   const sqlTouchMinIntervalMs = Math.max(0,
     Number(process.env.BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS || 0) || 0);
@@ -239,11 +239,16 @@ async function main() {
       phiFair = Math.min(0.999999, Math.max(0.000001, Number(phiFair.toFixed(6))));
     }
     const rtdsChainlink = rtds.getPrice(act.asset, 10000);
+    const rtdsChainlinkAgeMs = rtds.getAgeMs(act.asset, 'chainlink');
     const resolverDivergence = rtds.getDivergence(act.asset, px, 10000);
     const rtdsBinance = rtds.getBinancePrice(act.asset, 10000);
+    const resolverRefTrusted = act.chainlink_open_src === 'chainlink_rtds_nearest_3s';
     return {
       now, market: act, tteSec: tte, upBook, downBook, upMid: mid,
       phiFair, modelFairPositive: phiFair, sigma, btc: px, ref,
+      resolverRef: resolverRefTrusted && act.chainlink_open != null
+        ? parseFloat(act.chainlink_open) : null,
+      resolverRefSource: act.chainlink_open_src || null,
       cexRef: act.binance_open == null ? null : parseFloat(act.binance_open),
       marketType, strike, lowerBound, upperBound,
       gammaUp: markets.gammaPositive(act),
@@ -252,7 +257,7 @@ async function main() {
       micro30: feeds.getMicro(act.asset, 30),
       oraclePrice: act.asset === 'btc' ? chainlink.price : null,
       oracleRef: act.asset === 'btc' ? parseFloat(act.chainlink_open) : null,
-      rtdsChainlink, resolverDivergence,
+      rtdsChainlink, rtdsChainlinkAgeMs, resolverDivergence,
       rtdsChainlink10: rtds.getMicro(act.asset, 'chainlink', 10),
       rtdsChainlink30: rtds.getMicro(act.asset, 'chainlink', 30),
       rtdsBinance,
