@@ -324,9 +324,9 @@ async function run(pool) {
       H65_kalman_latent_consensus:
         'Normalized snapshots omit per-source age/sequence state.',
       H67_queue_depletion_hazard:
-        'One-second snapshots cannot reconstruct event queue hazards.',
+        'Sampled snapshots cannot reconstruct event queue hazards.',
       H68_multilevel_ofi_impact:
-        'The normalized replay intentionally does not relabel one-second snapshots as CLOB events.',
+        'The normalized replay intentionally does not relabel sampled snapshots as CLOB events.',
     },
     results,
     disclosure: [
