@@ -1,0 +1,152 @@
+{
+  "artifact_format": "borg-market-prior-calibration-v1",
+  "model_scope": "paper_forward_only",
+  "strategy": "H73_market_prior_calibration_residual",
+  "paper_only": true,
+  "generated_at": "2026-07-26T13:00:00.000Z",
+  "data_cutoff": "2026-07-26T13:00:00.000Z",
+  "dataset_hash": "25cfd5334bd858b19958e13ee0c49740be2906ad7476a826984b67d0e9d73f99",
+  "selection": {
+    "market_type": "direction_5m",
+    "assets": [
+      "btc",
+      "eth",
+      "sol",
+      "xrp"
+    ],
+    "decision_tte_sec": 120,
+    "snapshot_window_sec": [
+      110,
+      130
+    ],
+    "one_snapshot_per_market": "minimum absolute distance from T-120, then earliest timestamp",
+    "eligible_probability_interval": [
+      0.01,
+      0.99
+    ],
+    "independent_markets": 1744,
+    "first_market_end": "2026-07-25T00:05:00.000Z",
+    "last_market_end": "2026-07-26T12:55:00.000Z"
+  },
+  "estimator": {
+    "kind": "ten_equal_width_market_probability_buckets",
+    "target": "positive outcome frequency",
+    "interval": "two-sided Wilson score interval",
+    "confidence_level": 0.95,
+    "minimum_cell_n": 100,
+    "pnl_used_to_fit": false,
+    "disclosure": "This is a short discovery-period calibration artifact, not evidence of edge. Bins and confidence level were fixed without optimizing trading PnL. The forward H73 cohort begins after the cutoff and is PROVISIONAL."
+  },
+  "buckets": [
+    {
+      "bucket": 0,
+      "lower": 0.0,
+      "upper": 0.1,
+      "n": 176,
+      "positive_outcomes": 7,
+      "mean_market_probability": 0.0625,
+      "realized_probability": 0.03977273,
+      "wilson_lower": 0.01939698,
+      "wilson_upper": 0.07981032
+    },
+    {
+      "bucket": 1,
+      "lower": 0.1,
+      "upper": 0.2,
+      "n": 222,
+      "positive_outcomes": 34,
+      "mean_market_probability": 0.14772523,
+      "realized_probability": 0.15315315,
+      "wilson_lower": 0.11171409,
+      "wilson_upper": 0.20639205
+    },
+    {
+      "bucket": 2,
+      "lower": 0.2,
+      "upper": 0.3,
+      "n": 172,
+      "positive_outcomes": 46,
+      "mean_market_probability": 0.24764535,
+      "realized_probability": 0.26744186,
+      "wilson_lower": 0.20690248,
+      "wilson_upper": 0.33814261
+    },
+    {
+      "bucket": 3,
+      "lower": 0.3,
+      "upper": 0.4,
+      "n": 164,
+      "positive_outcomes": 64,
+      "mean_market_probability": 0.34835366,
+      "realized_probability": 0.3902439,
+      "wilson_lower": 0.31891396,
+      "wilson_upper": 0.4665981
+    },
+    {
+      "bucket": 4,
+      "lower": 0.4,
+      "upper": 0.5,
+      "n": 138,
+      "positive_outcomes": 74,
+      "mean_market_probability": 0.44880435,
+      "realized_probability": 0.53623188,
+      "wilson_lower": 0.45317537,
+      "wilson_upper": 0.61732581
+    },
+    {
+      "bucket": 5,
+      "lower": 0.5,
+      "upper": 0.6,
+      "n": 162,
+      "positive_outcomes": 104,
+      "mean_market_probability": 0.5512963,
+      "realized_probability": 0.64197531,
+      "wilson_lower": 0.56564573,
+      "wilson_upper": 0.71172738
+    },
+    {
+      "bucket": 6,
+      "lower": 0.6,
+      "upper": 0.7,
+      "n": 201,
+      "positive_outcomes": 137,
+      "mean_market_probability": 0.65738806,
+      "realized_probability": 0.68159204,
+      "wilson_lower": 0.61429849,
+      "wilson_upper": 0.74207443
+    },
+    {
+      "bucket": 7,
+      "lower": 0.7,
+      "upper": 0.8,
+      "n": 141,
+      "positive_outcomes": 112,
+      "mean_market_probability": 0.75099291,
+      "realized_probability": 0.79432624,
+      "wilson_lower": 0.7202325,
+      "wilson_upper": 0.85280729
+    },
+    {
+      "bucket": 8,
+      "lower": 0.8,
+      "upper": 0.9,
+      "n": 183,
+      "positive_outcomes": 165,
+      "mean_market_probability": 0.85191257,
+      "realized_probability": 0.90163934,
+      "wilson_lower": 0.84988835,
+      "wilson_upper": 0.93687434
+    },
+    {
+      "bucket": 9,
+      "lower": 0.9,
+      "upper": 1.0,
+      "n": 185,
+      "positive_outcomes": 177,
+      "mean_market_probability": 0.9402973,
+      "realized_probability": 0.95675676,
+      "wilson_lower": 0.91700199,
+      "wilson_upper": 0.97792794
+    }
+  ]
+}

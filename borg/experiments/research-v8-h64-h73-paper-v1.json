@@ -1,0 +1,158 @@
+{
+  "experiment_id": "research-v8-h64-h73-paper-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-26T13:15:00.000Z",
+  "evidence_started_at": "2026-07-26T15:00:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "neglected_operational_edges_v8",
+  "strategy_version": "research-v8-h64-h73-paper-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "max_stake_usd": 10,
+  "max_touch_participation": 0.2,
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "research_design": {
+    "selection_rule": "Exactly ten distinct mechanisms were chosen after an H1-H63 overlap audit and before any H64-H73 forward result existed. No V8 threshold was selected from V8 PnL.",
+    "excluded_duplicates": [
+      "generic CEX momentum",
+      "static top-of-book imbalance",
+      "favourite or near-even buying",
+      "signal inversion",
+      "unbounded Phi-versus-midpoint divergence",
+      "generic two-sided market making",
+      "fixed three-tick resolver persistence"
+    ],
+    "common_executable_hurdle": "Conservative selected-side fair lower bound minus executable ask minus 2x crypto taker fee must exceed one token tick.",
+    "capacity_rule": "At most $10 intended notional and 20% of displayed touch; minimum $1 executable notional.",
+    "structural_rule": "Every bundle is equal-share, depth-capped and marked non-atomic. Metadata equality is not described as terminal rule certification without separate human rule-text review.",
+    "independent_unit": "One Polymarket market/window per directional strategy; one exact relationship/terminal event per structural strategy; UTC days are additional clusters.",
+    "h73_training_separation": "H73 uses a frozen calibration artifact cut off at 2026-07-26T13:00:00Z. It used outcome frequency and Wilson intervals, never trading PnL. All H73 orders after the forward start are untouched observations.",
+    "no_live_claim": "Every arm is shadow-only. A positive point estimate is not proof and cannot authorize a real-money order path."
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "H64_multivenue_cusum_break",
+      "family": "sequential_change_detection",
+      "arm": "robust_multivenue_page_cusum",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "H65_kalman_latent_consensus",
+      "family": "latent_efficient_price_filtering",
+      "arm": "adaptive_four_source_measurement_noise",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "H66_range_threshold_partition_lock",
+      "family": "exact_payoff_graph",
+      "arm": "range_and_two_threshold_partition",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "net_pnl_2x_clustered_by_relationship_day"
+    },
+    {
+      "strategy": "H67_queue_depletion_hazard",
+      "family": "queue_reactive_microstructure",
+      "arm": "depletion_before_refill_hazard",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "H68_multilevel_ofi_impact",
+      "family": "multilevel_order_flow",
+      "arm": "causal_online_next_event_impact",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "H69_quarticity_confidence_envelope",
+      "family": "volatility_estimation_uncertainty",
+      "arm": "realized_quarticity_99pct_sigma_interval",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "H70_stationary_block_bootstrap_digital",
+      "family": "nonparametric_binary_pricing",
+      "arm": "centered_two_block_length_T120",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "H71_token_elasticity_residual",
+      "family": "adaptive_quote_response",
+      "arm": "online_logit_resolver_distance_residual",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "H72_crosshorizon_nested_lock",
+      "family": "exact_payoff_graph",
+      "arm": "same_expiry_chainlink_5m_15m_nested_threshold",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "net_pnl_2x_clustered_by_relationship_day"
+    },
+    {
+      "strategy": "H73_market_prior_calibration_residual",
+      "family": "market_prior_calibration",
+      "arm": "frozen_T120_wilson_bucket_interval",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "minimum_structural_calendar_days": 30,
+    "cluster_by": [
+      "Polymarket market/window",
+      "exact relationship or event family",
+      "UTC day"
+    ],
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "require_latency_profiles_ms": [
+      100,
+      250,
+      500
+    ],
+    "require_realistic_execution": [
+      "quote survival",
+      "displayed depth",
+      "partial and non-fills",
+      "queue evolution",
+      "non-atomic bundle orphan stress",
+      "adverse-selection markouts"
+    ],
+    "multiple_testing": "Holm-family correction across H1-H73, forward clones, live-derived variants and every discarded pilot.",
+    "shared_bankroll": "Portfolio replay with one shared $500 bankroll; strategy PnL must not be naively summed.",
+    "promotion": "No live path. Passing the mechanical read only triggers a separate authenticated $1-$2, 50-fill pilot review.",
+    "null_outcome": "All ten may have approximately zero or negative edge. No threshold changes, asset selection or inverse signals may be selected from this cohort."
+  }
+}

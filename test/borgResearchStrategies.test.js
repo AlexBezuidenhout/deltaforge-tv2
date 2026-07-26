@@ -48,7 +48,7 @@ function ctx(overrides = {}) {
   };
 }
 
-test('research portfolio registers the H1-H63 strategies', () => {
+test('research portfolio registers the H1-H73 strategies', () => {
   const names = makeStrategies().map((strategy) => strategy.name);
   const research = names.filter((name) => /^H\d+_/.test(name));
   assert.deepEqual(research, [
@@ -118,6 +118,16 @@ test('research portfolio registers the H1-H63 strategies', () => {
     'H61_vol_regime_envelope',
     'H62_threshold_isotonic_residual',
     'H63_range_simplex_residual',
+    'H64_multivenue_cusum_break',
+    'H65_kalman_latent_consensus',
+    'H66_range_threshold_partition_lock',
+    'H67_queue_depletion_hazard',
+    'H68_multilevel_ofi_impact',
+    'H69_quarticity_confidence_envelope',
+    'H70_stationary_block_bootstrap_digital',
+    'H71_token_elasticity_residual',
+    'H72_crosshorizon_nested_lock',
+    'H73_market_prior_calibration_residual',
   ]);
 });
 
