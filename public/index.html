@@ -391,6 +391,188 @@
     .section-claude { border-left: 3px solid var(--purple); }
     .section-poly   { border-left: 3px solid var(--yellow); }
 
+    /* ─── BORG STRATEGY EVIDENCE LEDGER ─── */
+    .borg-ledger-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 18px;
+      padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
+      background:
+        linear-gradient(90deg, rgba(0,207,255,0.05), transparent 42%),
+        rgba(0,0,0,0.18);
+    }
+    .borg-ledger-title {
+      color: var(--text-hi); font-size: 11px; font-weight: 700;
+      letter-spacing: 1.8px; text-transform: uppercase;
+    }
+    .borg-ledger-note { color: var(--text-muted); font-size: 10px; line-height: 1.5; margin-top: 4px; max-width: 840px; }
+    .borg-ledger-count {
+      color: var(--cyan); font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+      white-space: nowrap; padding-top: 1px;
+    }
+    .borg-strategy-controls {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px 12px; border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.25);
+    }
+    .borg-filter-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .borg-filter-chip, .borg-sort-direction {
+      appearance: none; background: transparent; border: 1px solid var(--border);
+      color: var(--text-muted); padding: 6px 9px; min-height: 30px;
+      font: 600 9px/1 var(--font); letter-spacing: 1px; text-transform: uppercase;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .borg-filter-chip:hover, .borg-sort-direction:hover { color: var(--text-hi); border-color: var(--border-hi); }
+    .borg-filter-chip.active {
+      color: var(--cyan); border-color: rgba(0,207,255,0.55); background: var(--cyan-glow);
+    }
+    .borg-filter-chip[data-filter="LIVE"].active { color: var(--green); border-color: var(--green); background: var(--green-glow); }
+    .borg-filter-chip[data-filter="DEAD"].active { color: var(--red); border-color: var(--red); background: var(--red-glow); }
+    .borg-filter-chip[data-filter="STALE"].active { color: var(--yellow); border-color: var(--yellow); background: rgba(255,214,0,0.06); }
+    .borg-controls-spacer { flex: 1 1 20px; }
+    .borg-control-label {
+      color: var(--text-muted); font-size: 8px; letter-spacing: 1.2px; text-transform: uppercase;
+    }
+    .borg-sort-select {
+      width: auto; min-width: 230px; min-height: 30px; padding: 5px 28px 5px 9px;
+      color: var(--text-hi); font-size: 10px; border-color: var(--border-hi);
+    }
+    .borg-strategy-search {
+      width: 190px; min-height: 30px; padding: 5px 9px;
+      color: var(--text-hi); background: var(--bg-input); border: 1px solid var(--border-hi);
+      outline: none; font: 10px var(--font);
+    }
+    .borg-strategy-search:focus, .borg-sort-select:focus { border-color: var(--cyan); }
+    .borg-scoreboard-scroll { max-height: 760px; overflow: auto; scrollbar-color: var(--border-hi) transparent; }
+    .borg-scoreboard-scroll thead { position: sticky; top: 0; z-index: 2; }
+    .borg-strategy-row {
+      cursor: pointer; border-left: 2px solid transparent;
+      background: linear-gradient(90deg, rgba(255,255,255,0.008), transparent 20%);
+    }
+    .borg-strategy-row:hover { background: linear-gradient(90deg, rgba(0,207,255,0.055), var(--bg-hover) 42%); }
+    .borg-strategy-row:focus-visible {
+      outline: 1px solid var(--cyan); outline-offset: -2px; background: var(--cyan-glow);
+    }
+    .borg-strategy-row.is-live { border-left-color: var(--green); }
+    .borg-strategy-row.is-testing { border-left-color: var(--cyan); }
+    .borg-strategy-row.is-stale { border-left-color: var(--yellow); }
+    .borg-strategy-row.is-paused { border-left-color: var(--text-muted); }
+    .borg-strategy-row.is-dead { border-left-color: var(--red); opacity: 0.68; }
+    .borg-strategy-row.is-dead:hover, .borg-strategy-row.is-dead:focus-visible { opacity: 1; }
+    .borg-strategy-cell { min-width: 250px; max-width: 370px; }
+    .borg-strategy-name { color: var(--text-hi); font-size: 11px; font-weight: 700; overflow-wrap: anywhere; }
+    .borg-strategy-premise {
+      color: var(--text-muted); font-size: 9px; line-height: 1.45; margin-top: 4px;
+      max-width: 360px;
+    }
+    .borg-priority-tag {
+      display: inline-block; margin-left: 6px; padding: 2px 5px; vertical-align: 1px;
+      border: 1px solid rgba(240,165,0,0.45); color: var(--amber);
+      font-size: 7px; letter-spacing: 1px; text-transform: uppercase;
+    }
+    .borg-row-open {
+      float: right; color: var(--text-muted); font-size: 12px; margin-left: 8px;
+      transition: color 0.15s, transform 0.15s;
+    }
+    .borg-strategy-row:hover .borg-row-open { color: var(--cyan); transform: translateX(2px); }
+    .borg-lifecycle {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 7px;
+      border: 1px solid currentColor; font-size: 8px; font-weight: 700;
+      letter-spacing: 1.2px; text-transform: uppercase; white-space: nowrap;
+    }
+    .borg-lifecycle::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .borg-lifecycle.live { color: var(--green); background: var(--green-glow); }
+    .borg-lifecycle.testing { color: var(--cyan); background: var(--cyan-glow); }
+    .borg-lifecycle.stale { color: var(--yellow); background: rgba(255,214,0,0.06); }
+    .borg-lifecycle.paused { color: var(--text-muted); background: rgba(62,88,114,0.08); }
+    .borg-lifecycle.dead { color: var(--red); background: var(--red-glow); }
+    .borg-lifecycle.live::before { animation: pulse-green 2s infinite; }
+    .borg-runtime-note { color: var(--text-muted); font-size: 8px; line-height: 1.35; margin-top: 5px; max-width: 180px; }
+    .borg-evidence-meter { min-width: 105px; }
+    .borg-evidence-value { color: var(--text-hi); font-weight: 700; font-size: 11px; }
+    .borg-meter-track { width: 92px; height: 3px; background: var(--border); margin-top: 5px; overflow: hidden; }
+    .borg-meter-fill { height: 100%; background: var(--cyan); }
+    .borg-cell-sub { color: var(--text-muted); font-size: 8px; line-height: 1.35; margin-top: 3px; white-space: nowrap; }
+    .borg-activity { min-width: 112px; }
+
+    /* Evidence dossier is the signature interaction: an operator-facing
+       research record, not a generic trade modal. */
+    .borg-dossier-shell {
+      position: fixed; inset: 0; z-index: 600; visibility: hidden; pointer-events: none;
+    }
+    .borg-dossier-shell.active { visibility: visible; pointer-events: auto; }
+    .borg-dossier-backdrop {
+      position: absolute; inset: 0; background: rgba(2,5,8,0.82);
+      opacity: 0; transition: opacity 0.2s ease; backdrop-filter: blur(3px);
+    }
+    .borg-dossier-shell.active .borg-dossier-backdrop { opacity: 1; }
+    .borg-dossier {
+      position: absolute; inset: 0 0 0 auto; width: min(720px, 94vw);
+      background: #09111b; border-left: 1px solid var(--border-hi);
+      box-shadow: -22px 0 60px rgba(0,0,0,0.45);
+      transform: translateX(102%); transition: transform 0.22s ease;
+      display: flex; flex-direction: column;
+    }
+    .borg-dossier-shell.active .borg-dossier { transform: translateX(0); }
+    .borg-dossier-header {
+      position: relative; padding: 20px 56px 18px 22px; border-bottom: 1px solid var(--border);
+      background:
+        linear-gradient(135deg, rgba(0,207,255,0.09), transparent 44%),
+        repeating-linear-gradient(90deg, transparent, transparent 38px, rgba(255,255,255,0.018) 39px);
+    }
+    .borg-dossier-header::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--cyan);
+    }
+    .borg-dossier-header.is-live::before { background: var(--green); }
+    .borg-dossier-header.is-stale::before { background: var(--yellow); }
+    .borg-dossier-header.is-paused::before { background: var(--text-muted); }
+    .borg-dossier-header.is-dead::before { background: var(--red); }
+    .borg-dossier-kicker { color: var(--text-muted); font-size: 8px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+    .borg-dossier-name {
+      color: var(--text-hi); font-family: 'Syne', sans-serif; font-size: 19px;
+      line-height: 1.2; overflow-wrap: anywhere;
+    }
+    .borg-dossier-stamp { color: var(--text-muted); font-size: 9px; margin-top: 8px; line-height: 1.5; }
+    .borg-dossier-close {
+      position: absolute; top: 16px; right: 16px; width: 30px; height: 30px;
+      border: 1px solid var(--border-hi); background: rgba(0,0,0,0.22);
+      color: var(--text-muted); font-size: 18px; line-height: 1;
+    }
+    .borg-dossier-close:hover, .borg-dossier-close:focus-visible { color: var(--red); border-color: var(--red); outline: none; }
+    .borg-dossier-body { flex: 1; overflow-y: auto; padding: 18px 22px 40px; scrollbar-color: var(--border-hi) transparent; }
+    .borg-dossier-loading { color: var(--text-muted); padding: 28px 0; text-align: center; letter-spacing: 1px; }
+    .borg-dossier-verdict {
+      display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 14px;
+      border: 1px solid var(--border-hi); padding: 14px; margin-bottom: 16px;
+      background: rgba(0,0,0,0.22);
+    }
+    .borg-dossier-verdict-copy { color: var(--text); font-size: 11px; line-height: 1.6; }
+    .borg-dossier-section { padding: 16px 0; border-top: 1px solid var(--border); }
+    .borg-dossier-section:first-child { border-top: none; padding-top: 0; }
+    .borg-dossier-label { color: var(--amber); font-size: 8px; letter-spacing: 1.7px; text-transform: uppercase; margin-bottom: 7px; }
+    .borg-dossier-premise { color: var(--text-hi); font-size: 14px; line-height: 1.65; }
+    .borg-dossier-copy { color: var(--text); font-size: 11px; line-height: 1.65; }
+    .borg-dossier-copy.muted { color: var(--text-muted); }
+    .borg-dossier-grid {
+      display: grid; grid-template-columns: repeat(4, minmax(0,1fr));
+      border: 1px solid var(--border); margin-top: 10px;
+    }
+    .borg-dossier-metric { padding: 11px; border-right: 1px solid var(--border); }
+    .borg-dossier-metric:last-child { border-right: none; }
+    .borg-dossier-metric-label { color: var(--text-muted); font-size: 7px; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 6px; }
+    .borg-dossier-metric-value { color: var(--text-hi); font-size: 15px; font-weight: 700; }
+    .borg-dossier-progress { height: 4px; background: var(--border); margin-top: 10px; }
+    .borg-dossier-progress > div { height: 100%; background: var(--cyan); }
+    .borg-dossier-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .borg-dossier-card { border: 1px solid var(--border); padding: 12px; background: rgba(0,0,0,0.16); }
+    .borg-dossier-table { width: 100%; margin-top: 8px; }
+    .borg-dossier-table th { padding: 6px 7px; font-size: 7px; }
+    .borg-dossier-table td { padding: 6px 7px; font-size: 9px; }
+    .borg-dossier details { border: 1px solid var(--border); margin-top: 10px; }
+    .borg-dossier summary {
+      cursor: pointer; padding: 9px 11px; color: var(--text-muted);
+      font-size: 8px; letter-spacing: 1.4px; text-transform: uppercase;
+    }
+    .borg-dossier details[open] summary { color: var(--cyan); border-bottom: 1px solid var(--border); }
+
     /* ─── RESPONSIVE ─── */
 
     /* Named utility classes for inline grids — allows media queries to target them */
@@ -427,6 +609,13 @@
 
       /* Session bar: wrap items */
       #sessionBar { flex-wrap: wrap; gap: 8px; }
+      .borg-ledger-head { flex-direction: column; gap: 7px; }
+      .borg-ledger-count { white-space: normal; }
+      .borg-controls-spacer { display: none; }
+      .borg-strategy-controls { align-items: flex-end; }
+      .borg-dossier-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .borg-dossier-metric:nth-child(2) { border-right: none; }
+      .borg-dossier-metric:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
     }
 
     @media (max-width: 600px) {
@@ -483,6 +672,18 @@
 
       /* Session history modal */
       #sessionHistoryModal > div { width: 100vw !important; max-height: 95vh !important; border-radius: 0 !important; }
+      .borg-sort-select, .borg-strategy-search { width: 100%; min-width: 0; }
+      .borg-control-block { flex: 1 1 100%; }
+      .borg-dossier { width: 100vw; }
+      .borg-dossier-header { padding: 16px 52px 14px 16px; }
+      .borg-dossier-body { padding: 14px 14px 32px; }
+      .borg-dossier-columns { grid-template-columns: 1fr; }
+      .borg-dossier-name { font-size: 16px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .borg-dossier, .borg-dossier-backdrop, .borg-row-open { transition: none; }
+      .borg-lifecycle.live::before { animation: none; }
     }
 
     /* Copy-targets / settings form grids */
@@ -1588,7 +1789,7 @@
       <div id="borgStatusTitle">BORG: —</div>
       <div id="borgStatusSubtitle">Research remains shadow-first. H53 and ETH G-late have separate, explicitly unproven canary executors; every live decision is reconciled to its frozen shadow source.</div>
     </div>
-    <div id="borgPhaseIndicator" style="border:1px solid var(--yellow); color:var(--yellow); font-size:10px; font-weight:700; padding:4px 8px; border-radius:4px; letter-spacing:1px;">PILOT — NOT EVIDENCE</div>
+    <div id="borgPhaseIndicator" style="border:1px solid var(--yellow); color:var(--yellow); font-size:10px; font-weight:700; padding:4px 8px;border-radius:4px;letter-spacing:1px;">PAPER TESTING · LIVE PATHS SEPARATE</div>
   </div>
 
   <div class="grid-5col">
@@ -1679,17 +1880,51 @@
   </div>
 
   <div class="panel">
-    <div class="panel-header"><span>SHADOW SCOREBOARD</span><span style="color:var(--text-muted);font-size:10px;">historical diagnostics are separated from the exact latest frozen trial · current and 6h/24h/3d use joint A/B data + execution rows · hover for doubled-cost P&amp;L</span></div>
+    <div class="borg-ledger-head">
+      <div>
+        <div class="borg-ledger-title">Strategy evidence ledger</div>
+        <div class="borg-ledger-note">One row per exact rule. “Testing” comes from the active collector heartbeat—not recent P&amp;L. Current windows use only the latest frozen trial’s joint A/B data and execution rows; historical results remain diagnostics.</div>
+      </div>
+      <div class="borg-ledger-count" id="borgLedgerCount">Loading strategy states…</div>
+    </div>
+    <div class="borg-strategy-controls" aria-label="Strategy filters and sorting">
+      <div class="borg-filter-group" id="borgLifecycleFilters">
+        <button type="button" class="borg-filter-chip active" data-filter="ALL" onclick="borgSetLifecycleFilter('ALL')">All <span id="borgCountAll">—</span></button>
+        <button type="button" class="borg-filter-chip" data-filter="LIVE" onclick="borgSetLifecycleFilter('LIVE')">Live <span id="borgCountLive">—</span></button>
+        <button type="button" class="borg-filter-chip" data-filter="TESTING" onclick="borgSetLifecycleFilter('TESTING')">Testing <span id="borgCountTesting">—</span></button>
+        <button type="button" class="borg-filter-chip" data-filter="STALE" onclick="borgSetLifecycleFilter('STALE')">Stale <span id="borgCountStale">—</span></button>
+        <button type="button" class="borg-filter-chip" data-filter="PAUSED" onclick="borgSetLifecycleFilter('PAUSED')">Paused <span id="borgCountPaused">—</span></button>
+        <button type="button" class="borg-filter-chip" data-filter="DEAD" onclick="borgSetLifecycleFilter('DEAD')">Dead <span id="borgCountDead">—</span></button>
+      </div>
+      <div class="borg-controls-spacer"></div>
+      <div class="borg-control-block">
+        <div class="borg-control-label">Find</div>
+        <input id="borgStrategySearch" class="borg-strategy-search" type="search" placeholder="strategy or premise" oninput="borgRenderStrategyLedger()" autocomplete="off">
+      </div>
+      <div class="borg-control-block">
+        <label class="borg-control-label" for="borgStrategySort">Order by</label>
+        <select id="borgStrategySort" class="borg-sort-select" onchange="borgSortChanged()">
+          <option value="active_profit">Active + most profitable</option>
+          <option value="current_2x">Current trial P&amp;L (2×)</option>
+          <option value="pnl_24h">Last 24h P&amp;L (2×)</option>
+          <option value="deployed">Most recently deployed</option>
+          <option value="recent">Most recently active</option>
+          <option value="evidence">Most independent markets</option>
+          <option value="name">Strategy name</option>
+        </select>
+      </div>
+      <button type="button" class="borg-sort-direction" id="borgSortDirection" onclick="borgToggleSortDirection()" title="Reverse sort direction" aria-label="Reverse sort direction">↓ DESC</button>
+    </div>
     <div class="panel-body" style="padding:0;">
-      <div class="table-wrap" style="margin:0;border:none;">
+      <div class="table-wrap borg-scoreboard-scroll" style="margin:0;border:none;">
         <table>
           <thead><tr>
-            <th>Strategy</th><th>Phase / governance</th><th>Places</th><th>Cancels</th><th>Scored</th><th>Historical eligible n</th>
-            <th>Historical 1×</th><th>Historical 2×</th><th>Current trial n</th><th>Current 1×</th><th>Current 2×</th>
-            <th>PnL 6h</th><th>PnL 24h</th><th>PnL 3d</th>
-            <th>Quality A/B</th><th>Fidelity A/B</th><th>Last</th>
+            <th>Strategy / premise</th><th>Lifecycle</th><th>Fresh evidence</th>
+            <th>Current 1×</th><th>Current 2×</th>
+            <th>6h · 2×</th><th>24h · 2×</th><th>3d · 2×</th>
+            <th>Historical · 2×</th><th>Data A/B</th><th>Activity</th>
           </tr></thead>
-          <tbody id="borgSummaryBody"><tr><td colspan="17" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr></tbody>
+          <tbody id="borgSummaryBody"><tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:18px;">Loading strategy evidence ledger…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1716,6 +1951,21 @@
       <div style="color:var(--text-muted);">Waiting for events…</div>
     </div>
   </div>
+</div>
+
+<div class="borg-dossier-shell" id="borgStrategyDossier" aria-hidden="true">
+  <div class="borg-dossier-backdrop" onclick="closeBorgStrategyDossier()" aria-hidden="true"></div>
+  <aside class="borg-dossier" role="dialog" aria-modal="true" aria-labelledby="borgDossierName" tabindex="-1">
+    <header class="borg-dossier-header" id="borgDossierHeader">
+      <div class="borg-dossier-kicker">Strategy evidence dossier · exact rule identity</div>
+      <div class="borg-dossier-name" id="borgDossierName">—</div>
+      <div class="borg-dossier-stamp" id="borgDossierStamp">Loading frozen trial…</div>
+      <button type="button" class="borg-dossier-close" onclick="closeBorgStrategyDossier()" aria-label="Close strategy evidence dossier">×</button>
+    </header>
+    <div class="borg-dossier-body" id="borgDossierBody">
+      <div class="borg-dossier-loading">Loading evidence dossier…</div>
+    </div>
+  </aside>
 </div>
 
 <!-- ═══════════════ FLOW LAB — public completed-flow scalp research ═══════════════ -->
@@ -3350,13 +3600,375 @@
   // ═══════════════ BORG — shadow-only edge discovery (read-only view) ═══════════════
   let _borgInterval = null;
   let _borgLoading = false;
+  let _borgSummaryData = [];
+  let _borgLifecycleFilter = 'ALL';
+  let _borgSortDirection = 'desc';
+  let _borgDossierStrategy = null;
+  let _borgDossierTrigger = null;
+  let _borgPrefsRestored = false;
 
   const _bAge = (s) => s == null ? 'never' : (s < 60 ? s + 's' : s < 3600 ? Math.round(s / 60) + 'm' : Math.round(s / 3600) + 'h') + ' ago';
   const _bMoney = (v) => v == null ? '—' : (v < 0 ? '-' : '') + '$' + Math.abs(v).toFixed(2);
-  const _bPnlColor = (v) => v > 0 ? 'var(--green)' : v < 0 ? 'var(--danger)' : 'var(--text-muted)';
+  const _bPnlColor = (v) => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text-muted)';
+  const _bTimestamp = (value) => {
+    if (!value) return 0;
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const _bDateTime = (value) => value
+    ? new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+    : '—';
+  const _bAgeFromDate = (value) => {
+    const timestamp = _bTimestamp(value);
+    return timestamp ? _bAge(Math.max(0, Math.round((Date.now() - timestamp) / 1000))) : 'never';
+  };
+  const _bLifecycleBadge = (lifecycle) => {
+    const label = String(lifecycle || 'PAUSED').toUpperCase();
+    return '<span class="borg-lifecycle ' + label.toLowerCase() + '">' + escapeHtml(label) + '</span>';
+  };
+
+  function borgSetLifecycleFilter(filter) {
+    _borgLifecycleFilter = String(filter || 'ALL').toUpperCase();
+    try { localStorage.setItem('borgLifecycleFilter', _borgLifecycleFilter); } catch (_) {}
+    document.querySelectorAll('#borgLifecycleFilters .borg-filter-chip').forEach((button) => {
+      button.classList.toggle('active', button.dataset.filter === _borgLifecycleFilter);
+    });
+    borgRenderStrategyLedger();
+  }
+
+  function borgSortChanged() {
+    const select = document.getElementById('borgStrategySort');
+    try { localStorage.setItem('borgStrategySort', select?.value || 'active_profit'); } catch (_) {}
+    borgRenderStrategyLedger();
+  }
+
+  function borgToggleSortDirection() {
+    _borgSortDirection = _borgSortDirection === 'desc' ? 'asc' : 'desc';
+    try { localStorage.setItem('borgSortDirection', _borgSortDirection); } catch (_) {}
+    const button = document.getElementById('borgSortDirection');
+    if (button) button.textContent = _borgSortDirection === 'desc' ? '↓ DESC' : '↑ ASC';
+    borgRenderStrategyLedger();
+  }
+
+  function borgRestoreLedgerPreferences() {
+    try {
+      const filter = localStorage.getItem('borgLifecycleFilter');
+      const sort = localStorage.getItem('borgStrategySort');
+      const direction = localStorage.getItem('borgSortDirection');
+      if (['ALL', 'LIVE', 'TESTING', 'STALE', 'PAUSED', 'DEAD'].includes(filter)) _borgLifecycleFilter = filter;
+      if (direction === 'asc' || direction === 'desc') _borgSortDirection = direction;
+      const select = document.getElementById('borgStrategySort');
+      if (select && [...select.options].some((option) => option.value === sort)) select.value = sort;
+    } catch (_) {}
+    const directionButton = document.getElementById('borgSortDirection');
+    if (directionButton) directionButton.textContent = _borgSortDirection === 'desc' ? '↓ DESC' : '↑ ASC';
+    document.querySelectorAll('#borgLifecycleFilters .borg-filter-chip').forEach((button) => {
+      button.classList.toggle('active', button.dataset.filter === _borgLifecycleFilter);
+    });
+  }
+
+  function borgRenderStrategyLedger() {
+    const sb = document.getElementById('borgSummaryBody');
+    if (!sb) return;
+    const counts = { ALL: _borgSummaryData.length, LIVE: 0, TESTING: 0, STALE: 0, PAUSED: 0, DEAD: 0 };
+    for (const row of _borgSummaryData) {
+      const state = String(row.lifecycle || 'PAUSED').toUpperCase();
+      if (Object.hasOwn(counts, state)) counts[state] += 1;
+    }
+    const countIds = {
+      ALL: 'borgCountAll', LIVE: 'borgCountLive', TESTING: 'borgCountTesting',
+      STALE: 'borgCountStale', PAUSED: 'borgCountPaused', DEAD: 'borgCountDead',
+    };
+    for (const [key, id] of Object.entries(countIds)) {
+      const element = document.getElementById(id);
+      if (element) element.textContent = counts[key];
+    }
+
+    const search = String(document.getElementById('borgStrategySearch')?.value || '').trim().toLowerCase();
+    const visible = _borgSummaryData.filter((row) => {
+      if (_borgLifecycleFilter !== 'ALL' && String(row.lifecycle).toUpperCase() !== _borgLifecycleFilter) return false;
+      if (!search) return true;
+      return [
+        row.strategy, row.premise, row.priorOutcome, row.outcome, row.current_trial_family,
+      ].filter(Boolean).join(' ').toLowerCase().includes(search);
+    });
+    const sort = document.getElementById('borgStrategySort')?.value || 'active_profit';
+    const direction = _borgSortDirection === 'desc' ? -1 : 1;
+    const number = (row, key) => Number(row[key] || 0);
+    visible.sort((left, right) => {
+      if (sort === 'active_profit') {
+        const lifecycle = Number(left.lifecycleRank ?? 9) - Number(right.lifecycleRank ?? 9);
+        if (lifecycle) return lifecycle;
+        const priority = Number(left.priorityRank ?? 999) - Number(right.priorityRank ?? 999);
+        if (priority) return priority;
+        return (number(left, 'current_pnl_2x') - number(right, 'current_pnl_2x')) * direction;
+      }
+      if (sort === 'current_2x') return (number(left, 'current_pnl_2x') - number(right, 'current_pnl_2x')) * direction;
+      if (sort === 'pnl_24h') return (number(left, 'pnl_2x_24h') - number(right, 'pnl_2x_24h')) * direction;
+      if (sort === 'deployed') return (_bTimestamp(left.deployed_at) - _bTimestamp(right.deployed_at)) * direction;
+      if (sort === 'recent') return (_bTimestamp(left.last_activity_at) - _bTimestamp(right.last_activity_at)) * direction;
+      if (sort === 'evidence') return (number(left, 'current_eligible_markets') - number(right, 'current_eligible_markets')) * direction;
+      return String(left.strategy).localeCompare(String(right.strategy)) * direction;
+    });
+
+    const ledgerCount = document.getElementById('borgLedgerCount');
+    if (ledgerCount) {
+      ledgerCount.textContent = visible.length + ' shown · ' + counts.TESTING + ' testing · ' +
+        counts.STALE + ' stale · ' + counts.DEAD + ' dead';
+    }
+    if (!visible.length) {
+      sb.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">No strategies match this lifecycle/search filter.</td></tr>';
+      return;
+    }
+
+    const pnlCell = (value, fills, title) => {
+      const pnl = Number(value || 0);
+      return '<td title="' + escapeHtml(title || '') + '" style="color:' +
+        (Number(fills || 0) ? _bPnlColor(pnl) : 'var(--text-muted)') + ';font-weight:700;">' +
+        (Number(fills || 0) ? _bMoney(pnl) : '—') + '</td>';
+    };
+    const horizonCell = (row, suffix, label) => {
+      const fills = number(row, 'fills_' + suffix);
+      const markets = number(row, 'markets_' + suffix);
+      const pnl1x = number(row, 'pnl_1x_' + suffix);
+      const pnl2x = number(row, 'pnl_2x_' + suffix);
+      return '<td title="' + label + ' fresh-cohort entry window · 1× ' + _bMoney(pnl1x) +
+        ' · 2× ' + _bMoney(pnl2x) + ' · ' + fills + ' fills / ' + markets + ' markets" style="color:' +
+        (fills ? _bPnlColor(pnl2x) : 'var(--text-muted)') + ';font-weight:700;">' +
+        (fills ? _bMoney(pnl2x) : '—') +
+        '<div class="borg-cell-sub">' + fills + 'f / ' + markets + 'm</div></td>';
+    };
+
+    sb.innerHTML = visible.map((row) => {
+      const lifecycle = String(row.lifecycle || 'PAUSED').toUpperCase();
+      const currentFills = number(row, 'current_eligible_fills');
+      const currentMarkets = number(row, 'current_eligible_markets');
+      const target = Number(row.current_min_independent_markets || 300);
+      const progress = Math.max(0, Math.min(100, target ? (100 * currentMarkets / target) : 0));
+      const historicalFills = number(row, 'eligible_fills');
+      const scored = number(row, 'scored');
+      const quality = scored ? Math.round(100 * number(row, 'quality_ab') / scored) : null;
+      const fidelity = scored ? Math.round(100 * number(row, 'fidelity_ab') / scored) : null;
+      const priority = row.recommended
+        ? '<span class="borg-priority-tag">' + escapeHtml(row.priorityTier || 'priority') + '</span>' : '';
+      const runtimeNote = lifecycle === 'TESTING' || lifecycle === 'STALE'
+        ? 'heartbeat ' + _bAge(row.runtimeAgeSec)
+        : String(row.trial_status || lifecycle).replaceAll('_', ' ');
+      const premise = String(row.premise || '');
+      const shortPremise = premise.length > 128 ? premise.slice(0, 125) + '…' : premise;
+      return '<tr class="borg-strategy-row is-' + lifecycle.toLowerCase() + '" tabindex="0" role="button" ' +
+        'data-strategy="' + escapeHtml(row.strategy) + '" aria-label="Open evidence dossier for ' + escapeHtml(row.strategy) + '">' +
+        '<td class="borg-strategy-cell"><span class="borg-row-open" aria-hidden="true">›</span>' +
+          '<div class="borg-strategy-name">' + escapeHtml(row.strategy) + priority + '</div>' +
+          '<div class="borg-strategy-premise">' + escapeHtml(shortPremise) + '</div></td>' +
+        '<td>' + _bLifecycleBadge(lifecycle) +
+          '<div class="borg-runtime-note">' + escapeHtml(runtimeNote) + '</div></td>' +
+        '<td class="borg-evidence-meter"><div class="borg-evidence-value">' + currentMarkets + ' / ' + target + '</div>' +
+          '<div class="borg-meter-track"><div class="borg-meter-fill" style="width:' + progress.toFixed(2) + '%;"></div></div>' +
+          '<div class="borg-cell-sub">' + currentFills + ' eligible fills · ' + escapeHtml(row.current_trial_phase || row.phase || '—') + '</div></td>' +
+        pnlCell(row.current_pnl_1x, currentFills, 'Fresh current trial · 1× pessimistic costs') +
+        pnlCell(row.current_pnl_2x, currentFills, 'Fresh current trial · doubled costs') +
+        horizonCell(row, '6h', 'Last 6 hours') +
+        horizonCell(row, '24h', 'Last 24 hours') +
+        horizonCell(row, '3d', 'Last 3 days') +
+        pnlCell(row.eligible_pnl_2x, historicalFills,
+          'Historical diagnostic only · ' + historicalFills + ' eligible fills / ' + number(row, 'eligible_markets') + ' markets') +
+        '<td>' + (quality == null ? '—' : quality + '%') +
+          '<div class="borg-cell-sub">quality · fidelity ' + (fidelity == null ? '—' : fidelity + '%') + '</div></td>' +
+        '<td class="borg-activity">' + _bAgeFromDate(row.last_activity_at) +
+          '<div class="borg-cell-sub">order ' + _bAgeFromDate(row.latest) + '</div>' +
+          '<div class="borg-cell-sub">deployed ' + _bAgeFromDate(row.deployed_at) + '</div></td>' +
+        '</tr>';
+    }).join('');
+
+    sb.querySelectorAll('.borg-strategy-row').forEach((row) => {
+      row.addEventListener('click', () => openBorgStrategyDossier(row.dataset.strategy, row));
+      row.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openBorgStrategyDossier(row.dataset.strategy, row);
+        }
+      });
+    });
+  }
+
+  function borgRenderDossier(data, summaryRow) {
+    const body = document.getElementById('borgDossierBody');
+    const header = document.getElementById('borgDossierHeader');
+    const lifecycle = String(data.lifecycle || summaryRow?.lifecycle || 'PAUSED').toUpperCase();
+    const trial = data.trial || {};
+    const runtime = data.runtime || {};
+    const evidence = data.evidence || {};
+    const halves = data.chronologicalHalves || {};
+    const markets = Number(evidence.independent_markets ?? summaryRow?.current_eligible_markets ?? 0);
+    const fills = Number(evidence.eligible_fills ?? summaryRow?.current_eligible_fills ?? 0);
+    const days = Number(evidence.utc_days || 0);
+    const targetMarkets = Number(trial.min_independent_markets || summaryRow?.current_min_independent_markets || 300);
+    const targetDays = Number(trial.min_days || summaryRow?.current_min_days || 14);
+    const pnl1x = Number(evidence.pnl_1x ?? summaryRow?.current_pnl_1x ?? 0);
+    const pnl2x = Number(evidence.pnl_2x ?? summaryRow?.current_pnl_2x ?? 0);
+    const progress = Math.max(0, Math.min(100, targetMarkets ? 100 * markets / targetMarkets : 0));
+    header.className = 'borg-dossier-header is-' + lifecycle.toLowerCase();
+    document.getElementById('borgDossierName').textContent = data.strategy || summaryRow?.strategy || '—';
+    document.getElementById('borgDossierStamp').textContent = [
+      trial.experiment_id || summaryRow?.current_experiment_id || 'no frozen experiment',
+      trial.phase || summaryRow?.current_trial_phase || 'historical',
+      'deployed ' + _bDateTime(trial.frozen_at || summaryRow?.deployed_at),
+    ].join(' · ');
+
+    const metric = (label, value, color) =>
+      '<div class="borg-dossier-metric"><div class="borg-dossier-metric-label">' + escapeHtml(label) +
+      '</div><div class="borg-dossier-metric-value" style="' + (color ? 'color:' + color + ';' : '') + '">' +
+      escapeHtml(value) + '</div></div>';
+    const emptyRows = (columns, text) =>
+      '<tr><td colspan="' + columns + '" style="text-align:center;color:var(--text-muted);padding:12px;">' + escapeHtml(text) + '</td></tr>';
+    const assetRows = (data.byAsset || []).length ? data.byAsset.map((row) =>
+      '<tr><td>' + escapeHtml(String(row.asset || 'unknown').toUpperCase()) + '</td><td>' + Number(row.markets || 0) +
+      '</td><td>' + Number(row.fills || 0) + '</td><td style="color:' + _bPnlColor(Number(row.pnl_2x || 0)) + ';">' +
+      _bMoney(Number(row.pnl_2x || 0)) + '</td></tr>').join('') : emptyRows(4, 'No eligible asset-level fills yet');
+    const dayRows = (data.byDay || []).length ? data.byDay.map((row) =>
+      '<tr><td>' + escapeHtml(String(row.day).slice(0, 10)) + '</td><td>' + Number(row.markets || 0) +
+      '</td><td>' + Number(row.fills || 0) + '</td><td style="color:' + _bPnlColor(Number(row.pnl_2x || 0)) + ';">' +
+      _bMoney(Number(row.pnl_2x || 0)) + '</td></tr>').join('') : emptyRows(4, 'No eligible UTC-day fills yet');
+    const historyRows = (data.trialHistory || []).length ? data.trialHistory.map((row) =>
+      '<tr><td>' + escapeHtml(row.experiment_id) + '</td><td>' + escapeHtml(String(row.status || '—').replaceAll('_', ' ')) +
+      '</td><td>' + escapeHtml(row.phase || '—') + '</td><td>' + _bDateTime(row.frozen_at) + '</td></tr>').join('')
+      : emptyRows(4, 'No registered experiment history');
+    const recentRows = (data.recent || []).length ? data.recent.map((row) =>
+      '<tr><td>' + new Date(row.ts).toLocaleTimeString() + '</td><td>' + escapeHtml(row.asset || '—') +
+      '</td><td>' + escapeHtml((row.action || '—') + ' ' + (row.token || '')) + '</td><td>' +
+      (row.price == null ? '—' : Number(row.price).toFixed(3)) + '</td><td>' +
+      (row.filled == null ? 'pending' : row.filled ? 'filled' : 'no fill') + '</td><td style="color:' +
+      _bPnlColor(Number(row.pnl_2x || 0)) + ';">' + (row.pnl_2x == null ? '—' : _bMoney(Number(row.pnl_2x))) +
+      '</td></tr>').join('') : emptyRows(6, 'No orders in the current frozen cohort');
+
+    const prior = data.priorOutcome
+      ? '<div class="borg-dossier-card"><div class="borg-dossier-label">Earlier version / concentration warning</div>' +
+        '<div class="borg-dossier-copy">' + escapeHtml(data.priorOutcome) + '</div></div>'
+      : '';
+    const source = data.sourceStrategy
+      ? '<div class="borg-dossier-copy muted" style="margin-top:7px;">Source rule: ' + escapeHtml(data.sourceStrategy) + '</div>'
+      : '';
+    const halfN = Number(halves.n || 0);
+    const firstHalf = Number(halves.first_half_2x || 0);
+    const secondHalf = Number(halves.second_half_2x || 0);
+    const runtimeMarkets = Array.isArray(runtime.market_types) ? runtime.market_types.join(', ') : '—';
+
+    body.innerHTML =
+      '<div class="borg-dossier-verdict">' + _bLifecycleBadge(lifecycle) +
+        '<div class="borg-dossier-verdict-copy">' + escapeHtml(data.lifecycleReason || summaryRow?.lifecycleReason || 'No lifecycle explanation available.') + '</div></div>' +
+      '<section class="borg-dossier-section"><div class="borg-dossier-label">Initial premise</div>' +
+        '<div class="borg-dossier-premise">' + escapeHtml(data.premise || summaryRow?.premise || '—') + '</div></section>' +
+      '<section class="borg-dossier-section"><div class="borg-dossier-label">Fresh frozen evidence</div>' +
+        '<div class="borg-dossier-grid">' +
+          metric('Independent markets', markets + ' / ' + targetMarkets) +
+          metric('UTC days', days + ' / ' + targetDays) +
+          metric('Current P&L · 1×', fills ? _bMoney(pnl1x) : '—', fills ? _bPnlColor(pnl1x) : '') +
+          metric('Current P&L · 2×', fills ? _bMoney(pnl2x) : '—', fills ? _bPnlColor(pnl2x) : '') +
+        '</div><div class="borg-dossier-progress" title="' + progress.toFixed(1) + '% of independent-market requirement"><div style="width:' +
+          progress.toFixed(2) + '%;"></div></div>' +
+        '<div class="borg-dossier-copy muted" style="margin-top:8px;">' + fills + ' eligible fills · first observation ' +
+          escapeHtml(_bDateTime(evidence.first_observation_at)) + ' · last ' + escapeHtml(_bDateTime(evidence.last_observation_at)) + '</div>' +
+      '</section>' +
+      '<section class="borg-dossier-section"><div class="borg-dossier-columns">' +
+        '<div class="borg-dossier-card"><div class="borg-dossier-label">' + (lifecycle === 'DEAD' ? 'Why the exact rule failed' : 'Current disposition') + '</div>' +
+          '<div class="borg-dossier-copy">' + escapeHtml(data.outcome || summaryRow?.outcome || 'No decision yet.') + '</div></div>' +
+        '<div class="borg-dossier-card"><div class="borg-dossier-label">What was redesigned</div>' +
+          '<div class="borg-dossier-copy">' + escapeHtml(data.design || summaryRow?.design || '—') + '</div>' + source + '</div>' +
+        prior +
+        '<div class="borg-dossier-card"><div class="borg-dossier-label">Interpretation guardrail</div>' +
+          '<div class="borg-dossier-copy">' + escapeHtml(data.interpretation || summaryRow?.interpretation || 'Interim paper P&L is not proof.') + '</div></div>' +
+      '</div></section>' +
+      '<section class="borg-dossier-section"><div class="borg-dossier-label">Chronological stability · doubled costs</div>' +
+        '<div class="borg-dossier-grid">' +
+          metric('Eligible fills', String(halfN)) +
+          metric('First half', halfN ? _bMoney(firstHalf) : '—', halfN ? _bPnlColor(firstHalf) : '') +
+          metric('Second half', halfN ? _bMoney(secondHalf) : '—', halfN ? _bPnlColor(secondHalf) : '') +
+          metric('Primary metric', trial.primary_metric || summaryRow?.current_primary_metric || '—') +
+        '</div></section>' +
+      '<section class="borg-dossier-section"><div class="borg-dossier-columns">' +
+        '<div><div class="borg-dossier-label">By asset · 2×</div><table class="borg-dossier-table"><thead><tr><th>Asset</th><th>Markets</th><th>Fills</th><th>P&L</th></tr></thead><tbody>' +
+          assetRows + '</tbody></table></div>' +
+        '<div><div class="borg-dossier-label">By UTC day · 2×</div><table class="borg-dossier-table"><thead><tr><th>Day</th><th>Markets</th><th>Fills</th><th>P&L</th></tr></thead><tbody>' +
+          dayRows + '</tbody></table></div>' +
+      '</div></section>' +
+      '<section class="borg-dossier-section"><div class="borg-dossier-columns">' +
+        '<div class="borg-dossier-card"><div class="borg-dossier-label">Runtime telemetry</div><div class="borg-dossier-copy">' +
+          (data.runtime
+            ? Number(runtime.evaluations || 0) + ' evaluations · ' + Number(runtime.actions || 0) + ' intents · ' +
+              Number(runtime.errors || 0) + ' errors<br>cadence ' + escapeHtml(runtime.cadence || '—') +
+              ' · markets ' + escapeHtml(runtimeMarkets) + '<br>heartbeat ' + escapeHtml(_bAgeFromDate(runtime.updated_at))
+            : 'Not registered in the active collector run.') + '</div></div>' +
+        '<div class="borg-dossier-card"><div class="borg-dossier-label">Frozen trial contract</div><div class="borg-dossier-copy">' +
+          escapeHtml(String(trial.status || summaryRow?.trial_status || 'unregistered').replaceAll('_', ' ')) +
+          '<br>' + targetMarkets + ' markets · ' + targetDays + ' days<br>evidence since ' +
+          escapeHtml(_bDateTime(trial.evidence_started_at || summaryRow?.current_evidence_started_at)) + '</div></div>' +
+      '</div>' +
+      '<details><summary>Experiment history</summary><div style="overflow:auto;"><table class="borg-dossier-table"><thead><tr><th>Experiment</th><th>Status</th><th>Phase</th><th>Frozen</th></tr></thead><tbody>' +
+        historyRows + '</tbody></table></div></details>' +
+      '<details><summary>Recent current-cohort orders</summary><div style="overflow:auto;"><table class="borg-dossier-table"><thead><tr><th>Time</th><th>Asset</th><th>Intent</th><th>Price</th><th>Fill</th><th>2× P&L</th></tr></thead><tbody>' +
+        recentRows + '</tbody></table></div></details></section>';
+  }
+
+  async function openBorgStrategyDossier(strategy, trigger) {
+    const shell = document.getElementById('borgStrategyDossier');
+    const summaryRow = _borgSummaryData.find((row) => row.strategy === strategy) || null;
+    _borgDossierStrategy = strategy;
+    _borgDossierTrigger = trigger || document.activeElement;
+    shell.classList.add('active');
+    shell.setAttribute('aria-hidden', 'false');
+    document.documentElement.style.overflow = 'hidden';
+    document.getElementById('borgDossierName').textContent = strategy;
+    document.getElementById('borgDossierStamp').textContent =
+      (summaryRow?.current_experiment_id || 'loading frozen experiment') + ' · ' +
+      (summaryRow?.lifecycle || '—');
+    document.getElementById('borgDossierHeader').className =
+      'borg-dossier-header is-' + String(summaryRow?.lifecycle || 'paused').toLowerCase();
+    document.getElementById('borgDossierBody').innerHTML =
+      '<div class="borg-dossier-loading">Loading evidence, runtime and trial history…</div>';
+    shell.querySelector('.borg-dossier').focus();
+    try {
+      const response = await fetch((window.API_BASE || '') + '/api/borg/shadow/strategy/' + encodeURIComponent(strategy), {
+        headers: { ...authHeaders() },
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const detail = await response.json();
+      if (_borgDossierStrategy === strategy) borgRenderDossier(detail, summaryRow);
+    } catch (error) {
+      if (_borgDossierStrategy !== strategy) return;
+      document.getElementById('borgDossierBody').innerHTML =
+        '<div class="alert error">The strategy row is available, but its detailed evidence query failed: ' +
+        escapeHtml(error.message) + '.</div>' +
+        (summaryRow
+          ? '<div class="borg-dossier-section"><div class="borg-dossier-label">Initial premise</div><div class="borg-dossier-premise">' +
+            escapeHtml(summaryRow.premise || '—') + '</div></div>'
+          : '');
+    }
+  }
+
+  function closeBorgStrategyDossier() {
+    const shell = document.getElementById('borgStrategyDossier');
+    if (!shell?.classList.contains('active')) return;
+    shell.classList.remove('active');
+    shell.setAttribute('aria-hidden', 'true');
+    document.documentElement.style.overflow = '';
+    _borgDossierStrategy = null;
+    if (_borgDossierTrigger?.focus) _borgDossierTrigger.focus();
+    _borgDossierTrigger = null;
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && document.getElementById('borgStrategyDossier')?.classList.contains('active')) {
+      closeBorgStrategyDossier();
+    }
+  });
 
   async function loadBorg() {
     if (_borgLoading) return;
+    if (!_borgPrefsRestored) {
+      borgRestoreLedgerPreferences();
+      _borgPrefsRestored = true;
+    }
     _borgLoading = true;
     try { await loadBorgOnce(); } finally { _borgLoading = false; }
   }
@@ -3389,7 +4001,7 @@
     const ind = document.getElementById('borgStatusIndicator');
     ind.style.background = status.alive ? 'var(--green)' : 'var(--danger)';
     document.getElementById('borgStatusTitle').textContent =
-      status.alive ? (status.shadowPaused ? 'BORG: COLLECTING (SHADOW PAUSED — feeds stale)' : 'BORG: COLLECTING + SHADOW LIVE')
+      status.alive ? (status.shadowPaused ? 'BORG: COLLECTING (PAPER EVALUATION PAUSED — feeds stale)' : 'BORG: COLLECTING + PAPER TESTING')
                    : 'BORG: COLLECTOR STALE';
     const f = status.feeds || {};
     document.getElementById('bFeedBook').textContent = _bAge(f.book_snaps);
@@ -3505,45 +4117,8 @@
 
     // scoreboard. Keep the previous render if this supplemental report lags.
     if (summary) {
-      const sb = document.getElementById('borgSummaryBody');
-      if (!summary.length) {
-        sb.innerHTML = '<tr><td colspan="17" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr>';
-      } else {
-        sb.innerHTML = summary.map((s) => {
-          const eligibleFills = Number(s.eligible_fills || 0);
-          const currentFills = Number(s.current_eligible_fills || 0);
-          const horizon = (label, suffix) => {
-            const pnl1x = Number(s['pnl_1x_' + suffix] || 0);
-            const pnl2x = Number(s['pnl_2x_' + suffix] || 0);
-            const fills = Number(s['fills_' + suffix] || 0);
-            const markets = Number(s['markets_' + suffix] || 0);
-            return '<td title="' + label + ' entry-time cohort · ' + fills + ' eligible fills / ' + markets +
-              ' markets · 2× P&amp;L ' + _bMoney(pnl2x) + '" style="color:' + _bPnlColor(pnl1x) +
-              ';font-weight:700;">' + _bMoney(pnl1x) +
-              '<div style="font-size:8px;color:var(--text-muted);">' + fills + 'f / ' + markets + 'm</div></td>';
-          };
-          const governance = s.trial_status
-            ? '<div title="' + escapeHtml(s.trial_status_reason || '') + '" style="font-size:8px;color:' +
-              (s.trial_status === 'COLLECTING' ? 'var(--cyan)' : 'var(--yellow)') + ';">' +
-              escapeHtml(String(s.trial_status).replaceAll('_', ' ')) + '</div>' : '';
-          return '<tr>' +
-            '<td style="font-weight:700;">' + escapeHtml(s.strategy) + '</td>' +
-            '<td><span style="color:var(--yellow);">' + escapeHtml(s.phase) + '</span>' + governance + '</td>' +
-            '<td>' + s.places + '</td><td>' + s.cancels + '</td><td>' + s.scored + '</td><td>' + eligibleFills +
-              '<div style="font-size:8px;color:var(--text-muted);">' + Number(s.eligible_markets || 0) + ' markets</div></td>' +
-            '<td style="color:' + _bPnlColor(s.eligible_pnl_1x) + ';font-weight:700;">' + _bMoney(s.eligible_pnl_1x) + '</td>' +
-            '<td style="color:' + _bPnlColor(s.eligible_pnl_2x) + ';">' + _bMoney(s.eligible_pnl_2x) + '</td>' +
-            '<td title="' + escapeHtml(s.current_experiment_id || 'no frozen trial') + '">' + currentFills +
-              '<div style="font-size:8px;color:var(--text-muted);">' + Number(s.current_eligible_markets || 0) + ' markets</div></td>' +
-            '<td style="color:' + _bPnlColor(s.current_pnl_1x) + ';font-weight:700;">' + _bMoney(s.current_pnl_1x) + '</td>' +
-            '<td style="color:' + _bPnlColor(s.current_pnl_2x) + ';">' + _bMoney(s.current_pnl_2x) + '</td>' +
-            horizon('6h', '6h') + horizon('24h', '24h') + horizon('3d', '3d') +
-            '<td>' + (s.scored > 0 ? Math.round(100 * s.quality_ab / s.scored) + '%' : '—') + '</td>' +
-            '<td>' + (s.scored > 0 ? Math.round(100 * s.fidelity_ab / s.scored) + '%' : '—') + '</td>' +
-            '<td style="color:var(--text-muted);">' + _bAge(Math.round((Date.now() - new Date(s.latest).getTime()) / 1000)) + '</td>' +
-            '</tr>';
-        }).join('');
-      }
+      _borgSummaryData = summary;
+      borgRenderStrategyLedger();
     }
 
     // recent orders
