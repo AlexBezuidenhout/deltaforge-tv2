@@ -30,13 +30,13 @@ const {
   buildArchiveTargets, normalizeInstrument, selectSurfaceInstruments,
 } = require('./surface-universe');
 const {
-  TARGET_UNIVERSE_VERSION, selectExactExpiryThresholds,
+  TARGET_UNIVERSE_VERSION, selectSurfaceBracketedThresholds,
 } = require('./target-universe');
 
 const DERIBIT_HTTP = 'https://www.deribit.com/api/v2';
 const DERIBIT_WS = 'wss://www.deribit.com/ws/api/v2';
 const GAMMA = 'https://gamma-api.polymarket.com';
-const OPTIONS_EXPERIMENT_ID = 'options-implied-binary-v2-resolver-exact-expiry';
+const OPTIONS_EXPERIMENT_ID = 'options-daily-threshold-surface-residual-v3';
 const CURRENCIES = String(process.env.OPTIONS_CURRENCIES || 'BTC,ETH')
   .split(',').map((value) => value.trim().toUpperCase()).filter(Boolean);
 const REFRESH_MS = Math.max(60_000, Number(process.env.OPTIONS_REFRESH_MS || 300_000));
@@ -161,7 +161,7 @@ async function loadTargets() {
      WHERE market_type='threshold_daily'
        AND lower(asset)=ANY($1::text[])
        AND accepting_orders=true
-       AND raw->'_optionsExactExpiry'->>'universeVersion'=$2
+       AND raw->'_optionsSurfaceTarget'->>'universeVersion'=$2
        AND strike IS NOT NULL
        AND window_end > now() + ($3::int * interval '1 second')
        AND window_end <= now() + ($4::int * interval '1 second')
@@ -190,6 +190,7 @@ async function loadTargets() {
       minimumOrderSize: finite(raw.orderMinSize ?? raw.minimum_order_size
         ?? raw.min_order_size),
       fees,
+      surfaceTarget: raw._optionsSurfaceTarget || null,
     };
   }).filter((row) => Number.isSafeInteger(row.id) && row.strike > 1
     && row.targetExpiryMs > Date.now() && row.yesToken && row.noToken
@@ -211,15 +212,24 @@ async function fetchThresholdEvents(expiries, options = {}) {
   const fetcher = options.fetcher || fetchJson;
   const uniqueExpiries = [...new Set((expiries || []).map(finite)
     .filter((value) => value > 0))].sort((left, right) => left - right);
-  const pages = await Promise.all(uniqueExpiries.map(async (expiryMs) => {
+  const windows = options.bracketed === true
+    ? uniqueExpiries.slice(0, -1).map((lower, index) => ({
+      lower: lower - 1000,
+      upper: uniqueExpiries[index + 1] + 1000,
+    }))
+    : uniqueExpiries.map((expiryMs) => ({
+      lower: expiryMs - 1000,
+      upper: expiryMs + 1000,
+    }));
+  const pages = await Promise.all(windows.map(async ({ lower, upper }) => {
     const url = new URL(`${GAMMA}/events`);
     const params = {
       tag_id: '21', active: 'true', closed: 'false', limit: '100',
       // Gamma caps a broad query at 100 rows. Querying each actually listed
       // Deribit boundary directly prevents nearer hourly events from crowding
       // the exact-expiry target out of the response.
-      end_date_min: new Date(expiryMs - 1000).toISOString(),
-      end_date_max: new Date(expiryMs + 1000).toISOString(),
+      end_date_min: new Date(lower).toISOString(),
+      end_date_max: new Date(upper).toISOString(),
       order: 'endDate', ascending: 'true',
     };
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
@@ -499,8 +509,10 @@ class OptionsObserver {
     for (const side of ['YES', 'NO']) {
       const token = side === 'YES' ? target.yesToken : target.noToken;
       const book = this.clob.getBook(token);
+      const bid = finite(book?.bids?.[0]?.[0]);
       const ask = finite(book?.asks?.[0]?.[0]);
       const askSize = finite(book?.asks?.[0]?.[1]);
+      const marketMid = bid != null && ask != null ? (bid + ask) / 2 : null;
       const bookAgeMs = book?.at == null ? null : Math.max(0, now - book.at);
       const minimumOrderSize = finite(book?.minOrderSize) ?? target.minimumOrderSize;
       const fair = side === 'YES' ? valuation.fairYes : 1 - valuation.fairYes;
@@ -545,7 +557,12 @@ class OptionsObserver {
         dedupKey, observedAt: now, marketId: target.id,
         conditionId: target.conditionId, asset: target.asset, strike: target.strike,
         targetExpiryMs: target.targetExpiryMs, triggerSource, side,
+        targetSurfaceMode: target.surfaceTarget?.surfaceMode || null,
+        lowerAnchorExpiryMs: target.surfaceTarget?.lowerDeribitExpiryMs || null,
+        upperAnchorExpiryMs: target.surfaceTarget?.upperDeribitExpiryMs || null,
         polyAsk: ask, polyAskSize: askSize, modelFair: fair,
+        marketMid,
+        surfaceResidual: marketMid == null ? null : fair - marketMid,
         fairLower, fairUpper, feeRate: target.fees.rate, fee2x,
         edgeLower2x: ask != null && fee2x != null ? fairLower - ask - fee2x : null,
         targetShares: optimized?.shares ?? null,
@@ -558,6 +575,7 @@ class OptionsObserver {
         detail: {
           runId: this.runId, experimentId: OPTIONS_EXPERIMENT_ID,
           targetUniverseVersion: TARGET_UNIVERSE_VERSION,
+          surfaceTarget: target.surfaceTarget,
           paperOnly: true, walletLoaded: false,
           tteSec, spot, resolverPrice, resolverAgeMs,
           resolverFeed: target.resolverFeed,
@@ -608,21 +626,25 @@ class OptionsObserver {
     ]);
     const rawInstruments = instrumentPages.flat();
     const listedExpiries = listedCallExpiries(rawInstruments, refreshAt);
-    const thresholdEvents = await fetchThresholdEvents(listedExpiries);
-    const exactExpiry = selectExactExpiryThresholds(thresholdEvents, rawInstruments, {
+    const thresholdEvents = await fetchThresholdEvents(listedExpiries, { bracketed: true });
+    const surfaceTargets = selectSurfaceBracketedThresholds(thresholdEvents, rawInstruments, {
       nowMs: refreshAt,
       minTteMs: MIN_TTE_SEC * 1000,
       maxTteMs: MAX_TTE_SEC * 1000,
       currencies: CURRENCIES,
     });
-    await persistExactExpiryTargets(exactExpiry.records);
+    await persistExactExpiryTargets(surfaceTargets.records);
     this.exactExpirySummary = {
-      universeVersion: exactExpiry.universeVersion,
+      universeVersion: surfaceTargets.universeVersion,
       queriedExpiries: listedExpiries.map((value) => new Date(value).toISOString()),
       fetchedEvents: thresholdEvents.length,
-      records: exactExpiry.records.length,
-      rejected: exactExpiry.rejected,
-      listedExpiryCounts: Object.fromEntries(Object.entries(exactExpiry.listedExpiries)
+      records: surfaceTargets.records.length,
+      exactExpiryRecords: surfaceTargets.records.filter((record) =>
+        record.raw?._optionsSurfaceTarget?.surfaceMode === 'EXACT_EXPIRY').length,
+      termInterpolatedRecords: surfaceTargets.records.filter((record) =>
+        record.raw?._optionsSurfaceTarget?.surfaceMode === 'TERM_INTERPOLATED').length,
+      rejected: surfaceTargets.rejected,
+      listedExpiryCounts: Object.fromEntries(Object.entries(surfaceTargets.listedExpiries)
         .map(([currency, values]) => [currency, values.length])),
     };
     const targets = await loadTargets();
@@ -712,16 +734,23 @@ class OptionsObserver {
         if (marks.length) await insertRows('borg_option_shadow_marks', [
           'dedup_key', 'experiment_id', 'observed_at',
           'market_id', 'condition_id', 'asset', 'strike',
-          'target_expiry_at', 'trigger_source', 'side', 'poly_ask', 'poly_ask_size',
-          'model_fair', 'fair_lower', 'fair_upper', 'fee_rate', 'fee_per_share_2x',
+          'target_expiry_at', 'target_surface_mode',
+          'lower_anchor_expiry_at', 'upper_anchor_expiry_at',
+          'trigger_source', 'side', 'poly_ask', 'poly_ask_size',
+          'model_fair', 'market_mid', 'surface_residual',
+          'fair_lower', 'fair_upper', 'fee_rate', 'fee_per_share_2x',
           'edge_lower_2x', 'target_shares', 'expected_profit_lower_usd', 'hedge_base',
           'hedge_cost_stress_usd', 'net_edge_stress_usd', 'residual_cvar95_usd',
           'surface_fidelity', 'data_quality_grade', 'executable', 'detail',
         ], marks.map((row) => [
           row.dedupKey, OPTIONS_EXPERIMENT_ID, new Date(row.observedAt),
           row.marketId, row.conditionId,
-          row.asset, row.strike, new Date(row.targetExpiryMs), row.triggerSource,
-          row.side, row.polyAsk, row.polyAskSize, row.modelFair, row.fairLower,
+          row.asset, row.strike, new Date(row.targetExpiryMs), row.targetSurfaceMode,
+          row.lowerAnchorExpiryMs ? new Date(row.lowerAnchorExpiryMs) : null,
+          row.upperAnchorExpiryMs ? new Date(row.upperAnchorExpiryMs) : null,
+          row.triggerSource,
+          row.side, row.polyAsk, row.polyAskSize, row.modelFair,
+          row.marketMid, row.surfaceResidual, row.fairLower,
           row.fairUpper, row.feeRate, row.fee2x, row.edgeLower2x,
           row.targetShares, row.expectedProfitLowerUsd, row.hedgeBase,
           row.hedgeCostStressUsd, row.netEdgeStressUsd, row.residualCvar95Usd,

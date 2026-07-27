@@ -13,7 +13,8 @@ const {
 } = require('../recon/research-universe');
 const { normalizeInstrument } = require('./surface-universe');
 
-const TARGET_UNIVERSE_VERSION = 'options-exact-expiry-targets-v2';
+const EXACT_TARGET_UNIVERSE_VERSION = 'options-exact-expiry-targets-v2';
+const TARGET_UNIVERSE_VERSION = 'options-daily-threshold-surface-v3';
 
 function normalizedText(value) {
   return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -23,6 +24,12 @@ function sha256(value) {
   return crypto.createHash('sha256').update(String(value)).digest('hex');
 }
 
+function resolverTimeframeSec(resolutionSource) {
+  if (resolutionSource === 'binance_1m_close') return 60;
+  if (resolutionSource === 'binance_1h_close') return 3600;
+  return null;
+}
+
 function certifyResolverRule(event, market, record) {
   const text = normalizedText([
     event?.title, event?.description, event?.resolutionSource,
@@ -30,11 +37,15 @@ function certifyResolverRule(event, market, record) {
   ].filter(Boolean).join(' '));
   const assetPair = record.asset === 'btc' ? /\bbtc\s*\/\s*usdt\b/
     : record.asset === 'eth' ? /\beth\s*\/\s*usdt\b/ : /$a/;
+  const timeframeSec = resolverTimeframeSec(record.resolution_source);
+  const intervalMatches = timeframeSec === 60
+    ? /\b1\s*(?:minute|min)\b/.test(text)
+    : timeframeSec === 3600 && /\b1\s*(?:hour|hr)\b/.test(text);
   const checks = {
     binaryAbovePredicate: /\babove\b/.test(normalizedText(market?.question)),
     closePrice: /\bclose\b/.test(text),
-    exactHourlyCandle: /\b1\s*(?:hour|hr)\b/.test(text) && /\bcandle\b/.test(text),
-    recognizedResolver: record.resolution_source === 'binance_1h_close',
+    exactResolverCandle: intervalMatches && /\bcandle\b/.test(text),
+    recognizedResolver: timeframeSec != null,
     resolverPair: /\bbinance\b/.test(text) && assetPair.test(text),
     timestampPresent: Number.isFinite(record.window_end?.getTime()),
     twoTokens: Boolean(record.up_token_id && record.down_token_id
@@ -97,17 +108,88 @@ function selectExactExpiryThresholds(events, rawInstruments, options = {}) {
         }
         continue;
       }
+      const timeframeSec = resolverTimeframeSec(record.resolution_source);
       selected.push({
         ...record,
-        window_start: new Date(expiryMs - 3_600_000),
-        timeframe_sec: 3600,
-        resolution_source: 'binance_1h_close',
+        window_start: new Date(expiryMs - timeframeSec * 1000),
+        timeframe_sec: timeframeSec,
         raw: {
           ...record.raw,
           _optionsExactExpiry: {
-            universeVersion: TARGET_UNIVERSE_VERSION,
+            universeVersion: EXACT_TARGET_UNIVERSE_VERSION,
             resolverCertification: certification,
             deribitExpiryMs: expiryMs,
+          },
+        },
+      });
+    }
+  }
+  return {
+    records: [...new Map(selected.map((record) => [record.slug, record])).values()],
+    rejected,
+    listedExpiries: Object.fromEntries([...expiries]
+      .map(([currency, values]) => [currency, [...values].sort((a, b) => a - b)])),
+    universeVersion: EXACT_TARGET_UNIVERSE_VERSION,
+  };
+}
+
+function selectSurfaceBracketedThresholds(events, rawInstruments, options = {}) {
+  const nowMs = Number.isFinite(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
+  const minTteMs = Math.max(0, Number(options.minTteMs || 0));
+  const maxTteMs = Math.max(minTteMs, Number(options.maxTteMs || 7 * 86_400_000));
+  const currencies = new Set((options.currencies || ['BTC', 'ETH'])
+    .map((value) => String(value).toUpperCase()));
+  const expiries = new Map();
+  for (const raw of Array.isArray(rawInstruments) ? rawInstruments : []) {
+    const instrument = normalizeInstrument(raw);
+    if (!instrument || instrument.optionType !== 'call'
+      || !currencies.has(instrument.currency)) continue;
+    const rows = expiries.get(instrument.currency) || new Set();
+    rows.add(instrument.expirationMs);
+    expiries.set(instrument.currency, rows);
+  }
+
+  const selected = [];
+  const rejected = {};
+  for (const event of Array.isArray(events) ? events : []) {
+    if (eventType(event) !== 'threshold_daily') continue;
+    for (const market of event?.markets || []) {
+      const record = marketRecord(event, market, 'threshold_daily');
+      if (!record || !record.accepting_orders || !(record.strike > 1)) continue;
+      const currency = String(record.asset || '').toUpperCase();
+      if (!currencies.has(currency)) continue;
+      const expiryMs = record.window_end?.getTime?.();
+      if (!Number.isFinite(expiryMs)
+        || expiryMs - nowMs < minTteMs || expiryMs - nowMs > maxTteMs) continue;
+      const ordered = [...(expiries.get(currency) || [])].sort((left, right) => left - right);
+      const lower = ordered.filter((value) => value <= expiryMs).at(-1);
+      const upper = ordered.find((value) => value >= expiryMs);
+      if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
+        rejected.NO_LISTED_TERM_BRACKET = (rejected.NO_LISTED_TERM_BRACKET || 0) + 1;
+        continue;
+      }
+      const certification = certifyResolverRule(event, market, record);
+      if (!certification.valid) {
+        for (const failure of certification.failures) {
+          rejected[`RULE_${failure}`] = (rejected[`RULE_${failure}`] || 0) + 1;
+        }
+        continue;
+      }
+      const mode = lower === upper ? 'EXACT_EXPIRY' : 'TERM_INTERPOLATED';
+      const timeframeSec = resolverTimeframeSec(record.resolution_source);
+      selected.push({
+        ...record,
+        window_start: new Date(expiryMs - timeframeSec * 1000),
+        timeframe_sec: timeframeSec,
+        raw: {
+          ...record.raw,
+          _optionsSurfaceTarget: {
+            universeVersion: TARGET_UNIVERSE_VERSION,
+            resolverCertification: certification,
+            surfaceMode: mode,
+            lowerDeribitExpiryMs: lower,
+            upperDeribitExpiryMs: upper,
+            extrapolationAllowed: false,
           },
         },
       });
@@ -123,7 +205,10 @@ function selectExactExpiryThresholds(events, rawInstruments, options = {}) {
 }
 
 module.exports = {
+  EXACT_TARGET_UNIVERSE_VERSION,
   TARGET_UNIVERSE_VERSION,
   certifyResolverRule,
+  resolverTimeframeSec,
   selectExactExpiryThresholds,
+  selectSurfaceBracketedThresholds,
 };

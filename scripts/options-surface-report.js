@@ -5,9 +5,9 @@ const path = require('node:path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { Pool } = require('pg');
 
-const OPTIONS_EXPERIMENT_ID = 'options-implied-binary-v2-resolver-exact-expiry';
-const OPTIONS_STRATEGY = 'options_implied_binary_v2';
-const MANIFEST_EVIDENCE_START = '2026-07-23T15:10:00Z';
+const OPTIONS_EXPERIMENT_ID = 'options-daily-threshold-surface-residual-v3';
+const OPTIONS_STRATEGY = 'options_daily_threshold_surface_residual_v3';
+const MANIFEST_EVIDENCE_START = '2026-07-27T13:05:00Z';
 
 function finite(value) {
   const parsed = parseFloat(value);
