@@ -350,7 +350,7 @@ async function main() {
        SET status='ABANDONED_PROCESS_RESTART',closed_at=now(),updated_at=now(),
            detail=detail||jsonb_build_object(
              'terminationReason','COLLECTOR_PROCESS_RESTART',
-             'closedByRunId',$1
+             'closedByRunId',$1::text
            )
      WHERE status='RESTING'
      RETURNING quote_id

@@ -134,6 +134,7 @@ test('collector closes stale RESTING paper quotes across process boundaries', ()
     __dirname, '..', 'borg', 'structural', 'scanner.js',
   ), 'utf8');
   assert.match(source, /ABANDONED_PROCESS_RESTART/);
+  assert.match(source, /'closedByRunId',\$1::text/);
   assert.match(source, /CANCELLED_UNFILLED_PROCESS_STOP/);
   assert.match(source, /runId: state\.runId/);
 });
