@@ -39,8 +39,8 @@ test('condition graph builds algebraic nested, disjoint, and explicit complete s
   assert.equal(complete.complete, true);
   assert.equal(complete.legs.length, 2);
   assert.equal(complete.ruleCertification.valid, true);
-  assert.equal(complete.universeId, 'structural-certified-payoff-graph-v4-capacity');
-  assert.equal(STRUCTURAL_UNIVERSE_VERSION, 'structural-certified-payoff-graph-v4-capacity');
+  assert.equal(complete.universeId, 'structural-certified-payoff-graph-v5-orphan-reserve');
+  assert.equal(STRUCTURAL_UNIVERSE_VERSION, 'structural-certified-payoff-graph-v5-orphan-reserve');
 });
 
 test('augmented negRisk sets fail closed as complete payoff identities', () => {
@@ -99,6 +99,26 @@ test('scanner separates 2x-fee economics, FOK capacity, and non-atomic orphan ri
   assert.ok(result.orphanLossStressUsd > 0);
 });
 
+test('non-atomic bundles qualify only after executable orphan reserve still leaves profit', () => {
+  const candidate = buildConditionGraph([{
+    id: 'orphan-safe', title: 'Binary', markets: [market(1, 'Yes or no')],
+  }]).find((entry) => entry.structureType === 'binary_complement');
+  const now = Date.now();
+  const books = new Map([
+    ['yes-1', { bids: [[0.44, 100]], asks: [[0.45, 100]], at: now, src: 'ws' }],
+    ['no-1', { bids: [[0.44, 100]], asks: [[0.45, 100]], at: now, src: 'ws' }],
+  ]);
+  const result = evaluateCandidate(candidate, books, now, {
+    targetNotionalUsd: 10, minCapacityProfitUsd: 0.05,
+  });
+  assert.equal(result.atomic, false);
+  assert.equal(result.orphanUnwindAvailable, true);
+  assert.ok(result.orphanReserveUsd > 0);
+  assert.ok(result.orphanSafeProfit2xUsd > 0.05);
+  assert.equal(result.passOrphanRisk, true);
+  assert.equal(result.qualified, true);
+});
+
 test('fee-enabled candidates fail closed when the current schedule is absent', () => {
   const candidate = buildConditionGraph([{ id: 'fees', title: 'Binary', markets: [
     market(1, 'Yes or no', { feesEnabled: true }),
@@ -112,6 +132,28 @@ test('fee-enabled candidates fail closed when the current schedule is absent', (
   assert.equal(result.passFeeSchedule, false);
   assert.equal(result.passFees2x, false);
   assert.equal(result.economicCandidate, false);
+});
+
+test('structural residual applies the current fee curve at 2x with correct arguments', () => {
+  const candidate = buildConditionGraph([{
+    id: 'fee-known', title: 'Fee binary', markets: [market(1, 'Yes or no', {
+      feesEnabled: true,
+      feeSchedule: { rate: 0.1, exponent: 1 },
+    })],
+  }]).find((entry) => entry.structureType === 'binary_complement');
+  const now = Date.now();
+  const books = new Map([
+    ['yes-1', { bids: [[0.39, 100]], asks: [[0.4, 100]], at: now }],
+    ['no-1', { bids: [[0.39, 100]], asks: [[0.4, 100]], at: now }],
+  ]);
+  const result = evaluateCandidate(candidate, books, now, {
+    targetNotionalUsd: 10,
+    minCapacityProfitUsd: 0,
+  });
+  const expectedFeePerBundle = 2 * (2 * 0.1 * 0.4 * 0.6);
+  assert.ok(Math.abs(result.fees2xPerBundle - expectedFeePerBundle) < 1e-12);
+  assert.ok(Math.abs(result.residual2xPerBundle
+    - (1 - 0.8 - expectedFeePerBundle)) < 1e-12);
 });
 
 test('condition graph fails closed on dates and mixed percentage operators', () => {

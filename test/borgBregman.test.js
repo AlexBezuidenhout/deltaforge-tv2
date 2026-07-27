@@ -6,6 +6,7 @@ const {
   generalizedSimplexKl,
   optimizeEqualShareBundle,
   projectMarginalsFrankWolfe,
+  worstIncompleteFillUnwindPnl,
 } = require('../borg/structural/bregman');
 
 test('Frank-Wolfe projects an exactly-one quote vector onto the probability simplex', () => {
@@ -38,7 +39,7 @@ test('simplex KL implements the requested normalized Bregman divergence', () => 
   assert.ok(Math.abs(value - (0.5 * Math.log(5 / 6) + 0.5 * Math.log(5 / 4))) < 1e-12);
 });
 
-test('equal-share optimizer walks every leg and maximizes guaranteed depth profit', () => {
+test('equal-share optimizer walks every leg and maximizes orphan-safe profit', () => {
   const result = optimizeEqualShareBundle({
     legs: [
       { asks: [[0.4, 10], [0.45, 10]], bids: [[0.39, 30]], minOrderSize: 1,
@@ -50,11 +51,12 @@ test('equal-share optimizer walks every leg and maximizes guaranteed depth profi
     budgetUsd: 20,
     feeMultiplier: 2,
   });
-  assert.equal(result.shares, 10);
-  assert.ok(Math.abs(result.guaranteedProfit - 0.75) < 1e-9);
-  assert.equal(result.fills[1].fills.length, 2);
+  assert.equal(result.shares, 5);
+  assert.ok(Math.abs(result.guaranteedProfit - 0.5) < 1e-9);
+  assert.equal(result.fills[1].fills.length, 1);
   assert.equal(result.orphanUnwindAvailable, true);
   assert.ok(result.worstOrphanUnwindPnl < 0);
+  assert.ok(Math.abs(result.orphanSafeProfit - 0.45) < 1e-9);
 });
 
 test('equal-share optimizer fails closed when one leg cannot meet its venue minimum', () => {
@@ -79,4 +81,11 @@ test('equal-share optimizer never assumes missing fee metadata means zero fees',
     budgetUsd: 10,
   });
   assert.equal(result, null);
+});
+
+test('multi-leg orphan reserve covers the worst proper filled subset', () => {
+  assert.equal(worstIncompleteFillUnwindPnl([-0.5, -0.2, -0.1]), -0.7);
+  assert.equal(worstIncompleteFillUnwindPnl([-0.5, -0.2, 0.05]), -0.7);
+  assert.ok(Math.abs(worstIncompleteFillUnwindPnl([-0.5, -0.2]) + 0.5) < 1e-12);
+  assert.equal(worstIncompleteFillUnwindPnl([-0.5, null, -0.1]), null);
 });

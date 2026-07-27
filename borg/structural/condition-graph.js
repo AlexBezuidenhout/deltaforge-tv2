@@ -9,7 +9,7 @@ const {
   certifyStructuralRelation, createRuleDocument,
 } = require('./rule-certifier');
 
-const STRUCTURAL_UNIVERSE_VERSION = 'structural-certified-payoff-graph-v4-capacity';
+const STRUCTURAL_UNIVERSE_VERSION = 'structural-certified-payoff-graph-v5-orphan-reserve';
 
 function jsonArray(value) {
   if (Array.isArray(value)) return value;
@@ -178,6 +178,9 @@ function normalizedMarket(event, market) {
     ?? market?.fee_rate);
   const scheduledFeeExponent = finite(market?.feeSchedule?.exponent
     ?? market?.fee_schedule?.exponent);
+  const feeTakerOnly = !feesEnabled
+    || market?.feeSchedule?.takerOnly === true
+    || market?.fee_schedule?.takerOnly === true;
   const rule = createRuleDocument(event, market);
   return {
     eventId: String(event?.id ?? event?.slug ?? ''),
@@ -208,6 +211,9 @@ function normalizedMarket(event, market) {
     // not an executable fee quote.
     feeRate: feesEnabled ? scheduledFeeRate : 0,
     feeExponent: feesEnabled ? scheduledFeeExponent : 1,
+    // Only waive the passive-leg fee when venue metadata says the schedule is
+    // taker-only. Missing maker/taker scope is charged conservatively.
+    feeTakerOnly,
     feeScheduleKnown: !feesEnabled || (scheduledFeeRate != null && scheduledFeeRate >= 0
       && scheduledFeeExponent != null && scheduledFeeExponent > 0),
     feeSource: feesEnabled ? 'gamma_fee_schedule' : 'fee_free',
@@ -268,6 +274,7 @@ function leg(market, outcome) {
     semantic: market.sportsSemantic || null,
     feeRate: market.feeRate,
     feeExponent: market.feeExponent,
+    feeTakerOnly: market.feeTakerOnly,
     feeScheduleKnown: market.feeScheduleKnown,
     feeSource: market.feeSource,
     orderMinSize: market.orderMinSize,
@@ -400,7 +407,7 @@ function buildConditionGraph(events) {
   return [...new Map(candidates.map((candidate) => [candidate.candidateId, candidate])).values()];
 }
 
-function feePerShare(price, multiplier = 2, feeRate = null, feeExponent = null) {
+function feePerShare(price, feeRate = null, feeExponent = null, multiplier = 2) {
   const p = finite(price);
   const m = finite(multiplier);
   const r = finite(feeRate);
@@ -443,7 +450,7 @@ function evaluateCandidate(candidate, books, nowMs, options = {}) {
     && entry.minimumOrderSize > 0);
   const costPerBundle = passQuotes ? legStates.reduce((sum, entry) => sum + entry.ask, 0) : null;
   const fees2xPerBundle = passQuotes && passFeeSchedule ? legStates.reduce((sum, entry) => sum
-    + feePerShare(entry.ask, 2, entry.feeRate, entry.feeExponent), 0) : null;
+    + feePerShare(entry.ask, entry.feeRate, entry.feeExponent, 2), 0) : null;
   const residual2xPerBundle = passQuotes && passFeeSchedule
     ? candidate.guaranteedMinPayout - costPerBundle - fees2xPerBundle : null;
   const passFees2x = passProof && residual2xPerBundle != null && residual2xPerBundle > 0;
@@ -465,9 +472,14 @@ function evaluateCandidate(candidate, books, nowMs, options = {}) {
   const passCapacity = displayedProfit2xUsd >= minCapacityProfitUsd;
   const fallbackOrphanLoss = passQuotes && passFeeSchedule && targetShares > 0
     ? Math.max(...legStates.map((entry) => targetShares * (entry.ask
-      + feePerShare(entry.ask, 2, entry.feeRate, entry.feeExponent)))) : null;
+      + feePerShare(entry.ask, entry.feeRate, entry.feeExponent, 2)))) : null;
   const orphanLossStressUsd = optimized?.worstOrphanUnwindPnl != null
     ? Math.max(0, -optimized.worstOrphanUnwindPnl) : fallbackOrphanLoss;
+  const orphanUnwindAvailable = optimized?.orphanUnwindAvailable === true;
+  const orphanReserveUsd = candidate.atomic === true ? 0
+    : orphanUnwindAvailable ? orphanLossStressUsd : null;
+  const orphanSafeProfit2xUsd = orphanReserveUsd == null
+    ? null : displayedProfit2xUsd - orphanReserveUsd;
   let bregman = null;
   if (passQuotes && legStates.every((entry) => entry.bid > 0 && entry.bid < 1)
     && candidate.payoffProof?.terminalStates?.length) {
@@ -481,7 +493,8 @@ function evaluateCandidate(candidate, books, nowMs, options = {}) {
       bregman = projectMarginalsFrankWolfe({ statePayoffs, quotedMarginals });
     } catch (_) { bregman = null; }
   }
-  const passOrphanRisk = candidate.atomic === true;
+  const passOrphanRisk = candidate.atomic === true
+    || (orphanUnwindAvailable && orphanSafeProfit2xUsd >= minCapacityProfitUsd);
   return {
     candidateId: candidate.candidateId,
     evaluatedAt: new Date(nowMs).toISOString(),
@@ -510,6 +523,9 @@ function evaluateCandidate(candidate, books, nowMs, options = {}) {
     passCapacity,
     passOrphanRisk,
     orphanLossStressUsd,
+    orphanUnwindAvailable,
+    orphanReserveUsd,
+    orphanSafeProfit2xUsd,
     atomic: candidate.atomic,
     qualified: passProof && passStale && passQuotes && passFeeSchedule && passVenueMinimum
       && passFees2x && passFok && passCapacity && passOrphanRisk,

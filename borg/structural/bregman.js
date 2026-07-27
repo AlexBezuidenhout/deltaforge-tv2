@@ -205,6 +205,23 @@ function walkShares(levels, shares, feeRate, feeExponent, feeMultiplier, side = 
   return { shares: target, gross, fees, fills, vwap: gross / target };
 }
 
+function worstIncompleteFillUnwindPnl(orphanPnls) {
+  if (!Array.isArray(orphanPnls) || orphanPnls.length < 2
+    || orphanPnls.some((value) => finite(value) == null)) return null;
+  const values = orphanPnls.map(finite);
+  const negative = values.filter((value) => value < 0);
+  if (!negative.length) return Math.min(...values);
+  const totalNegative = negative.reduce((sum, value) => sum + value, 0);
+  // If every leg loses on immediate unwind, the full set is not an incomplete
+  // fill. The worst admissible subset therefore omits the least damaging leg.
+  if (negative.length === values.length) {
+    return totalNegative - Math.max(...values);
+  }
+  // Otherwise all losing legs may fill while at least one non-losing leg is
+  // absent, which is already a proper subset.
+  return totalNegative;
+}
+
 function optimizeEqualShareBundle({
   legs, guaranteedMinPayout = 1, budgetUsd = Infinity, maxShares = Infinity,
   feeMultiplier = 2,
@@ -232,10 +249,26 @@ function optimizeEqualShareBundle({
     const grossCost = fills.reduce((sum, fill) => sum + fill.gross, 0);
     const fees = fills.reduce((sum, fill) => sum + fill.fees, 0);
     const cashRequired = grossCost + fees;
+    const orphanPnls = normalized.map((leg, index) => {
+      const entry = fills[index];
+      const exit = walkShares(leg.bids, shares,
+        leg.feeRate, leg.feeExponent, feeMultiplier, 'BID');
+      return exit ? exit.gross - exit.fees - entry.gross - entry.fees : null;
+    });
+    const worstIncompleteFillUnwind = worstIncompleteFillUnwindPnl(orphanPnls);
+    const orphanReserve = worstIncompleteFillUnwind == null
+      ? null : Math.max(0, -worstIncompleteFillUnwind);
+    const guaranteedProfit = shares * payout - cashRequired;
     return {
       shares, fills, grossCost, fees, cashRequired,
       guaranteedPayout: shares * payout,
-      guaranteedProfit: shares * payout - cashRequired,
+      guaranteedProfit,
+      orphanPnls,
+      orphanUnwindAvailable: worstIncompleteFillUnwind != null,
+      worstIncompleteFillUnwindPnl: worstIncompleteFillUnwind,
+      worstOrphanUnwindPnl: worstIncompleteFillUnwind,
+      orphanReserve,
+      orphanSafeProfit: orphanReserve == null ? null : guaranteedProfit - orphanReserve,
     };
   };
   let affordable = depth;
@@ -263,25 +296,17 @@ function optimizeEqualShareBundle({
     }
   }
   const rows = [...candidates].map(evaluate).filter((row) => row && row.cashRequired <= budget + 1e-7)
-    .sort((left, right) => right.guaranteedProfit - left.guaranteedProfit
+    .sort((left, right) => (right.orphanSafeProfit ?? -Infinity)
+      - (left.orphanSafeProfit ?? -Infinity)
+      || right.guaranteedProfit - left.guaranteedProfit
       || left.cashRequired - right.cashRequired || left.shares - right.shares);
   const best = rows[0];
   if (!best) return null;
-  const orphanPnls = normalized.map((leg, index) => {
-    const entry = best.fills[index];
-    const exit = walkShares(leg.bids, best.shares,
-      leg.feeRate, leg.feeExponent, feeMultiplier, 'BID');
-    return exit ? exit.gross - exit.fees - entry.gross - entry.fees : null;
-  });
   return {
     ...best,
     candidateQuantities: rows.length,
     maximumDepthShares: depth,
     affordableShares: affordable,
-    orphanPnls,
-    orphanUnwindAvailable: orphanPnls.every((value) => value != null),
-    worstOrphanUnwindPnl: orphanPnls.some((value) => value == null)
-      ? null : Math.min(...orphanPnls),
   };
 }
 
@@ -292,4 +317,5 @@ module.exports = {
   optimizeEqualShareBundle,
   projectMarginalsFrankWolfe,
   walkShares,
+  worstIncompleteFillUnwindPnl,
 };

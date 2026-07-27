@@ -19,6 +19,9 @@ const { pool, migrateStructural, insertRows, logEvent } = require('../recon/db')
 const {
   buildConditionGraph, evaluateCandidate, STRUCTURAL_UNIVERSE_VERSION,
 } = require('./condition-graph');
+const {
+  createPassiveQuoteState, proposePassiveQuotes, updatePassiveQuoteState,
+} = require('./passive-entry');
 
 const GAMMA = 'https://gamma-api.polymarket.com';
 const MAX_CANDIDATES = Math.max(4, Number(process.env.STRUCTURAL_MAX_CANDIDATES || 24));
@@ -31,6 +34,8 @@ const MIN_CAPACITY_PROFIT_USD = Math.max(0, Number(process.env.STRUCTURAL_MIN_CA
 const STALE_MS = Math.max(250, Number(process.env.STRUCTURAL_STALE_MS || 2000));
 const NEGATIVE_SAMPLE_MS = Math.max(1000, Number(process.env.STRUCTURAL_NEGATIVE_SAMPLE_MS || 60_000));
 const POSITIVE_SAMPLE_MS = Math.max(25, Number(process.env.STRUCTURAL_POSITIVE_SAMPLE_MS || 1000));
+const PASSIVE_TIMEOUT_MS = Math.max(60_000,
+  Number(process.env.STRUCTURAL_PASSIVE_TIMEOUT_MS || 60 * 60_000));
 const EVENT_PAGES = Math.max(1, Math.min(20, Number(process.env.STRUCTURAL_EVENT_PAGES || 20)));
 const SPORTS_EVENT_PAGES = Math.max(1, Math.min(10,
   Number(process.env.STRUCTURAL_SPORTS_EVENT_PAGES || 5)));
@@ -193,6 +198,9 @@ function compactEvaluationDetail(item) {
       cashRequired: item.executionOptimization.cashRequired,
       guaranteedProfit: item.executionOptimization.guaranteedProfit,
       worstOrphanUnwindPnl: item.executionOptimization.worstOrphanUnwindPnl,
+      orphanUnwindAvailable: item.orphanUnwindAvailable,
+      orphanReserveUsd: item.orphanReserveUsd,
+      orphanSafeProfit2xUsd: item.orphanSafeProfit2xUsd,
       capacityLimitedBy: item.executionOptimization.capacityLimitedBy,
     } : null,
     bregman: item.bregman ? {
@@ -205,6 +213,32 @@ function compactEvaluationDetail(item) {
     failureReasons: structuralFailureReasons(item),
     canonicalPayload: 'structural-scanner decision WAL',
   };
+}
+
+function passiveQuoteRow(state, latencyMs) {
+  return [
+    state.quoteId, state.candidateId, state.structureType,
+    state.passiveLegIndex, state.passiveToken, state.passiveOutcome,
+    state.quotedAt, state.expiresAt, state.filledAt || null, state.closedAt || null,
+    state.status, latencyMs, state.quotePrice, state.shares,
+    state.queueAheadShares, state.cashRequired, state.stressedProfit,
+    state.orphanReserveUsd, state.orphanSafeProfitUsd,
+    state.hedgeCost2xUsd ?? null, state.totalCost2xUsd ?? null,
+    state.lockedPnl2xUsd ?? null, state.orphanUnwindPnl2xUsd ?? null,
+    state.observations, state.payoffProofHash, state.ruleCertificationHash,
+    true, true, 'B', 'C',
+    JSON.stringify({
+      fillModel: state.fillModel,
+      feeModel: state.feeModel,
+      makerFeeMode: state.makerFeeMode,
+      queue: state.queue || null,
+      passiveFilledShares: state.passiveFilledShares ?? 0,
+      hedgedShares: state.hedgedShares ?? 0,
+      hedgeFullDepth: state.hedgeFullDepth ?? null,
+      runId: state.runId || null,
+      warning: 'Paper post-only quote; only public prints consume the frozen displayed queue ahead. Cancellations receive no queue credit. Authenticated queue position and cancel acknowledgement are unavailable.',
+    }),
+  ];
 }
 
 function boundedPanel(candidates) {
@@ -311,6 +345,23 @@ async function persistCandidates(catalog, panel) {
 
 async function main() {
   await migrateStructural();
+  const abandoned = await pool.query(`
+    UPDATE borg_structural_passive_quotes
+       SET status='ABANDONED_PROCESS_RESTART',closed_at=now(),updated_at=now(),
+           detail=detail||jsonb_build_object(
+             'terminationReason','COLLECTOR_PROCESS_RESTART',
+             'closedByRunId',$1
+           )
+     WHERE status='RESTING'
+     RETURNING quote_id
+  `, [RUN_ID]);
+  if (abandoned.rowCount > 0) {
+    await logEvent('WARN', 'structural_scanner',
+      `closed ${abandoned.rowCount} stale passive paper quotes from a prior process`, {
+        runId: RUN_ID,
+        abandonedQuotes: abandoned.rowCount,
+      });
+  }
   const wal = new RawWal('structural-scanner', {
     root: process.env.BORG_WAL_DIR,
     mirrorRoot: process.env.BORG_WAL_MIRROR_DIR || null,
@@ -321,15 +372,33 @@ async function main() {
   let byToken = new Map();
   let tokenMarket = new Map();
   const buffer = [];
+  // SQL needs only the latest materialized state for each quote. The WAL
+  // below retains every transition; keyed coalescing prevents one INSERT ...
+  // ON CONFLICT batch from trying to update the same primary key twice.
+  const passiveBuffer = new Map();
+  const passiveStates = new Map();
   const lastStored = new Map();
   let successfulFlushes = 0;
   let persistenceErrors = 0;
   let lastPersistedAt = null;
   let lastPersistenceErrorAt = null;
+  const recordPassiveState = (state, latencyMs, transition, sourceMs = null) => {
+    wal.append(JSON.stringify({
+      type: 'structural_passive_quote',
+      transition,
+      observedAt: Date.now(),
+      state,
+    }), {
+      channel: 'structural-passive-decision',
+      sourceMs,
+    });
+    passiveBuffer.set(state.quoteId, passiveQuoteRow(state, latencyMs));
+  };
 
   const clob = new ClobMultiplex((token) => tokenMarket.get(String(token)) || null, {
     shardCount: Number(process.env.STRUCTURAL_CLOB_SHARDS || 2),
     wal,
+    emitTradeEvents: true,
     onMarketEvent: (event) => {
       const linked = byToken.get(String(event.assetId)) || [];
       for (const candidate of linked) {
@@ -362,14 +431,68 @@ async function main() {
             const minimumInterval = evaluation.economicCandidate ? POSITIVE_SAMPLE_MS : NEGATIVE_SAMPLE_MS;
             const shouldStore = !previous || previous.signature !== signature
               || evaluatedAt - previous.at >= minimumInterval;
-            if (!shouldStore) return;
-            lastStored.set(storageKey, { signature, at: evaluatedAt });
-            wal.append(JSON.stringify(durable), {
-              channel: 'structural-decision', sourceMs: event.sourceMs,
-              connectionEpoch: event.connectionEpoch, connectionShard: event.connectionShard,
-            });
-            buffer.push(durable);
-            if (buffer.length > 20_000) buffer.shift();
+            if (shouldStore) {
+              lastStored.set(storageKey, { signature, at: evaluatedAt });
+              wal.append(JSON.stringify(durable), {
+                channel: 'structural-decision', sourceMs: event.sourceMs,
+                connectionEpoch: event.connectionEpoch, connectionShard: event.connectionShard,
+              });
+              buffer.push(durable);
+              if (buffer.length > 20_000) buffer.shift();
+            }
+
+            const passiveKey = `${candidate.candidateId}:${latencyMs}`;
+            const currentPassive = passiveStates.get(passiveKey);
+            if (currentPassive) {
+              const updated = updatePassiveQuoteState(
+                currentPassive,
+                candidate,
+                { get: (token) => clob.getBook(token) },
+                evaluatedAt,
+                {
+                  staleMs: STALE_MS,
+                  prints: String(event.assetId) === currentPassive.passiveToken
+                    ? clob.printsSince(
+                      currentPassive.passiveToken,
+                      currentPassive.queue?.lastPrintAtMs || currentPassive.quotedAtMs,
+                    ) : [],
+                },
+              );
+              passiveStates.set(passiveKey, updated);
+              const fillChanged = finite(updated.passiveFilledShares, 0)
+                > finite(currentPassive.passiveFilledShares, 0) + 1e-9;
+              if (fillChanged || updated.status !== currentPassive.status) {
+                recordPassiveState(
+                  updated,
+                  latencyMs,
+                  fillChanged && updated.status === 'RESTING'
+                    ? 'PARTIAL_FILL_HEDGED' : updated.status,
+                  event.sourceMs,
+                );
+              }
+              if (updated.status !== 'RESTING') {
+                passiveStates.delete(passiveKey);
+              }
+            } else {
+              const proposal = proposePassiveQuotes(
+                candidate,
+                { get: (token) => clob.getBook(token) },
+                evaluatedAt,
+                {
+                  staleMs: STALE_MS,
+                  targetNotionalUsd: TARGET_NOTIONAL_USD,
+                  minCapacityProfitUsd: MIN_CAPACITY_PROFIT_USD,
+                },
+              ).find((row) => row.eligible);
+              if (proposal) {
+                const state = createPassiveQuoteState(proposal, evaluatedAt, {
+                  timeoutMs: PASSIVE_TIMEOUT_MS,
+                });
+                state.runId = RUN_ID;
+                recordPassiveState(state, latencyMs, 'PLACED', event.sourceMs);
+                passiveStates.set(passiveKey, state);
+              }
+            }
           }, latencyMs).unref?.();
         }
       }
@@ -410,8 +533,11 @@ async function main() {
   };
 
   const flush = async () => {
-    if (!buffer.length) return;
+    if (!buffer.length && !passiveBuffer.size) return;
     const rows = buffer.splice(0, 2000);
+    const passiveEntries = [...passiveBuffer.entries()].slice(0, 2000);
+    for (const [quoteId] of passiveEntries) passiveBuffer.delete(quoteId);
+    const passiveRows = passiveEntries.map(([, row]) => row);
     try {
       for (const item of rows) {
         await pool.query(`
@@ -423,8 +549,10 @@ async function main() {
             displayed_bundle_shares, displayed_notional_usd, displayed_profit_2x_usd,
             pass_proof, payoff_proof_hash, pass_rule_certification, rule_certification_hash,
             pass_stale, pass_quotes, pass_fees_2x, pass_fok, pass_capacity,
-            pass_orphan_risk, orphan_loss_stress_usd, economic_candidate, qualified, detail)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33::jsonb)
+            pass_orphan_risk, orphan_loss_stress_usd, orphan_unwind_available,
+            orphan_reserve_usd, orphan_safe_profit_2x_usd,
+            economic_candidate, qualified, detail)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36::jsonb)
           ON CONFLICT (dedup_key,evaluated_at) DO NOTHING
         `, [
           item.dedupKey, item.evaluatedAt, item.candidateId, item.triggerToken,
@@ -437,13 +565,40 @@ async function main() {
           item.passRuleCertification, item.ruleCertificationHash,
           item.passStale, item.passQuotes, item.passFees2x,
           item.passFok, item.passCapacity, item.passOrphanRisk, item.orphanLossStressUsd,
+          item.orphanUnwindAvailable, item.orphanReserveUsd, item.orphanSafeProfit2xUsd,
           item.economicCandidate, item.qualified, JSON.stringify(compactEvaluationDetail(item)),
         ]);
+      }
+      if (passiveRows.length) {
+        await insertRows('borg_structural_passive_quotes', [
+          'quote_id', 'candidate_id', 'structure_type', 'passive_leg_index',
+          'passive_token', 'passive_outcome', 'quoted_at', 'expires_at',
+          'filled_at', 'closed_at', 'status', 'latency_ms', 'quote_price',
+          'shares', 'queue_ahead_shares', 'proposed_cash_required',
+          'proposed_stressed_profit', 'proposed_orphan_reserve_usd',
+          'proposed_orphan_safe_profit_usd', 'hedge_cost_2x_usd',
+          'total_cost_2x_usd', 'locked_pnl_2x_usd',
+          'orphan_unwind_pnl_2x_usd', 'observations', 'payoff_proof_hash',
+          'rule_certification_hash', 'paper_only', 'post_only',
+          'data_quality_grade', 'execution_fidelity_grade', 'detail',
+        ], passiveRows, `ON CONFLICT (quote_id) DO UPDATE SET
+          filled_at=EXCLUDED.filled_at,closed_at=EXCLUDED.closed_at,
+          status=EXCLUDED.status,hedge_cost_2x_usd=EXCLUDED.hedge_cost_2x_usd,
+          total_cost_2x_usd=EXCLUDED.total_cost_2x_usd,
+          locked_pnl_2x_usd=EXCLUDED.locked_pnl_2x_usd,
+          orphan_unwind_pnl_2x_usd=EXCLUDED.orphan_unwind_pnl_2x_usd,
+          observations=EXCLUDED.observations,detail=EXCLUDED.detail,
+          updated_at=now()`);
       }
       successfulFlushes += 1;
       lastPersistedAt = new Date().toISOString();
     } catch (error) {
       buffer.unshift(...rows);
+      for (const [quoteId, row] of passiveEntries) {
+        // A newer transition may have arrived while SQL was in flight. Never
+        // replace it with the older failed materialization.
+        if (!passiveBuffer.has(quoteId)) passiveBuffer.set(quoteId, row);
+      }
       persistenceErrors += 1;
       lastPersistenceErrorAt = new Date().toISOString();
       await logEvent('ERROR', 'structural_scanner', `async persistence failed; WAL retained: ${error.message}`);
@@ -452,9 +607,43 @@ async function main() {
 
   await refresh();
   await clob.connect();
+  const sweepPassiveQuotes = () => {
+    const now = Date.now();
+    for (const [key, state] of passiveStates) {
+      const candidate = candidates.get(state.candidateId);
+      const updated = updatePassiveQuoteState(
+        state,
+        candidate,
+        { get: (token) => clob.getBook(token) },
+        now,
+        {
+          staleMs: STALE_MS,
+          prints: clob.printsSince(
+            state.passiveToken,
+            state.queue?.lastPrintAtMs || state.quotedAtMs,
+          ),
+        },
+      );
+      passiveStates.set(key, updated);
+      const fillChanged = finite(updated.passiveFilledShares, 0)
+        > finite(state.passiveFilledShares, 0) + 1e-9;
+      if (fillChanged || updated.status !== state.status) {
+        recordPassiveState(
+          updated,
+          Number(key.split(':').at(-1)),
+          fillChanged && updated.status === 'RESTING'
+            ? 'PARTIAL_FILL_HEDGED' : updated.status,
+        );
+      }
+      if (updated.status !== 'RESTING') {
+        passiveStates.delete(key);
+      }
+    }
+  };
   const timers = [
     setInterval(() => refresh().catch((error) => logEvent('ERROR', 'structural_scanner', error.message)), REFRESH_MS),
     setInterval(() => flush().catch(() => {}), 1000),
+    setInterval(sweepPassiveQuotes, 1000),
     setInterval(() => clob.flushEvents().catch(() => {}), 5000),
     setInterval(() => clob.checkStale(), 30_000),
     setInterval(() => pool.query(`
@@ -466,17 +655,30 @@ async function main() {
       collectionEpochId: process.env.BORG_COLLECTION_EPOCH_ID || 'structural-unmarked',
       candidates: candidates.size,
       catalogCandidates: catalogSize, tokens: byToken.size, queued: buffer.length,
+      passiveQueued: passiveBuffer.size, passiveResting: passiveStates.size,
       successfulFlushes, persistenceErrors, lastPersistedAt, lastPersistenceErrorAt,
       paperOnly: true, walletLoaded: false, allMarket: true, sportsTagId: 1,
       sportsEventPages: SPORTS_EVENT_PAGES, universeVersion: STRUCTURAL_UNIVERSE_VERSION,
       gammaConcurrency: GAMMA_CONCURRENCY, gammaTimeoutMs: GAMMA_TIMEOUT_MS,
       gammaMaxAttempts: GAMMA_MAX_ATTEMPTS,
       negativeSampleMs: NEGATIVE_SAMPLE_MS, positiveSampleMs: POSITIVE_SAMPLE_MS,
+      passiveTimeoutMs: PASSIVE_TIMEOUT_MS,
       latencyProfilesMs: LATENCY_PROFILES_MS })]).catch(() => {}), 10_000),
   ];
 
   const shutdown = async (signal) => {
     timers.forEach(clearInterval);
+    const closedAt = new Date().toISOString();
+    for (const [key, state] of passiveStates) {
+      const stopped = {
+        ...state,
+        status: state.passiveFilledShares > 1e-9
+          ? 'CANCELLED_PARTIAL_HEDGED_PROCESS_STOP' : 'CANCELLED_UNFILLED_PROCESS_STOP',
+        closedAt,
+      };
+      recordPassiveState(stopped, Number(key.split(':').at(-1)), stopped.status);
+    }
+    passiveStates.clear();
     await flush().catch(() => {});
     clob.close();
     await wal.close().catch(() => {});
@@ -496,5 +698,5 @@ if (require.main === module) main().catch(async (error) => {
 
 module.exports = {
   boundedCatalog, boundedPanel, compactEvaluationDetail, concurrentMap,
-  fetchEventPage, fetchEvents, structuralFailureReasons,
+  fetchEventPage, fetchEvents, passiveQuoteRow, structuralFailureReasons,
 };
