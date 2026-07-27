@@ -175,7 +175,7 @@ async function queryForward(pool, days) {
         FROM cv_basis_samples b
         LEFT JOIN cv_settlements s USING(match_id)
        WHERE b.experiment_id=$1
-         AND b.observed_at >= now()-($2||' days')::interval
+         AND b.observed_at >= now()-($2::int * interval '1 day')
          AND b.quantity=$3
          AND b.synchronized AND b.books_fresh AND b.full_entry_depth
          AND (b.paper_entry_eligible OR b.entry_economic)
@@ -214,7 +214,8 @@ async function queryForward(pool, days) {
          WHERE x.experiment_id=$1 AND x.match_id=e.match_id
            AND x.direction=e.direction AND x.quantity=e.quantity
            AND x.observed_at>e.observed_at
-           AND x.observed_at<=e.observed_at+($4||' milliseconds')::interval
+           AND x.observed_at<=e.observed_at
+             + ($4::bigint * interval '1 millisecond')
            AND x.synchronized AND x.books_fresh AND x.full_exit_depth
            AND x.data_quality_grade IN ('A','B')
            AND x.execution_fidelity_grade IN ('A','B')
@@ -230,8 +231,10 @@ async function queryForward(pool, days) {
           FROM cv_basis_samples x
          WHERE x.experiment_id=$1 AND x.match_id=e.match_id
            AND x.direction=e.direction AND x.quantity=e.quantity
-           AND x.observed_at>=e.observed_at+($4||' milliseconds')::interval
-           AND x.observed_at<=e.observed_at+(($4+60000)||' milliseconds')::interval
+           AND x.observed_at>=e.observed_at
+             + ($4::bigint * interval '1 millisecond')
+           AND x.observed_at<=e.observed_at
+             + (($4::bigint+60000) * interval '1 millisecond')
            AND x.synchronized AND x.books_fresh AND x.full_exit_depth
            AND x.data_quality_grade IN ('A','B')
            AND x.execution_fidelity_grade IN ('A','B')
@@ -261,7 +264,7 @@ async function queryDepth(pool, days) {
            count(DISTINCT match_id)::int pairs
       FROM cv_depth_replays
      WHERE experiment_id=$1
-       AND observed_at>=now()-($2||' days')::interval
+       AND observed_at>=now()-($2::int * interval '1 day')
        AND exact_rule_eligible AND NOT hard_mismatch
      GROUP BY quantity,reason
      ORDER BY quantity,reason

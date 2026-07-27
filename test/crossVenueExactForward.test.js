@@ -87,5 +87,8 @@ test('forward scoring binds certification to the entry row, not a later match up
   assert.doesNotMatch(source, /m\.identity_approved/);
   assert.match(source, /b\.exact_rule_key IS NOT NULL/);
   assert.match(source, /x\.exact_rule_key=e\.entry_exact_rule_key/);
+  assert.match(source, /\$2::int \* interval '1 day'/);
+  assert.match(source, /\$4::bigint \* interval '1 millisecond'/);
+  assert.doesNotMatch(source, /\$[24]\|\|/);
   assert.doesNotMatch(source, /m\.exact_rule_eligible/);
 });
