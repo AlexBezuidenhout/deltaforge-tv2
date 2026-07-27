@@ -74,6 +74,12 @@ at `/var/lib/deltaforge/google-drive-archive/rclone.conf`, owned by
 `deltaforge:deltaforge` with mode `0600`; this lets rclone rotate short-lived
 access tokens without making `/etc` writable. The remote must be named
 `deltaforge-gdrive`, use `type = drive`, and use `scope = drive.file`.
+Install `deltaforge-google-drive-archive.tmpfiles.conf` under
+`/etc/tmpfiles.d/` and run `systemd-tmpfiles --create`. The uploader writes
+receipts atomically inside its private state directory; stable symlinks expose
+them at `/var/lib/deltaforge/offhost-{archive,snapshot}.receipt` to existing
+health and retention consumers without granting write access to the whole
+`/var/lib/deltaforge` tree.
 
 For an archive independent of the Mac, install
 `deltaforge-object-store-archive.{service,timer}` and create the root-owned,
