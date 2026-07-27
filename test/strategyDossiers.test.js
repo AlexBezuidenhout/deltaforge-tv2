@@ -49,6 +49,18 @@ test('governance dispositions override runtime activity and label the exact rule
   assert.equal(state.reason, 'Forward cohort was negative.');
 });
 
+test('mechanism-invalid governance is terminal even if a stale runtime row exists', () => {
+  const state = lifecycleFor({
+    trialStatus: 'REJECTED_MECHANISM_INVALID',
+    trialStatusReason: 'Source-time causality failed.',
+    runtimePresent: true,
+    runtimeUpdatedAt: new Date(NOW - 10_000).toISOString(),
+  }, NOW);
+  assert.equal(state.lifecycle, 'DEAD');
+  assert.equal(state.active, false);
+  assert.equal(state.reason, 'Source-time causality failed.');
+});
+
 test('LIVE is reserved for an explicit authenticated live executor', () => {
   const state = lifecycleFor({
     liveActive: true,

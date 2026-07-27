@@ -10,17 +10,24 @@ const {
 } = require('../borg/research/strategy-policy');
 
 test('governance parks rejected strategies without deleting their implementations', () => {
-  const strategies = [{ name: 'candidate' }, { name: 'failed' }, { name: 'protocol' }];
+  const strategies = [
+    { name: 'candidate' },
+    { name: 'failed' },
+    { name: 'invalid' },
+    { name: 'protocol' },
+  ];
   const result = filterStrategiesByDisposition(strategies, [
     { strategy: 'failed', status: 'REJECTED_OUT_OF_SAMPLE' },
+    { strategy: 'invalid', status: 'REJECTED_MECHANISM_INVALID' },
     { strategy: 'protocol', status: 'PROTOCOL_COMPLETION_ONLY' },
   ]);
   assert.deepEqual(result.active.map((row) => row.name), ['candidate']);
   assert.deepEqual(result.parked, [
     { strategy: 'failed', status: 'REJECTED_OUT_OF_SAMPLE' },
+    { strategy: 'invalid', status: 'REJECTED_MECHANISM_INVALID' },
     { strategy: 'protocol', status: 'PROTOCOL_COMPLETION_ONLY' },
   ]);
-  assert.equal(filterStrategiesByDisposition(strategies, [], { includeParked: true }).active.length, 3);
+  assert.equal(filterStrategiesByDisposition(strategies, [], { includeParked: true }).active.length, 4);
 });
 
 test('an explicit research allowlist is strict and fail-closed on typos', () => {

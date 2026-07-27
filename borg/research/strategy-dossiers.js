@@ -8,8 +8,6 @@ const RUNTIME_STALE_AFTER_SEC = 130;
 // recommendations. They make the operator's current, pre-registered work queue
 // explicit without changing any strategy rule.
 const PRIORITY_RESEARCH = Object.freeze({
-  H59_resolver_cross_persistence: { rank: 1, tier: 'PRIORITY' },
-  H58_resolver_event_stale_quote: { rank: 2, tier: 'PRIORITY' },
   FWD_H24_hourly_flow_breakout_v1: { rank: 3, tier: 'PRIORITY' },
   FWD_H40_directional_entropy_breakout_v1: { rank: 4, tier: 'PRIORITY' },
   H43_resolution_boundary_buffer: { rank: 5, tier: 'PRIORITY' },
@@ -129,6 +127,8 @@ const FORWARD_SOURCE = Object.freeze({
 });
 
 const PRIOR_OUTCOMES = Object.freeze({
+  H58_resolver_event_stale_quote: 'The causal audit invalidated the premise: all inspected books were newer than the Chainlink source event even though they arrived locally just before the delayed RTDS packet.',
+  H59_resolver_cross_persistence: 'The complete result was weak and unstable, the second chronological half was negative, and most apparent profit depended on BTC. A new mechanism is required rather than a threshold edit.',
   H43_resolution_boundary_buffer: 'The historical point estimate was fragile: removing the best day erased the profit, and the clean epoch has not yet supplied enough new fills.',
   FWD_H24_hourly_flow_breakout_v1: 'The original broad H24 cohort was negative. A later capital-normalized diagnostic subset looked positive, so this unchanged successor tests replication without reusing those rows.',
   FWD_H40_directional_entropy_breakout_v1: 'The original rule produced a small positive diagnostic cohort but too few independent markets; its first forward observations were negative.',

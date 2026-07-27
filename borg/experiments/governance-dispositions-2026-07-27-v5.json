@@ -1,0 +1,24 @@
+{
+  "experiment_id": "governance-dispositions-2026-07-27-v5",
+  "manifest_format": "borg-governance-v1",
+  "created_at": "2026-07-27",
+  "frozen_at": "2026-07-27T01:25:00.000Z",
+  "status": "frozen",
+  "phase": "audit",
+  "paper_only": true,
+  "live_order_path": false,
+  "family": "research_governance",
+  "policy": "A frozen strategy may be stopped before its sample target when its claimed causal predicate is proven false by source-time evidence. This is a mechanism-invalidity decision, not a PnL threshold change. Historical observations remain immutable and queryable; any repaired rule requires a new strategy id, manifest and evidence clock.",
+  "dispositions": [
+    {
+      "strategy": "H58_resolver_event_stale_quote",
+      "status": "REJECTED_MECHANISM_INVALID",
+      "reason": "Source-time autopsy found that zero of 146 inspected fills had a CLOB book predating the Chainlink source event. Every inspected book was 965-2912 ms newer than the source event because H58 compared local packet receipt order rather than source-time causality. The exact rule is invalid and must not emit further intents."
+    },
+    {
+      "strategy": "H59_resolver_cross_persistence",
+      "status": "REDESIGN_REQUIRED",
+      "reason": "The slower persistence arm remained BTC-concentrated and unstable: its 86-fill doubled-cost total was only +$9.10, its second chronological half was -$19.29, and the latest 37 high-fidelity fills lost $16.08. It is non-promotable and may only return under a separately frozen mechanism."
+    }
+  ]
+}
