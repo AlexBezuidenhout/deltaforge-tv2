@@ -120,6 +120,16 @@ function classifyExecutionBarrier({
   return null;
 }
 
+function syncPolymarketSubscriptions(clob, targetByToken) {
+  const tokenIds = [...targetByToken.keys()];
+  // ClobRecon retains this desired set while disconnected and sends it as the
+  // first application message on open. This must run before the initial
+  // connect; otherwise empty sockets only exchange heartbeats and every option
+  // mark is incorrectly classified as lacking an executable Polymarket book.
+  clob.subscribe(tokenIds);
+  return tokenIds.length;
+}
+
 async function fetchJson(url, timeoutMs = 20_000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -663,11 +673,11 @@ class OptionsObserver {
     this.instrumentByName = new Map(selection.instruments
       .map((row) => [row.instrumentName, row]));
     this.changeSubscriptions([...this.instrumentByName.keys()]);
+    syncPolymarketSubscriptions(this.clob, this.targetByToken);
     if (this.networkStarted && this.targetByToken.size && !this.clobStarted) {
       this.clobStarted = true;
       await this.clob.connect();
     }
-    if (this.clobStarted) this.clob.subscribe([...this.targetByToken.keys()]);
     await logEvent('INFO', 'options',
       `surface universe refreshed: ${targets.length} thresholds, ${selection.instruments.length} options, ${this.targetByToken.size} Polymarket tokens`, {
         runId: this.runId, experimentId: OPTIONS_EXPERIMENT_ID,
@@ -931,5 +941,5 @@ module.exports = {
   DB_SAMPLE_MS, EXECUTABLE_MARK_SAMPLE_MS, MARK_SAMPLE_MS,
   OptionsObserver, classifyExecutionBarrier, feeMetadata, fetchIndexPrice,
   fetchThresholdEvents, isRetryableDbError, listedCallExpiries, loadTargets,
-  resolverFeed, retryTransientDb,
+  resolverFeed, retryTransientDb, syncPolymarketSubscriptions,
 };

@@ -7,6 +7,7 @@ const {
 } = require('../borg/options/target-universe');
 const {
   fetchThresholdEvents, listedCallExpiries, resolverFeed,
+  syncPolymarketSubscriptions,
 } = require('../borg/options/collector');
 
 function event(expiry) {
@@ -75,6 +76,17 @@ test('target resolver feed follows the certified contract source and never subst
   assert.equal(resolverFeed('chainlink_rtds_15m'), 'chainlink');
   assert.equal(resolverFeed('coinbase'), null);
   assert.equal(resolverFeed('unknown'), null);
+});
+
+test('Polymarket targets are installed before the initial socket connection', () => {
+  const calls = [];
+  const clob = { subscribe: (tokenIds) => calls.push(tokenIds) };
+  const targets = new Map([
+    ['yes-token', { id: 1 }],
+    ['no-token', { id: 1 }],
+  ]);
+  assert.equal(syncPolymarketSubscriptions(clob, targets), 2);
+  assert.deepEqual(calls, [['yes-token', 'no-token']]);
 });
 
 test('daily thresholds use bounded term interpolation but never expiry extrapolation', () => {
