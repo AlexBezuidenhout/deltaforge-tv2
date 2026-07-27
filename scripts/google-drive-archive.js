@@ -214,6 +214,15 @@ function rcloneCommon(env, configFile) {
   ];
 }
 
+async function ensureRemoteDirectory({
+  destination, configFile, rclone, env,
+}) {
+  await rclone([
+    'mkdir', destination,
+    ...rcloneCommon(env, configFile),
+  ]);
+}
+
 async function copyAndVerifyBatch({
   batch, namespace, root, remote, prefix, configFile, rclone, env, workRoot,
 }) {
@@ -223,6 +232,9 @@ async function copyAndVerifyBatch({
   writeFileList(listFile, batch);
   const destination = remoteTarget(remote, prefix, namespace);
   const common = rcloneCommon(env, configFile);
+  await ensureRemoteDirectory({
+    destination, configFile, rclone, env,
+  });
   await rclone([
     'copy', root, destination,
     '--files-from-raw', listFile,
@@ -320,6 +332,9 @@ async function publishManifest({
   }]);
   const destination = remoteTarget(remote, prefix, 'manifests');
   const common = rcloneCommon(env, configFile);
+  await ensureRemoteDirectory({
+    destination, configFile, rclone, env,
+  });
   await rclone([
     'copy', localDirectory, destination,
     '--files-from-raw', listFile,

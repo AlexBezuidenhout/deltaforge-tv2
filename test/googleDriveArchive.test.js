@@ -188,5 +188,6 @@ test('end-to-end frozen traversal publishes distinct raw and snapshot receipts',
   assert.match(fs.readFileSync(rawReceipt, 'utf8'), /\.raw\.manifest\.json/);
   assert.match(fs.readFileSync(snapshotReceipt, 'utf8'), /\.snapshot\.manifest\.json/);
   assert.notEqual(report.manifest, report.snapshotManifest);
+  assert.equal(remoteCalls.filter((args) => args[0] === 'mkdir').length, 5);
   assert.equal(remoteCalls.filter((args) => args[0] === 'check').length, 5);
 });
