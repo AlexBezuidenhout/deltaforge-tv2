@@ -13,6 +13,9 @@ host/latency acceptance—is documented in
 The Dublin local-PostgreSQL cutover, append-before-persist decision path,
 off-host archive, frozen T-240 arm and structural condition graph are documented
 in [`INFRASTRUCTURE_CUTOVER.md`](INFRASTRUCTURE_CUTOVER.md).
+The exact-rule cross-venue, orphan-reserved payoff graph, Kalshi fee/depth and
+daily-threshold Deribit implementations are recorded in
+[`RESEARCH_BACKLOG_IMPLEMENTATION_2026-07-27.md`](RESEARCH_BACKLOG_IMPLEMENTATION_2026-07-27.md).
 
 Drop-in successor to **Printer CLOB v2**. Same Polymarket BTC 5-min binary scope,
 but every layer is upgraded:

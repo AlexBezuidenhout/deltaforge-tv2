@@ -127,8 +127,11 @@ authenticated CLOB client, or order-posting dependency. Books and simulated
 orders remain in memory; raw frames and decisions are appended to the local
 WAL, and PostgreSQL persistence is asynchronous. `borg-structural-scanner`
 uses the same 20/50/100/250/500 ms latency cohort across all active market
-categories, while continuing to reject every non-atomic bundle as true locked
-arbitrage.
+categories. A non-atomic bundle remains ineligible unless current bid depth can
+unwind every possible orphan and the doubled-cost profit remains positive after
+reserving the worst unwind loss. Its separate passive arm is paper-only and
+C-grade: public prints consume frozen queue-ahead, partial fills are hedged
+immediately, and cancellation volume receives no queue credit.
 
 `borg-paired-maker.service` is an isolated condition-level paper experiment
 inspired by the observed two-sided inventory/merge mechanism of a large public
