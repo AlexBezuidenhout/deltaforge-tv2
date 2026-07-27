@@ -16,7 +16,7 @@ Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
 Environment=BORG_ARCHIVE_DIR=/var/lib/deltaforge/archive/borg-raw
 Environment=BORG_WAL_MIN_FREE_GB=20
 Environment=BORG_ARCHIVE_MIN_FREE_GB=20
-Environment=BORG_CODE_VERSION=dublin-runtime-v10-h58-source-causal
+Environment=BORG_CODE_VERSION=backlog-research-v13
 # Paper/shadow only. The FWD_* identities are unchanged-rule prospective
 # replications; their historical source IDs remain parked and their PnL is
 # never pooled. H43 and the exact ETH arm continue their existing clocks.
