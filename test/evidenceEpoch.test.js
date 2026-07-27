@@ -76,6 +76,8 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
   assert.ok(archiveSeed >= 0, 'raw archive seed is present');
   assert.ok(collectorStart >= 0, 'collector start block is present');
   assert.ok(archiveSeed < collectorStart, 'archive seed precedes the hot writers');
+  assert.match(launcher, /backlog-research-v13/);
+  assert.match(launcher, /exact-rule-structural-options-forward-after-runtime-repair/);
 });
 
 test('partition heartbeat cadence stays inside the evidence freshness window', () => {

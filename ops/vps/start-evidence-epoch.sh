@@ -6,7 +6,7 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
-epoch_id="${1:-money-finding-$(date -u +%Y-%m-%d)-v11}"
+epoch_id="${1:-backlog-forward-$(date -u +%Y-%m-%d)-v13}"
 if [[ ! "${epoch_id}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "epoch id may contain only letters, numbers, dot, underscore and dash" >&2
   exit 1
@@ -14,6 +14,8 @@ fi
 
 minimum_free_gib="${BORG_EPOCH_MIN_FREE_GIB:-30}"
 warmup_timeout_sec="${BORG_EPOCH_WARMUP_TIMEOUT_SEC:-240}"
+code_version="${BORG_EPOCH_CODE_VERSION:-backlog-research-v13}"
+epoch_reason="${BORG_EPOCH_REASON:-exact-rule-structural-options-forward-after-runtime-repair}"
 available_kib="$(df --output=avail /var/lib/postgresql | tail -1 | tr -d ' ')"
 required_kib="$((minimum_free_gib * 1024 * 1024))"
 if (( available_kib < required_kib )); then
@@ -51,8 +53,8 @@ trap 'rm -f "${tmp_file}"' EXIT
   printf 'BORG_COLLECTION_EPOCH_ID=%s\n' "${epoch_id}"
   printf 'BORG_COLLECTION_EPOCH_START=%s\n' "${epoch_start}"
   printf 'BORG_COLLECTION_LOCATION=dublin-ie\n'
-  printf 'BORG_COLLECTION_CODE_VERSION=storage-partitioned-priority-lanes-v11\n'
-  printf 'BORG_COLLECTION_EPOCH_REASON=post-storage-repair-frozen-five-lane-forward-epoch\n'
+  printf 'BORG_COLLECTION_CODE_VERSION=%s\n' "${code_version}"
+  printf 'BORG_COLLECTION_EPOCH_REASON=%s\n' "${epoch_reason}"
   printf 'BORG_INCLUDE_PARKED_CONTROLS=false\n'
 } >"${tmp_file}"
 
