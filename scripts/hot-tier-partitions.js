@@ -298,22 +298,76 @@ function partitionName(spec, dayMs) {
   return `${spec.table}_p${dayStamp(dayMs)}`;
 }
 
+function retainedColumnDefinition(column) {
+  if (column.identity_kind || column.generated_kind) {
+    throw new Error(`retained schema cannot auto-copy generated column ${column.column_name}`);
+  }
+  return [
+    qid(column.column_name),
+    column.data_type,
+    column.default_expression ? `DEFAULT ${column.default_expression}` : '',
+    column.not_null ? 'NOT NULL' : '',
+  ].filter(Boolean).join(' ');
+}
+
+async function sourceColumns(client, table) {
+  const { rows } = await client.query(`
+    SELECT a.attname column_name,
+           pg_catalog.format_type(a.atttypid,a.atttypmod) data_type,
+           pg_get_expr(d.adbin,d.adrelid) default_expression,
+           a.attnotnull not_null,
+           a.attidentity identity_kind,
+           a.attgenerated generated_kind
+      FROM pg_attribute a
+      LEFT JOIN pg_attrdef d
+        ON d.adrelid=a.attrelid AND d.adnum=a.attnum
+     WHERE a.attrelid=to_regclass($1::text)
+       AND a.attnum>0 AND NOT a.attisdropped
+     ORDER BY a.attnum
+  `, [`public.${table}`]);
+  return rows;
+}
+
+async function syncRetainedColumns(client, spec) {
+  const source = await sourceColumns(client, spec.table);
+  const { rows: retainedRows } = await client.query(`
+    SELECT attname column_name
+      FROM pg_attribute
+     WHERE attrelid=to_regclass($1::text)
+       AND attnum>0 AND NOT attisdropped
+  `, [`public.${spec.retain.table}`]);
+  const retained = new Set(retainedRows.map((row) => row.column_name));
+  for (const column of source) {
+    if (retained.has(column.column_name)) continue;
+    await client.query(`ALTER TABLE ${qid(spec.retain.table)}
+      ADD COLUMN IF NOT EXISTS ${retainedColumnDefinition(column)}`);
+  }
+  return source.map((column) => column.column_name);
+}
+
+function retainedCopySql(spec, sourceTable, columns) {
+  const names = columns.map(qid).join(',');
+  return `
+    INSERT INTO ${qid(spec.retain.table)} (${names})
+    SELECT ${names} FROM ${qid(sourceTable)} WHERE ${spec.retain.predicate}
+    ON CONFLICT (${qid(spec.retain.conflict)}) DO NOTHING`;
+}
+
 async function createRetainedTable(client, spec) {
-  if (!spec.retain) return;
+  if (!spec.retain) return [];
   const table = qid(spec.retain.table);
   await client.query(`CREATE TABLE IF NOT EXISTS ${table}
     (LIKE ${qid(spec.table)} INCLUDING DEFAULTS INCLUDING STORAGE INCLUDING COMMENTS)`);
+  const columns = await syncRetainedColumns(client, spec);
   await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ${qid(`${spec.retain.table}_${spec.retain.conflict}_key`)}
     ON ${table} (${qid(spec.retain.conflict)})`);
+  return columns;
 }
 
 async function preserveRetainedRows(client, spec) {
   if (!spec.retain) return 0;
-  await createRetainedTable(client, spec);
-  const result = await client.query(`
-    INSERT INTO ${qid(spec.retain.table)}
-    SELECT * FROM ${qid(spec.table)} WHERE ${spec.retain.predicate}
-    ON CONFLICT (${qid(spec.retain.conflict)}) DO NOTHING`);
+  const columns = await createRetainedTable(client, spec);
+  const result = await client.query(retainedCopySql(spec, spec.table, columns));
   return result.rowCount;
 }
 
@@ -439,10 +493,8 @@ async function dropOldPartitions(client, spec, authority, options = {}) {
     const endEpoch = (dayMs + DAY_MS) / 1000;
     if (dayMs >= keepFrom || endEpoch > authority.sourceCutoffEpoch) continue;
     if (spec.retain) {
-      await client.query(`
-        INSERT INTO ${qid(spec.retain.table)}
-        SELECT * FROM ${qid(row.child)} WHERE ${spec.retain.predicate}
-        ON CONFLICT (${qid(spec.retain.conflict)}) DO NOTHING`);
+      const columns = await createRetainedTable(client, spec);
+      await client.query(retainedCopySql(spec, row.child, columns));
     }
     await client.query(`DROP TABLE ${qid(row.child)}`);
     dropped.push(row.child);
@@ -586,5 +638,6 @@ if (require.main === module) main().catch((error) => {
 module.exports = {
   DAY_MS, MIGRATION_CONFIRM, PARTITION_LOCK, SPECS,
   dayStamp, partitionName, readReceipt, receiptAgeSeconds,
+  retainedColumnDefinition, retainedCopySql,
   retentionAuthorityState, verifyMigrationAuthority, verifyRetentionAuthority,
 };

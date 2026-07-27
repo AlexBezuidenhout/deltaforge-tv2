@@ -7,7 +7,8 @@ const path = require('node:path');
 const test = require('node:test');
 const {
   MIGRATION_CONFIRM, SPECS, partitionName, verifyMigrationAuthority,
-  retentionAuthorityState, verifyRetentionAuthority,
+  retainedColumnDefinition, retainedCopySql, retentionAuthorityState,
+  verifyRetentionAuthority,
 } = require('../scripts/hot-tier-partitions');
 
 test('high-rate tables partition by UTC day and retain conflict uniqueness with the time key', () => {
@@ -30,6 +31,24 @@ test('high-rate tables partition by UTC day and retain conflict uniqueness with 
   );
   assert.equal(SPECS.find((spec) => spec.table === 'borg_clob_touch').keepDays, 0);
   assert.equal(optionMarks.keepDays, 1);
+});
+
+test('retained projections evolve additively and copy by explicit column name', () => {
+  assert.equal(retainedColumnDefinition({
+    column_name: 'exact_rule_eligible',
+    data_type: 'boolean',
+    default_expression: 'false',
+    not_null: true,
+    identity_kind: '',
+    generated_kind: '',
+  }), '"exact_rule_eligible" boolean DEFAULT false NOT NULL');
+  const cross = SPECS.find((spec) => spec.table === 'cv_opportunities');
+  const sql = retainedCopySql(cross, 'cv_opportunities_p20260726', [
+    'opportunity_id', 'observed_at', 'exact_rule_eligible',
+  ]);
+  assert.match(sql, /INSERT INTO "cv_opportunities_retained" \("opportunity_id","observed_at","exact_rule_eligible"\)/);
+  assert.match(sql, /SELECT "opportunity_id","observed_at","exact_rule_eligible"/);
+  assert.doesNotMatch(sql, /SELECT\s+\*/);
 });
 
 test('destructive migration requires a fresh off-host receipt matching the latest snapshot', (t) => {
