@@ -24,6 +24,7 @@
     "replay:latency": "node scripts/borg-latency-replay.js",
     "replay:latency-sweep": "node scripts/latency-sweep.js",
     "archive:parquet": "node scripts/parquet-mirror.js",
+    "archive:gdrive": "node scripts/google-drive-archive.js",
     "recover:wal": "node scripts/recover-wal-backlog.js",
     "research:portfolio": "node scripts/portfolio-simulator.js",
     "research:promotion": "node scripts/promotion-report.js",

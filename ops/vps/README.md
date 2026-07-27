@@ -40,15 +40,20 @@ ssh -NT \
   deltaforge-vps
 ```
 
-The Mac launch agent maintains that tunnel. A separate 15-minute launch agent
-pulls sealed gzip WAL/archive files, Parquet and database snapshots into iCloud
-Drive. Transfers land on ordinary APFS storage first, are SHA-256 checksummed,
-and are then atomically published into iCloud; this avoids File Provider
-deadlocks on evicted placeholders. Per-pull manifests and independent raw and
-snapshot receipts are copied back to the VPS. The pull never uses `--delete`,
-so source retention cannot propagate deletions to historical storage. VPS
-retention refuses to delete when the relevant receipt is missing, stale, empty,
-or older than three hours.
+The Mac launch agent maintains the dashboard tunnel. The former Mac/iCloud
+archive relay is disabled: it consumed the Mac's disk and home bandwidth, and a
+copy into an iCloud File Provider directory did not prove that Apple had
+completed an off-host upload.
+
+The canonical archive path is now direct from the VPS to the operator's Google
+Drive through `deltaforge-google-drive-archive.{service,timer}`. Its rclone
+remote is required to use the least-privilege `drive.file` OAuth scope, so it
+cannot read unrelated Drive contents. Closed immutable files are copied with
+`--immutable`, verified against Google Drive's MD5 metadata with `rclone check`,
+and listed in a SHA-256 manifest. Raw and snapshot retention receipts are
+published only after a frozen traversal is complete. The transport never uses
+`sync` or remote deletion; VPS retention remains fail-closed when the receipt
+is missing, stale, empty, or older than three hours.
 
 For normal use, double-click `TV2 Dashboard.webloc` or `DF2 Dashboard.webloc`
 on the Mac Desktop. They open `http://localhost:3004/` and
@@ -57,9 +62,15 @@ automatically after login or a network interruption. The passwordless GUIs
 must never be exposed directly on a public interface. VPS systemd units bind
 TV2 to loopback and UFW permits inbound SSH only.
 
-The archive script is installed under `~/.deltaforge-vps`, not run from the
-Desktop checkout, because background launch agents do not have reliable macOS
-TCC access to Desktop.
+The legacy Mac relay is retained only as a disaster-recovery fallback under
+`~/.deltaforge-vps`; it must remain disabled during normal operation.
+
+Install the root-owned, mode-`0600` environment as
+`/etc/deltaforge/google-drive-archive.env`. The refreshable rclone token lives
+at `/var/lib/deltaforge/google-drive-archive/rclone.conf`, owned by
+`deltaforge:deltaforge` with mode `0600`; this lets rclone rotate short-lived
+access tokens without making `/etc` writable. The remote must be named
+`deltaforge-gdrive`, use `type = drive`, and use `scope = drive.file`.
 
 For an archive independent of the Mac, install
 `deltaforge-object-store-archive.{service,timer}` and create the root-owned,
