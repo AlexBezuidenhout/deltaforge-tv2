@@ -7,6 +7,7 @@ const path = require('node:path');
 const {
   createPassiveQuoteState, proposePassiveQuotes, updatePassiveQuoteState,
 } = require('../borg/structural/passive-entry');
+const { passiveFillAdvanced } = require('../borg/structural/scanner');
 
 function candidate() {
   return {
@@ -136,5 +137,17 @@ test('collector closes stale RESTING paper quotes across process boundaries', ()
   assert.match(source, /ABANDONED_PROCESS_RESTART/);
   assert.match(source, /'closedByRunId',\$1::text/);
   assert.match(source, /CANCELLED_UNFILLED_PROCESS_STOP/);
+  assert.match(source, /pendingEvaluations\.clear\(\)/);
   assert.match(source, /runId: state\.runId/);
+});
+
+test('collector compares passive fills without a hidden module helper', () => {
+  assert.equal(passiveFillAdvanced(
+    { passiveFilledShares: '5' },
+    { passiveFilledShares: '0' },
+  ), true);
+  assert.equal(passiveFillAdvanced(
+    { passiveFilledShares: null },
+    { passiveFilledShares: undefined },
+  ), false);
 });

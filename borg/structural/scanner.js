@@ -54,6 +54,13 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function passiveFillAdvanced(next, previous) {
+  const nextShares = Number(next?.passiveFilledShares);
+  const previousShares = Number(previous?.passiveFilledShares);
+  return (Number.isFinite(nextShares) ? nextShares : 0)
+    > (Number.isFinite(previousShares) ? previousShares : 0) + 1e-9;
+}
+
 async function concurrentMap(items, width, worker) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -382,6 +389,8 @@ async function main() {
   let persistenceErrors = 0;
   let lastPersistedAt = null;
   let lastPersistenceErrorAt = null;
+  let stopping = false;
+  const pendingEvaluations = new Set();
   const recordPassiveState = (state, latencyMs, transition, sourceMs = null) => {
     wal.append(JSON.stringify({
       type: 'structural_passive_quote',
@@ -400,10 +409,13 @@ async function main() {
     wal,
     emitTradeEvents: true,
     onMarketEvent: (event) => {
+      if (stopping) return;
       const linked = byToken.get(String(event.assetId)) || [];
       for (const candidate of linked) {
         for (const latencyMs of LATENCY_PROFILES_MS) {
-          setTimeout(() => {
+          const timer = setTimeout(() => {
+            pendingEvaluations.delete(timer);
+            if (stopping) return;
             const evaluatedAt = Date.now();
             const evaluation = evaluateCandidate(candidate, {
               get: (token) => clob.getBook(token),
@@ -459,8 +471,7 @@ async function main() {
                 },
               );
               passiveStates.set(passiveKey, updated);
-              const fillChanged = finite(updated.passiveFilledShares, 0)
-                > finite(currentPassive.passiveFilledShares, 0) + 1e-9;
+              const fillChanged = passiveFillAdvanced(updated, currentPassive);
               if (fillChanged || updated.status !== currentPassive.status) {
                 recordPassiveState(
                   updated,
@@ -493,7 +504,9 @@ async function main() {
                 passiveStates.set(passiveKey, state);
               }
             }
-          }, latencyMs).unref?.();
+          }, latencyMs);
+          pendingEvaluations.add(timer);
+          timer.unref?.();
         }
       }
     },
@@ -625,8 +638,7 @@ async function main() {
         },
       );
       passiveStates.set(key, updated);
-      const fillChanged = finite(updated.passiveFilledShares, 0)
-        > finite(state.passiveFilledShares, 0) + 1e-9;
+      const fillChanged = passiveFillAdvanced(updated, state);
       if (fillChanged || updated.status !== state.status) {
         recordPassiveState(
           updated,
@@ -667,6 +679,9 @@ async function main() {
   ];
 
   const shutdown = async (signal) => {
+    stopping = true;
+    for (const timer of pendingEvaluations) clearTimeout(timer);
+    pendingEvaluations.clear();
     timers.forEach(clearInterval);
     const closedAt = new Date().toISOString();
     for (const [key, state] of passiveStates) {
@@ -698,5 +713,6 @@ if (require.main === module) main().catch(async (error) => {
 
 module.exports = {
   boundedCatalog, boundedPanel, compactEvaluationDetail, concurrentMap,
-  fetchEventPage, fetchEvents, passiveQuoteRow, structuralFailureReasons,
+  fetchEventPage, fetchEvents, passiveFillAdvanced, passiveQuoteRow,
+  structuralFailureReasons,
 };
