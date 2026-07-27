@@ -52,8 +52,14 @@ const SOCKET_SHARDS = Math.max(1, Math.min(4, Number(process.env.FLOW_CLOB_SHARD
 const GLOBAL_POLL_MS = Math.max(1000, Number(process.env.FLOW_GLOBAL_POLL_MS || 2000));
 const DATA_TRADE_PAGE_SIZE = Math.max(100, Math.min(1000,
   Number(process.env.FLOW_DATA_TRADE_PAGE_SIZE || 500)));
-const DATA_TRADE_MAX_PAGES = Math.max(1, Math.min(10,
-  Number(process.env.FLOW_DATA_TRADE_MAX_PAGES || 4)));
+// Offset pages are not one atomic Data API snapshot: trades inserted between
+// requests shift later offsets and can manufacture a coverage gap. Use one
+// ordinary page, then one larger offset-zero rescue snapshot only when that
+// page cannot reach the prior source cursor. The documented endpoint limit is
+// 10,000 rows.
+const DATA_TRADE_MAX_PAGES = 1;
+const DATA_TRADE_RESCUE_LIMIT = Math.max(DATA_TRADE_PAGE_SIZE, Math.min(10_000,
+  Number(process.env.FLOW_DATA_TRADE_RESCUE_LIMIT || 10_000)));
 const REST_MAX_ATTEMPTS = Math.max(1, Math.min(6,
   Number(process.env.FLOW_REST_MAX_ATTEMPTS || 4)));
 const DATA_API_TIMEOUT_MS = Math.max(5_000,
@@ -162,6 +168,33 @@ async function collectRecentTradePages(fetchPage, {
     pages,
     oldestSec,
     saturated,
+  };
+}
+
+async function collectStableTradeSnapshot(fetchPage, {
+  sinceSec,
+  pageSize = DATA_TRADE_PAGE_SIZE,
+  rescueLimit = DATA_TRADE_RESCUE_LIMIT,
+} = {}) {
+  const primary = await collectRecentTradePages(fetchPage, {
+    sinceSec, pageSize, maxPages: 1,
+  });
+  const hasLiveCursor = Number.isFinite(Number(sinceSec)) && Number(sinceSec) > 0;
+  if (!primary.saturated || !hasLiveCursor || rescueLimit <= pageSize) {
+    return { ...primary, rescueSnapshot: false, primaryOldestSec: primary.oldestSec };
+  }
+
+  // Fetch offset zero again at the wider limit. It is acceptable for this
+  // second request to observe a newer snapshot: coverage is proved only when
+  // that single response itself reaches the prior causal cursor.
+  const rescue = await collectRecentTradePages(fetchPage, {
+    sinceSec, pageSize: rescueLimit, maxPages: 1,
+  });
+  return {
+    ...rescue,
+    pages: primary.pages + rescue.pages,
+    rescueSnapshot: true,
+    primaryOldestSec: primary.oldestSec,
   };
 }
 
@@ -437,7 +470,8 @@ class FlowCollector {
     this.counters = {
       globalTrades: 0, realtimeTrades: 0, eligibleSweeps: 0, signals: 0,
       scored: 0, filled: 0, errors: 0, scheduledSkips: 0, globalCoverageGaps: 0,
-      globalBootstrapTruncations: 0, restRetries: 0, lastRestRetryAt: null,
+      globalBootstrapTruncations: 0, globalRescueSnapshots: 0,
+      restRetries: 0, lastRestRetryAt: null,
       boundarySourceArmed: 0, boundaryReady: 0, boundaryRejected: 0,
       startedAt: new Date().toISOString(),
     };
@@ -466,6 +500,7 @@ class FlowCollector {
       realtime_markets: REALTIME_MARKETS, shards: SOCKET_SHARDS,
       global_poll_ms: GLOBAL_POLL_MS, data_trade_page_size: DATA_TRADE_PAGE_SIZE,
       data_trade_max_pages: DATA_TRADE_MAX_PAGES,
+      data_trade_rescue_limit: DATA_TRADE_RESCUE_LIMIT,
       boundary_intent_stream: BOUNDARY_EXPERIMENT_ID,
     });
     await this.heartbeat();
@@ -481,7 +516,7 @@ class FlowCollector {
   }
 
   async fetchRecentTrades(sinceSec) {
-    return collectRecentTradePages(
+    const result = await collectStableTradeSnapshot(
       (offset, limit) => fetchJson(dataTradesUrl(limit, offset), DATA_API_TIMEOUT_MS, {
         maxAttempts: REST_MAX_ATTEMPTS,
         onRetry: () => {
@@ -489,8 +524,14 @@ class FlowCollector {
           this.counters.lastRestRetryAt = new Date().toISOString();
         },
       }),
-      { sinceSec, pageSize: DATA_TRADE_PAGE_SIZE, maxPages: DATA_TRADE_MAX_PAGES },
+      {
+        sinceSec,
+        pageSize: DATA_TRADE_PAGE_SIZE,
+        rescueLimit: DATA_TRADE_RESCUE_LIMIT,
+      },
     );
+    if (result.rescueSnapshot) this.counters.globalRescueSnapshots += 1;
+    return result;
   }
 
   async refreshUniverse() {
@@ -1008,6 +1049,8 @@ class FlowCollector {
         request: {
           start, end, received_at_ms: receivedAt, returned: trades.length,
           pages: recent.pages, page_size: DATA_TRADE_PAGE_SIZE, saturated: recent.saturated,
+          rescue_snapshot: recent.rescueSnapshot,
+          rescue_limit: DATA_TRADE_RESCUE_LIMIT,
           coverage_state: completedCoverageState,
         },
         trades: uniqueEntries.map((entry) => entry.trade),
@@ -1035,6 +1078,7 @@ class FlowCollector {
         this.lastGlobalSaturationLogAt = receivedAt;
         await logEvent('WARN', 'flow', 'bounded global trade sample did not reach the prior cursor', {
           start, end, pages: recent.pages, page_size: DATA_TRADE_PAGE_SIZE,
+          rescue_snapshot: recent.rescueSnapshot, rescue_limit: DATA_TRADE_RESCUE_LIMIT,
           oldest_sec: recent.oldestSec,
           interpretation: 'global discovery tape may have a gap; realtime CLOB experiment panel is unaffected',
         });
@@ -1303,6 +1347,7 @@ module.exports = {
   ORDER_TRANSIT_PROFILES_MS,
   RUN_ID,
   collectRecentTradePages,
+  collectStableTradeSnapshot,
   dataTradesUrl,
   epochMs,
   fetchJson,

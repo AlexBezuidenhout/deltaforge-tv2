@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   FlowSocket,
   collectRecentTradePages,
+  collectStableTradeSnapshot,
   dataTradesUrl,
   fetchText,
   globalCoverageState,
@@ -118,6 +119,46 @@ test('bounded trade pagination exposes an explicit coverage gap', async () => {
   assert.equal(result.pages, 3);
   assert.equal(result.saturated, true);
   assert.equal(result.trades.length, 6);
+});
+
+test('saturated flow discovery retries one stable offset-zero rescue snapshot', async () => {
+  const calls = [];
+  const result = await collectStableTradeSnapshot(async (offset, limit) => {
+    calls.push({ offset, limit });
+    if (limit === 2) {
+      return [
+        { timestamp: '105', id: 'primary-a' },
+        { timestamp: '104', id: 'primary-b' },
+      ];
+    }
+    return [
+      { timestamp: '106', id: 'rescue-a' },
+      { timestamp: '103', id: 'rescue-b' },
+      { timestamp: '99', id: 'old' },
+    ];
+  }, { sinceSec: 100, pageSize: 2, rescueLimit: 10 });
+
+  assert.deepEqual(calls, [{ offset: 0, limit: 2 }, { offset: 0, limit: 10 }]);
+  assert.equal(result.rescueSnapshot, true);
+  assert.equal(result.primaryOldestSec, 104);
+  assert.equal(result.saturated, false);
+  assert.deepEqual(result.trades.map((row) => row.id), ['rescue-a', 'rescue-b']);
+});
+
+test('complete primary flow snapshot does not spend the rescue request', async () => {
+  const calls = [];
+  const result = await collectStableTradeSnapshot(async (offset, limit) => {
+    calls.push({ offset, limit });
+    return [
+      { timestamp: '105', id: 'new' },
+      { timestamp: '99', id: 'old' },
+    ];
+  }, { sinceSec: 100, pageSize: 2, rescueLimit: 10 });
+
+  assert.deepEqual(calls, [{ offset: 0, limit: 2 }]);
+  assert.equal(result.rescueSnapshot, false);
+  assert.equal(result.saturated, false);
+  assert.deepEqual(result.trades.map((row) => row.id), ['new']);
 });
 
 test('scheduled Flow work cannot overlap itself', async () => {

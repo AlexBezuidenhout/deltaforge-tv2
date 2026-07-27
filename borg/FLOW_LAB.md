@@ -86,13 +86,16 @@ to historical trades.
 
 The service has two capture planes:
 
-1. A two-second, non-overlapping Data API sampler paginates the latest completed
-   public trades using the endpoint's supported `limit` and `offset` parameters,
-   then advances a cursor in API source time. It stores newly observed rows in the
-   raw WAL and `pm_flow_trades`. The API does not expose a global time cursor, so
-   this plane is explicitly a bounded discovery sample rather than a guaranteed
-   complete all-market tape. Exhausted page budgets increment
-   `globalCoverageGaps` and the rows remain D-grade.
+1. A two-second, non-overlapping Data API sampler reads one offset-zero snapshot
+   of the latest completed public trades, then advances a cursor in API source
+   time. Offset pagination is not used for live coverage because concurrent
+   inserts shift later pages. When the ordinary snapshot cannot reach the prior
+   cursor, the sampler makes one offset-zero rescue request at the endpoint's
+   documented 10,000-row limit. It stores newly observed rows in the raw WAL and
+   `pm_flow_trades`. The API does not expose a global time cursor, so this plane
+   remains a bounded discovery sample rather than a guaranteed complete all-market
+   tape. A rescue snapshot that still cannot reach the cursor increments
+   `globalCoverageGaps`; those rows remain D-grade.
 2. Two market-channel sockets capture full raw frames plus compact event-time
    touches for the four most actively traded binary markets in the final 90
    seconds of the bounded API sample, anchored to that sample's newest source
