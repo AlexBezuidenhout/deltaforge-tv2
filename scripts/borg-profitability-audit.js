@@ -195,7 +195,7 @@ async function buildReport(pool, { now = new Date() } = {}) {
     [RESEARCH_CAPITAL_VERSION]),
     pool.query(`
       SELECT DISTINCT ON (strategy)
-             strategy,phase,status,status_reason,experiment_id,
+             strategy,phase,status,status_reason,experiment_id,variant,
              frozen_at,evidence_started_at
         FROM borg_trial_ledger
        ORDER BY strategy,frozen_at DESC,id DESC`),

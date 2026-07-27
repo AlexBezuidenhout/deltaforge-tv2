@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
+  buildReport,
   horizonMetrics,
   isCurrentTrialRow,
   summarizeArm,
@@ -63,6 +64,44 @@ test('current-trial evidence cannot pool an older experiment or pre-freeze row',
   assert.equal(isCurrentTrialRow(row({
     available_at: '2026-07-25T10:29:59.999Z',
   }), trial, epoch), false);
+});
+
+test('report query retains the non-baseline trial variant used by cohort matching', async () => {
+  const candidate = row({
+    arm: 'source_ordered_market_prior_residual',
+    available_at: '2026-07-25T11:30:00.000Z',
+  });
+  const pool = {
+    async query(sql) {
+      if (sql.includes('FROM borg_shadow_orders')) return { rows: [candidate] };
+      if (sql.includes('count(*)::int trials')) return { rows: [{ trials: 1 }] };
+      if (sql.includes('FROM borg_trial_ledger')) {
+        assert.match(sql, /experiment_id,variant/);
+        return { rows: [{
+          strategy: 'candidate',
+          phase: 'eval',
+          status: 'COLLECTING',
+          status_reason: null,
+          experiment_id: 'candidate-forward-v1',
+          variant: 'source_ordered_market_prior_residual',
+          frozen_at: '2026-07-25T10:00:00.000Z',
+          evidence_started_at: '2026-07-25T10:00:00.000Z',
+        }] };
+      }
+      if (sql.includes('FROM borg_collector_runs')) {
+        return { rows: [{
+          id: 'clean-v11',
+          started_at: '2026-07-25T10:30:00.000Z',
+        }] };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    },
+  };
+  const report = await buildReport(pool, {
+    now: new Date('2026-07-25T12:00:00.000Z'),
+  });
+  assert.equal(report.arms[0].currentTrial.eligibleFills, 1);
+  assert.equal(report.arms[0].currentTrial.pnl2x, 1);
 });
 
 test('profitability summary excludes any row without joint A/B fidelity', () => {
