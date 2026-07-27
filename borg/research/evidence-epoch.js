@@ -101,8 +101,10 @@ async function assessEvidenceEpoch(pool, options = {}) {
   const critical = [];
   const warnings = [];
   const { rows: runRows } = await pool.query(`
-    SELECT r.run_id,r.epoch_id,r.started_at run_started_at,r.host,r.code_version,
-           e.started_at epoch_started_at,e.reason,e.data_contract_version
+    SELECT r.run_id,r.epoch_id,r.started_at run_started_at,r.host,
+           r.code_version run_code_version,
+           e.started_at epoch_started_at,e.code_version epoch_code_version,
+           e.reason,e.data_contract_version
       FROM borg_collector_runs r
       JOIN borg_collection_epochs e ON e.epoch_id=r.epoch_id
      WHERE r.status='RUNNING'
@@ -320,7 +322,8 @@ async function assessEvidenceEpoch(pool, options = {}) {
       ageHours: +epochAgeHours.toFixed(4),
       runId: run.run_id,
       host: run.host,
-      codeVersion: run.code_version,
+      codeVersion: run.epoch_code_version,
+      collectorCodeVersion: run.run_code_version,
       dataContractVersion: run.data_contract_version,
       reason: run.reason,
     },

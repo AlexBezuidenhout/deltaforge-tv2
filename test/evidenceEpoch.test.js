@@ -87,6 +87,17 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
   assert.match(launcher, /exact-rule-structural-options-forward-after-runtime-repair/);
 });
 
+test('evidence report distinguishes the immutable release from the collector family label', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'borg', 'research',
+    'evidence-epoch.js'), 'utf8');
+  assert.match(source, /e\.code_version epoch_code_version/);
+  assert.match(source, /r\.code_version run_code_version/);
+  assert.match(source, /codeVersion: run\.epoch_code_version/);
+  assert.match(source, /collectorCodeVersion: run\.run_code_version/);
+});
+
 test('partition heartbeat cadence stays inside the evidence freshness window', () => {
   const fs = require('node:fs');
   const path = require('node:path');
