@@ -9,10 +9,10 @@ const {
 } = require('./opportunity-economics');
 
 const H43_EXPERIMENT_ID = 'research-h43-forward-v1';
-const STRUCTURAL_UNIVERSE_ID = 'structural-certified-payoff-graph-v4-capacity';
-const CROSSVENUE_EXPERIMENT_ID = 'crossvenue-rule-aware-convergence-v5';
-const OPTIONS_EXPERIMENT_ID = 'options-implied-binary-v2-resolver-exact-expiry';
-const OPTIONS_EVIDENCE_START = '2026-07-23T15:10:00Z';
+const STRUCTURAL_UNIVERSE_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
+const CROSSVENUE_EXPERIMENT_ID = 'crossvenue-exact-rule-convergence-v6';
+const OPTIONS_EXPERIMENT_ID = 'options-daily-threshold-surface-residual-v3';
+const OPTIONS_EVIDENCE_START = '2026-07-27T13:05:00Z';
 
 function secondsBetween(later, earlier) {
   const end = new Date(later).getTime();

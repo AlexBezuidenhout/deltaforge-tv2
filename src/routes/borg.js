@@ -31,7 +31,7 @@ const {
   TERMINAL_CARRY_V1_EXPERIMENT_ID,
 } =
   require('../../borg/crossvenue/terminal-carry');
-const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v4-capacity';
+const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
 const PYTH_EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v2';
 
 router.get('/research/priority-lanes', authMiddleware, async (req, res) => {
@@ -1514,7 +1514,7 @@ router.get('/pairedmaker/observations', authMiddleware, async (req, res) => {
 router.get('/structural/summary', authMiddleware, async (req, res) => {
   try {
     const value = await dashboardReports.get('structural-summary', 15_000, async () => {
-      const [heartbeat, candidates, rows] = await Promise.all([
+      const [heartbeat, candidates, rows, passive] = await Promise.all([
         pool.query(`SELECT beat_at,meta FROM system_heartbeats WHERE component='structural_scanner'`),
         pool.query(`SELECT universe_id,universe_class,structure_type,
                          count(*)::int catalog_candidates,
@@ -1526,8 +1526,10 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
         pool.query(`SELECT e.structure_type,e.latency_ms,count(*)::int evaluations,
                          count(*) FILTER (WHERE pass_proof)::int proved_evaluations,
                          count(*) FILTER (WHERE economic_candidate AND pass_proof)::int economic_candidates,
-                         count(*) FILTER (WHERE qualified AND pass_proof)::int atomic_qualified,
+                         count(*) FILTER (WHERE qualified AND pass_proof)::int orphan_safe_qualified,
                          max(displayed_profit_2x_usd) FILTER (WHERE pass_proof)::float max_displayed_profit_2x,
+                         max(orphan_safe_profit_2x_usd)
+                           FILTER (WHERE qualified AND pass_proof)::float max_orphan_safe_profit_2x,
                          sum(displayed_profit_2x_usd) FILTER (WHERE economic_candidate AND pass_proof)::float displayed_profit_not_portfolio,
                          max(evaluated_at) latest
                     FROM borg_structural_evaluations e
@@ -1535,14 +1537,26 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
                    WHERE c.universe_id=$1
                    GROUP BY e.structure_type,e.latency_ms ORDER BY e.structure_type,e.latency_ms`,
           [STRUCTURAL_EXPERIMENT_ID]),
+        pool.query(`SELECT structure_type,latency_ms,count(*)::int quotes,
+                           count(*) FILTER (WHERE status='RESTING')::int resting,
+                           count(*) FILTER (WHERE filled_at IS NOT NULL)::int fills,
+                           count(*) FILTER (WHERE status='FILLED_HEDGED_POSITIVE')::int positive_locks,
+                           count(*) FILTER (WHERE status='FILLED_HEDGED_NEGATIVE')::int negative_locks,
+                           count(*) FILTER (WHERE status LIKE 'FILLED_ORPHAN%')::int orphan_fills,
+                           COALESCE(sum(locked_pnl_2x_usd)
+                             FILTER (WHERE closed_at IS NOT NULL),0)::float closed_pnl_2x,
+                           max(updated_at) latest
+                      FROM borg_structural_passive_quotes
+                     GROUP BY structure_type,latency_ms
+                     ORDER BY structure_type,latency_ms`),
       ]);
       const hb = heartbeat.rows[0] || null;
       const ageSec = hb ? Math.max(0, Math.round((Date.now() - new Date(hb.beat_at).getTime()) / 1000)) : null;
       return {
         alive: ageSec != null && ageSec < 30, heartbeatAt: hb?.beat_at || null,
         experimentId: STRUCTURAL_EXPERIMENT_ID,
-        contract: 'Frozen V4 expanded-capacity, content-addressed rule universe. Proof, rule, fee, depth and orphan-risk standards are unchanged from V3; only the deterministic candidate/token panel is wider. Augmented negRisk sets fail closed. Qualified remains false unless every required execution test passes.',
-        candidates: candidates.rows, rows: rows.rows,
+        contract: 'Frozen V5 content-addressed rule universe. A bundle qualifies only when its doubled-cost displayed profit remains positive after reserving the worst executable proper-subset fill unwind across the bundle. The passive arm consumes public prints behind frozen queue-ahead and immediately crosses every partial hedge; it is C-grade until authenticated queue and cancel acknowledgements exist.',
+        candidates: candidates.rows, rows: rows.rows, passive: passive.rows,
       };
     });
     res.json(value);
@@ -1554,12 +1568,15 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
 // --- Polymarket/Kalshi cross-venue identity + executable-book lab (paper only) ---
 router.get('/crossvenue/status', authMiddleware, async (req, res) => {
   try {
-    const [heartbeat, runtime, activity, relationEvents] = await Promise.all([
+    const [heartbeat, runtime, activity, relationEvents, exactRules] = await Promise.all([
       pool.query(`SELECT beat_at,meta FROM system_heartbeats WHERE component='crossvenue_lab'`),
       pool.query(`SELECT * FROM cv_runtime ORDER BY started_at DESC LIMIT 1`),
       pool.query(`SELECT count(*) FILTER (WHERE observed_at>now()-interval '1 hour')::int evaluations_1h,
                          count(*) FILTER (WHERE economic AND relation_approved AND observed_at>now()-interval '1 hour')::int economic_1h,
                          count(*) FILTER (WHERE paper_trade_eligible AND observed_at>now()-interval '1 hour')::int paper_trades_1h,
+                         count(*) FILTER (WHERE paper_trade_eligible
+                           AND exact_rule_eligible AND NOT hard_mismatch
+                           AND observed_at>now()-interval '1 hour')::int exact_rule_paper_trades_1h,
                          count(*) FILTER (WHERE lockable_after_both_fills AND observed_at>now()-interval '1 hour')::int lockable_1h,
                          count(DISTINCT episode_id) FILTER (WHERE economic AND relation_approved AND observed_at>now()-interval '1 hour')::int episodes_1h,
                          max(observed_at) latest
@@ -1571,25 +1588,43 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
                          COALESCE(sum(orphan_stress_loss_observations),0)::int orphan_stress_loss_observations,
                          max(last_observed_at) latest
                     FROM cv_relation_episodes WHERE experiment_id=$1`, [CROSSVENUE_EXPERIMENT_ID]),
+      pool.query(`SELECT count(*) FILTER (WHERE active)::int candidates,
+                         count(*) FILTER (WHERE active AND exact_rule_eligible
+                           AND NOT hard_mismatch)::int exact_rule_pairs,
+                         count(*) FILTER (WHERE active AND monitored
+                           AND exact_rule_eligible AND NOT hard_mismatch
+                           AND (paper_eval_approved OR relation_approved OR identity_approved)
+                           AND kalshi_fee_schedule IS NOT NULL
+                           AND COALESCE((kalshi_fee_schedule->>'supported')::boolean,false)
+                         )::int paper_eligible_exact,
+                         count(*) FILTER (WHERE active AND hard_mismatch)::int hard_vetoes,
+                         count(*) FILTER (WHERE active AND kalshi_fee_schedule IS NOT NULL
+                           AND COALESCE((kalshi_fee_schedule->>'supported')::boolean,false))::int fee_supported
+                    FROM cv_contract_matches`),
     ]);
     const hb = heartbeat.rows[0] || null;
     const currentRuntime = runtime.rows[0] || null;
     const approvedMatches = parseInt(currentRuntime?.approved_matches, 10) || 0;
+    const exact = exactRules.rows[0] || {};
+    const exactRulePairs = parseInt(exact.exact_rule_pairs, 10) || 0;
+    const paperEligibleExact = parseInt(exact.paper_eligible_exact, 10) || 0;
     const ageSec = hb ? Math.max(0, Math.round((Date.now() - new Date(hb.beat_at).getTime()) / 1000)) : null;
     res.json({
       alive: ageSec != null && ageSec < 30 && currentRuntime?.status === 'RUNNING'
         && hb?.meta?.runId === currentRuntime?.run_id,
       heartbeatAt: hb?.beat_at || null, heartbeatAgeSec: ageSec,
-      evidenceEnabled: approvedMatches > 0,
+      evidenceEnabled: paperEligibleExact > 0,
       paperEvaluationEnabled: hb?.meta?.paperEvaluationPolicy?.enabled === true,
-      evidenceBlocker: approvedMatches > 0 ? null
-        : 'ZERO_RULE_CERTIFIED_RELATIONS: monitored dislocations are diagnostic controls, not PnL evidence',
+      evidenceBlocker: paperEligibleExact > 0 ? null
+        : exactRulePairs > 0
+          ? 'EXACT_RULE_KEYS_NOT_EXECUTION_ELIGIBLE: no exact pair is both monitored, enrolled and backed by a supported Kalshi fee schedule'
+          : 'ZERO_COMPLETE_EXACT_RULE_KEYS: all current cross-venue candidates are vetoed or incomplete; no V6 convergence entry is admissible',
       contract: {
         mode: 'PAPER_ONLY_LIVE_DATA', walletLoaded: false, liveOrderPath: 'absent',
         atomicAcrossVenues: false, startingBankrollUsd: STARTING_BANKROLL_USD,
         capitalPerVenueUsd: STARTING_BANKROLL_USD / 2,
         sizingMode: 'equal payout shares, optimized over executable depth and the $250-per-venue bankroll',
-        identityRule: 'Only a frozen deterministic payoff proof with every state gate satisfied may be labelled economic or lockable.',
+        identityRule: 'V6 requires a complete equal subject/predicate/comparator/strike/resolver/time/timezone/fallback/precision key; any missing or conflicting dimension is an automatic veto.',
         paperScorePolicy: hb?.meta?.paperEvaluationPolicy || null,
         experimentId: CROSSVENUE_EXPERIMENT_ID,
         kalshiTransport: hb?.meta?.kalshiTransport || 'public_batch_rest',
@@ -1597,6 +1632,14 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
         jurisdiction: 'Dublin is data/research only; do not route Kalshi orders from this host.',
       },
       runtime: currentRuntime,
+      exactRuleCoverage: {
+        candidates: parseInt(exact.candidates, 10) || 0,
+        exactRulePairs,
+        paperEligibleExact,
+        hardVetoes: parseInt(exact.hard_vetoes, 10) || 0,
+        feeSupported: parseInt(exact.fee_supported, 10) || 0,
+        legacyRelationApproved: approvedMatches,
+      },
       activity: { ...(activity.rows[0] || {}), ...(relationEvents.rows[0] || {}) },
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1609,6 +1652,10 @@ router.get('/crossvenue/matches', authMiddleware, async (req, res) => {
       SELECT match_id,poly_condition_id,poly_question,kalshi_ticker,kalshi_title,
              match_score::float,title_similarity::float,identity_status,identity_approved,
              identity_snapshot_hash,identity_certification,
+             exact_rule_key,exact_rule_eligible,hard_mismatch,
+             hard_mismatch_reasons,exact_rule_audit,
+             kalshi_fee_type,kalshi_fee_multiplier::float,kalshi_fee_source,
+             kalshi_fee_observed_at,kalshi_fee_schedule,
              relation_type,relation_approved,relation_status,relation_proof,
              relation_resolution_audit,state_evidence,
              paper_eval_approved,paper_eval_status,paper_eval_source,
@@ -1618,17 +1665,50 @@ router.get('/crossvenue/matches', authMiddleware, async (req, res) => {
              monitored,active,metadata,refreshed_at
         FROM cv_contract_matches
        WHERE active=true OR relation_approved=true
-       ORDER BY relation_approved DESC,paper_eval_approved DESC,identity_approved DESC,
+       ORDER BY exact_rule_eligible DESC,hard_mismatch ASC,
+                relation_approved DESC,paper_eval_approved DESC,identity_approved DESC,
                 monitored DESC,match_score DESC,refreshed_at DESC
        LIMIT $1`, [limit]), pool.query(`
       SELECT count(*)::int total
         FROM cv_contract_matches
        WHERE active=true OR relation_approved=true`)]);
     res.json({
-      warning: 'A title match is not a payoff relation. Approval requires exact ids, typed terminal states, a deterministic minimum-payout proof, and satisfied state evidence.',
+      warning: 'A title score or manual review cannot override V6. Paper convergence requires a complete equal rule key and no hard mismatch; a terminal lock additionally requires deterministic state-payoff certification.',
       total: total.rows[0]?.total || 0,
       returned: matches.rows.length,
       rows: matches.rows,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/crossvenue/depth', authMiddleware, async (req, res) => {
+  try {
+    const days = Math.max(1, Math.min(90, parseInt(req.query.days, 10) || 30));
+    const { rows } = await pool.query(`
+      SELECT quantity::float,direction,count(*)::int observations,
+             count(DISTINCT match_id)::int pairs,
+             count(*) FILTER (WHERE fee_schedule_known)::int fee_known,
+             count(*) FILTER (WHERE full_entry_depth)::int full_entry_depth,
+             count(*) FILTER (WHERE full_exit_depth)::int full_exit_depth,
+             count(*) FILTER (WHERE paper_entry_eligible)::int paper_entry_eligible,
+             count(*) FILTER (WHERE reason='KALSHI_FEE_SCHEDULE_UNKNOWN')::int fee_unknown,
+             max(terminal_locked_profit)::float max_terminal_lock,
+             avg(immediate_round_trip_pnl)
+               FILTER (WHERE full_exit_depth)::float mean_immediate_round_trip_pnl,
+             max(observed_at) latest
+        FROM cv_depth_replays
+       WHERE experiment_id=$1
+         AND observed_at>=now()-($2||' days')::interval
+         AND exact_rule_eligible AND NOT hard_mismatch
+       GROUP BY quantity,direction
+       ORDER BY quantity,direction
+    `, [CROSSVENUE_EXPERIMENT_ID, days]);
+    res.json({
+      experimentId: CROSSVENUE_EXPERIMENT_ID,
+      requestedDays: days,
+      quantities: [5, 10, 25],
+      warning: 'These are overlapping capacity observations, not additive trades. A row absent because depth or fees failed is recorded explicitly.',
+      rows,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1644,7 +1724,8 @@ router.get('/crossvenue/opportunities', authMiddleware, async (req, res) => {
              o.stressed_profit::float,o.indicative_economic,o.economic,
              o.paper_eval_approved,o.paper_trade_eligible,o.identity_approved,
              o.relation_type,o.relation_approved,o.guaranteed_min_payout_per_share::float,
-             o.payoff_proof_hash,o.books_fresh,
+             o.payoff_proof_hash,o.exact_rule_key,o.exact_rule_eligible,o.hard_mismatch,
+             o.books_fresh,
              (100*o.locked_profit_after_both_fills/NULLIF(o.total_cost,0))::float raw_roi_pct,
              (100*o.stressed_profit/NULLIF(o.total_cost,0))::float stressed_roi_pct,
              o.full_depth,o.atomic,o.lockable_after_both_fills,o.status,
@@ -1726,8 +1807,8 @@ router.get('/crossvenue/summary', authMiddleware, async (req, res) => {
         evidenceBlocker: provedEvents > 0 ? null
           : 'No rule-certified relation event exists. Indicative controls are overlapping quote diagnostics and cannot be added or called profit.',
         engineCohort: CROSSVENUE_EXPERIMENT_ID,
-        warning: 'Rows are overlapping observations, not additive trades. The >80% operator cohort paper-tests assumed parity after 2x fees and one adverse tick per leg; economic/lockable still requires an approved deterministic relation. Every cross-venue execution remains non-atomic.',
-        requirement: 'Forward synchronized L2; one approved relation event per state activation/direction; at least 300 independent events and 14 UTC days, positive 2x-cost economics in both halves, and market/day clustered lower bounds above zero before any deployment review.',
+        warning: 'Rows are overlapping observations, not additive trades. V6 paper entries require a complete exact-rule key, a hard-mismatch veto, synchronized depth and a persisted Kalshi fee schedule; terminal-lock economics still requires a deterministic payoff proof. Every cross-venue execution remains non-atomic.',
+        requirement: 'Forward synchronized L2; one first entry per exact-rule match/direction/UTC day; at least 300 fresh pair-direction-days and 30 UTC days, positive 2x-cost plus one-tick economics in both halves, multiplicity correction, and market/day clustered lower bounds above zero before deployment review.',
         rows: observations.rows,
         relationEvents: episodes.rows,
       };
@@ -1746,6 +1827,7 @@ router.get('/crossvenue/convergence', authMiddleware, async (req, res) => {
              terminal_locked_profit::float,immediate_round_trip_pnl::float,
              entry_economic,paper_eval_approved,paper_entry_eligible,
              identity_approved,relation_approved,relation_type,books_fresh,
+             exact_rule_key,exact_rule_eligible,hard_mismatch,
              full_entry_depth,full_exit_depth,
              data_quality_grade,execution_fidelity_grade
         FROM cv_basis_samples
@@ -1754,7 +1836,7 @@ router.get('/crossvenue/convergence', authMiddleware, async (req, res) => {
          ORDER BY match_id,direction,quantity,observed_at`, [days, CROSSVENUE_EXPERIMENT_ID]);
       return {
         requestedDays: days,
-        ...summarizeConvergence(rows),
+        ...summarizeConvergence(rows, { requireExactRule: true }),
         interpretation: 'This measures time to executable early liquidation, not time to midpoint convergence. Terminal locks and early exits are reported separately.',
       };
     });

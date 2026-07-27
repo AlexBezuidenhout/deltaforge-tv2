@@ -18,9 +18,9 @@ function manifest(relative) {
 
 test('priority research manifests are paper-only and preserve frozen H43', () => {
   const h43 = manifest('borg/experiments/research-h43-forward-v1.json');
-  const structural = manifest('borg/experiments/structural-certified-payoff-graph-v4-capacity.json');
-  const crossvenue = manifest('borg/experiments/crossvenue-rule-aware-convergence-v5.json');
-  const options = manifest('borg/experiments/options-implied-binary-v2-resolver-exact-expiry.json');
+  const structural = manifest('borg/experiments/structural-certified-payoff-graph-v5-orphan-reserve.json');
+  const crossvenue = manifest('borg/experiments/crossvenue-exact-rule-convergence-v6.json');
+  const options = manifest('borg/experiments/options-daily-threshold-surface-residual-v3.json');
   for (const item of [h43, structural, crossvenue, options]) {
     assert.equal(item.paper_only, true);
     assert.equal(item.live_order_path, 'disabled');

@@ -2020,7 +2020,7 @@
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Universe</div><div style="font-size:18px;font-weight:700;" id="bookLabUniverse">—</div><div style="font-size:10px;color:var(--text-muted);" id="bookLabSelected">— selected</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Intents 1h</div><div style="font-size:18px;font-weight:700;" id="bookLabIntents">—</div><div style="font-size:10px;color:var(--text-muted);" id="bookLabFills">— fills</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Reaction</div><div style="font-size:18px;font-weight:700;" id="bookLabReaction">—</div><div style="font-size:10px;color:var(--text-muted);">target 20–50 ms internal</div></div></div>
-    <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Structural</div><div style="font-size:18px;font-weight:700;" id="bookLabStructural">—</div><div style="font-size:10px;color:var(--text-muted);">economic leads · non-atomic</div></div></div>
+    <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Structural</div><div style="font-size:18px;font-weight:700;" id="bookLabStructural">—</div><div style="font-size:10px;color:var(--text-muted);">economic / orphan-safe</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Mode</div><div style="font-size:18px;font-weight:700;color:var(--yellow);">PAPER</div><div style="font-size:10px;color:var(--text-muted);">$500 cohort · no DB hot path</div></div></div>
   </div>
 
@@ -2039,9 +2039,14 @@
     <tbody id="pairedMakerCyclesBody"><tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">No paired cycles yet</td></tr></tbody>
   </table></div></div></div>
 
-  <div class="panel"><div class="panel-header"><span>STRUCTURAL PAYOFF IDENTITIES</span><span style="font-size:10px;color:var(--text-muted);">“economic” is not locked arbitrage; atomic-qualified is the hard standard</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
-    <thead><tr><th>Structure</th><th>Latency</th><th>Evaluations</th><th>Economic leads</th><th>Atomic qualified</th><th>Max displayed 2× profit</th><th>Latest</th></tr></thead>
-    <tbody id="bookLabStructuralBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;">No structural evaluations yet</td></tr></tbody>
+  <div class="panel"><div class="panel-header"><span>STRUCTURAL PAYOFF IDENTITIES</span><span style="font-size:10px;color:var(--text-muted);">qualified = doubled-cost profit survives full executable orphan reserve</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
+    <thead><tr><th>Structure</th><th>Latency</th><th>Evaluations</th><th>Economic leads</th><th>Orphan-safe qualified</th><th>Max displayed 2×</th><th>Max after reserve</th><th>Latest</th></tr></thead>
+    <tbody id="bookLabStructuralBody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;">No structural evaluations yet</td></tr></tbody>
+  </table></div></div></div>
+
+  <div class="panel"><div class="panel-header"><span>PASSIVE STRUCTURAL ENTRY — QUEUE PAPER</span><span style="font-size:10px;color:var(--text-muted);">public prints consume queue-ahead · every partial fill hedged immediately · C-grade</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
+    <thead><tr><th>Structure</th><th>Latency</th><th>Quotes</th><th>Resting</th><th>Fills</th><th>Positive locks</th><th>Negative locks</th><th>Orphans</th><th>Closed 2× PnL</th><th>Latest</th></tr></thead>
+    <tbody id="bookLabStructuralPassiveBody"><tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:18px;">No passive structural quotes yet</td></tr></tbody>
   </table></div></div></div>
 
   <div class="panel"><div class="panel-header"><span>RECENT SIMULATED ORDER INTENTS</span><span style="font-size:10px;color:var(--text-muted);">post-only queue model, partial fills, and executable bid-depth markouts</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;max-height:360px;overflow:auto;"><table>
@@ -2064,7 +2069,7 @@
   <div class="grid-5col">
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Polymarket</div><div style="font-size:18px;font-weight:700;" id="cvPolyMarkets">—</div><div style="font-size:10px;color:var(--text-muted);">active binary markets</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Kalshi</div><div style="font-size:18px;font-weight:700;" id="cvKalshiMarkets">—</div><div style="font-size:10px;color:var(--text-muted);">active binary markets</div></div></div>
-    <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Paper &gt;80 / Proved</div><div style="font-size:18px;font-weight:700;" id="cvCandidates">—</div><div style="font-size:10px;color:var(--text-muted);" id="cvMonitored">— paper monitored · — total monitored</div></div></div>
+    <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Exact / hard veto</div><div style="font-size:18px;font-weight:700;" id="cvCandidates">—</div><div style="font-size:10px;color:var(--text-muted);" id="cvMonitored">— fees certified · — monitored</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Forward Relation Events</div><div style="font-size:18px;font-weight:700;" id="cvEpisodes">—</div><div style="font-size:10px;color:var(--text-muted);" id="cvLockable">— ever economic · — disappeared</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Capital Model</div><div style="font-size:18px;font-weight:700;color:var(--yellow);">$250 + $250</div><div style="font-size:10px;color:var(--text-muted);">prefunded · $500 total</div></div></div>
   </div>
@@ -2077,6 +2082,11 @@
   <div class="panel"><div class="panel-header"><span>CAPITAL RELEASE — EXECUTABLE CONVERGENCE</span><span id="cvConvergenceCoverage" style="font-size:10px;color:var(--text-muted);">four fees · right-censored · 30-day horizon</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
     <thead><tr><th>Cohort</th><th>Episodes</th><th>Pairs</th><th>Profitable exits</th><th>Censored</th><th>Observed median</th><th>P ≤1h</th><th>P ≤6h</th><th>P ≤24h</th><th>P ≤7d</th></tr></thead>
     <tbody id="cvConvergenceBody"><tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:18px;">Collecting fixed-size entry and liquidation marks…</td></tr></tbody>
+  </table></div></div></div>
+
+  <div class="panel"><div class="panel-header"><span>EXACT-RULE CAPACITY REPLAY</span><span style="font-size:10px;color:var(--text-muted);">5 / 10 / 25 shares · observed series fee persisted · failed depth remains visible</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
+    <thead><tr><th>Qty</th><th>Direction</th><th>Observations</th><th>Pairs</th><th>Fee known</th><th>Full entry</th><th>Full exit</th><th>Eligible</th><th>Fee unknown</th><th>Max terminal lock</th><th>Mean immediate PnL</th><th>Latest</th></tr></thead>
+    <tbody id="cvDepthBody"><tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">Waiting for a complete exact-rule pair and synchronized depth…</td></tr></tbody>
   </table></div></div></div>
 
   <div class="panel" style="border-color:var(--yellow);"><div class="panel-header"><span>RESOLVER-RISK TERMINAL CARRY V2 — FORWARD PAPER</span><span id="cvTerminalCarryPrior" style="font-size:10px;color:var(--text-muted);">risk-class settlement priors loading…</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
@@ -3348,7 +3358,8 @@
     const reaction = Number(status.runtime?.metrics?.reactionUsP95);
     document.getElementById('bookLabReaction').textContent = Number.isFinite(reaction) ? (reaction / 1000).toFixed(2) + ' ms' : '—';
     const economic = structural.rows.reduce((sum, row) => sum + Number(row.economic_candidates || 0), 0);
-    const qualified = structural.rows.reduce((sum, row) => sum + Number(row.atomic_qualified || 0), 0);
+    const qualified = structural.rows.reduce((sum, row) =>
+      sum + Number(row.orphan_safe_qualified || 0), 0);
     document.getElementById('bookLabStructural').textContent = economic + ' / ' + qualified;
     const pairedActivity = pairedStatus.activity || {};
     document.getElementById('pairedMakerStatus').textContent = pairedStatus.alive
@@ -3361,7 +3372,7 @@
       const e = lane.evidence || {};
       if (lane.program === 'resolver_boundary_transfer') return (e.evaluations || 0) + ' evaluations · ' + (e.actions || 0) + ' actions · ' + (e.errors || 0) + ' errors';
       if (lane.program === 'certified_payoff_graph') return (e.candidates || 0) + ' candidates · ' + (e.qualified || 0) + ' qualified';
-      if (lane.program === 'rule_aware_crossvenue') return (e.pairs || 0) + ' pairs · ' + (e.paperTradeLeads || 0) + ' eligible leads';
+      if (lane.program === 'rule_aware_crossvenue') return (e.exactRuleMatches || 0) + ' exact pairs · ' + (e.hardMismatchMatches || 0) + ' hard vetoes · ' + (e.paperTradeLeads || 0) + ' eligible leads';
       if (lane.program === 'options_implied_binary_residual') return (e.markets || 0) + ' targets · ' + (e.executable || 0) + ' executable marks';
       return (e.selectedMarkets || 0) + ' frozen capture markets · ' + (e.decisions || 0) + ' quote decisions';
     };
@@ -3395,7 +3406,11 @@
       return '<tr><td style="color:var(--text-muted);">' + new Date(row.opened_at).toLocaleTimeString() + '</td><td title="' + escapeHtml(row.question || '') + '">' + escapeHtml((row.question || row.condition_id || '').slice(0, 36)) + '</td><td>' + escapeHtml(row.strategy) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(row.arm) + '</div></td><td>' + escapeHtml(row.status) + '</td><td>' + Number(row.initial_pair_cost).toFixed(3) + '</td><td>' + fillText + '</td><td>' + Number(row.merged_shares || 0).toFixed(2) + '</td><td style="color:' + _bPnlColor(row.locked_pnl) + '">' + _bMoney(row.locked_pnl) + '</td><td style="color:' + _bPnlColor(row.orphan_pnl) + '">' + _bMoney(row.orphan_pnl) + '</td><td style="color:' + _bPnlColor(row.total_pnl) + ';font-weight:700;">' + total + '</td><td style="color:var(--yellow);">' + _bMoney(row.modeled_reward_accrual) + '</td><td>' + escapeHtml(row.data_quality_grade || '—') + '/' + escapeHtml(row.execution_fidelity_grade || '—') + '</td></tr>';
     }).join('') : '<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">No paired cycles yet</td></tr>';
 
-    document.getElementById('bookLabStructuralBody').innerHTML = structural.rows.length ? structural.rows.map((row) => '<tr><td>' + escapeHtml(row.structure_type) + '</td><td>' + row.latency_ms + 'ms</td><td>' + row.evaluations + '</td><td>' + row.economic_candidates + '</td><td style="color:' + (Number(row.atomic_qualified) ? 'var(--green)' : 'var(--text-muted)') + '">' + row.atomic_qualified + '</td><td>' + _bMoney(row.max_displayed_profit_2x) + '</td><td style="color:var(--text-muted);">' + (row.latest ? new Date(row.latest).toLocaleTimeString() : '—') + '</td></tr>').join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;">No structural evaluations yet</td></tr>';
+    document.getElementById('bookLabStructuralBody').innerHTML = structural.rows.length ? structural.rows.map((row) => '<tr><td>' + escapeHtml(row.structure_type) + '</td><td>' + row.latency_ms + 'ms</td><td>' + row.evaluations + '</td><td>' + row.economic_candidates + '</td><td style="color:' + (Number(row.orphan_safe_qualified) ? 'var(--green)' : 'var(--text-muted)') + '">' + row.orphan_safe_qualified + '</td><td>' + _bMoney(row.max_displayed_profit_2x) + '</td><td style="color:' + _bPnlColor(row.max_orphan_safe_profit_2x) + '">' + _bMoney(row.max_orphan_safe_profit_2x) + '</td><td style="color:var(--text-muted);">' + (row.latest ? new Date(row.latest).toLocaleTimeString() : '—') + '</td></tr>').join('') : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;">No structural evaluations yet</td></tr>';
+
+    document.getElementById('bookLabStructuralPassiveBody').innerHTML = (structural.passive || []).length ? structural.passive.map((row) =>
+      '<tr><td>' + escapeHtml(row.structure_type) + '</td><td>' + row.latency_ms + 'ms</td><td>' + row.quotes + '</td><td>' + row.resting + '</td><td>' + row.fills + '</td><td style="color:' + (Number(row.positive_locks) ? 'var(--green)' : 'var(--text-muted)') + '">' + row.positive_locks + '</td><td style="color:' + (Number(row.negative_locks) ? 'var(--danger)' : 'var(--text-muted)') + '">' + row.negative_locks + '</td><td style="color:' + (Number(row.orphan_fills) ? 'var(--danger)' : 'var(--text-muted)') + '">' + row.orphan_fills + '</td><td style="color:' + _bPnlColor(row.closed_pnl_2x) + '">' + _bMoney(row.closed_pnl_2x) + '</td><td style="color:var(--text-muted);">' + (row.latest ? new Date(row.latest).toLocaleTimeString() : '—') + '</td></tr>'
+    ).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:18px;">No passive structural quotes yet</td></tr>';
 
     document.getElementById('bookLabIntentsBody').innerHTML = intents.length ? intents.map((item) => {
       const fill = item.filled == null ? '—' : item.filled ? Number(item.fill_size || 0).toFixed(2) : 'no';
@@ -3410,13 +3425,14 @@
   }
 
   async function loadCrossVenueOnce() {
-    let status, summary, matches, opportunities, convergence, relationEpisodes, terminalCarry;
+    let status, summary, matches, opportunities, convergence, relationEpisodes, terminalCarry, depth;
     try {
-      [status, summary, matches, opportunities, convergence, relationEpisodes, terminalCarry] = await Promise.all([
+      [status, summary, matches, opportunities, convergence, relationEpisodes, terminalCarry, depth] = await Promise.all([
         labApiGet('/crossvenue/status'), labApiGet('/crossvenue/summary'),
         labApiGet('/crossvenue/matches?limit=500'), labApiGet('/crossvenue/opportunities?limit=100'),
         labApiGet('/crossvenue/convergence?days=30'), labApiGet('/crossvenue/episodes?limit=100'),
         labApiGet('/crossvenue/terminal-carry?limit=100'),
+        labApiGet('/crossvenue/depth?days=30'),
       ]);
     } catch (error) {
       document.getElementById('cvStatusTitle').textContent = 'CROSS-VENUE: API UNAVAILABLE';
@@ -3429,9 +3445,8 @@
     const cvEvidenceEnabled = status.evidenceEnabled === true;
     document.getElementById('cvStatusIndicator').style.background = status.alive && cvEvidenceEnabled ? 'var(--green)' : 'var(--yellow)';
     document.getElementById('cvStatusTitle').textContent = !status.alive ? 'CROSS-VENUE: COLLECTOR STALE'
-      : cvEvidenceEnabled && status.paperEvaluationEnabled ? 'CROSS-VENUE: PROVED + SCORE>80 PAPER COHORTS ACTIVE'
-        : cvEvidenceEnabled ? 'CROSS-VENUE: RULE-CERTIFIED PAPER EVIDENCE ACTIVE'
-        : 'CROSS-VENUE: TRANSPORT HEALTHY · 0 PROVED RELATIONS · CONTROLS ONLY';
+      : cvEvidenceEnabled ? 'CROSS-VENUE: EXACT-RULE V6 PAPER COHORT ACTIVE'
+        : 'CROSS-VENUE: TRANSPORT HEALTHY · 0 COMPLETE EXACT RULE KEYS';
     const cvRuntimeMetrics = runtime.metrics || {};
     const cvUniverseHealth = cvRuntimeMetrics.kalshiUniverseTruncated || cvRuntimeMetrics.polyUniverseTruncated
       ? ' · WARNING: venue universe fallback/truncated'
@@ -3441,8 +3456,8 @@
     document.getElementById('cvStatusSubtitle').textContent = (status.evidenceBlocker || ('Polymarket WebSocket + Kalshi ' + (status.contract?.kalshiTransport || 'public_batch_rest') + ' · deterministic payoff relations · $500 depth-optimized sizing · orders non-atomic')) + cvUniverseHealth + ' · refreshed ' + new Date().toLocaleTimeString();
     document.getElementById('cvPolyMarkets').textContent = runtime.poly_markets ?? 0;
     document.getElementById('cvKalshiMarkets').textContent = runtime.kalshi_markets ?? 0;
-    document.getElementById('cvCandidates').textContent = (cvRuntimeMetrics.paperApprovedMatches ?? 0) + ' / ' + (runtime.approved_matches ?? 0);
-    document.getElementById('cvMonitored').textContent = (matches.total ?? runtime.candidates ?? 0) + ' discovered · ' + (cvRuntimeMetrics.paperMonitoredMatches ?? 0) + ' paper monitored · ' + (runtime.monitored_matches ?? 0) + ' total monitored';
+    document.getElementById('cvCandidates').textContent = (status.exactRuleCoverage?.paperEligibleExact ?? 0) + ' enrolled / ' + (status.exactRuleCoverage?.exactRulePairs ?? 0) + ' exact / ' + (status.exactRuleCoverage?.hardVetoes ?? 0) + ' vetoed';
+    document.getElementById('cvMonitored').textContent = (matches.total ?? runtime.candidates ?? 0) + ' discovered · ' + (status.exactRuleCoverage?.feeSupported ?? 0) + ' fees certified · ' + (runtime.monitored_matches ?? 0) + ' monitored';
     document.getElementById('cvEpisodes').textContent = activity.relation_events ?? 0;
     document.getElementById('cvLockable').textContent = (activity.ever_economic ?? 0) + ' ever economic · ' + (activity.disappeared ?? 0) + ' disappeared';
 
@@ -3462,16 +3477,22 @@
       return (Number(ms) / 86400000).toFixed(1) + 'd';
     };
     const cvCohorts = [
-      { label: 'APPROVED EVIDENCE', row: convergence.approvedEvidence, evidence: true },
-      { label: 'SCORE>80 PAPER TEST', row: convergence.paperEvaluation, paper: true },
-      { label: 'UNAPPROVED DIAGNOSTIC', row: convergence.unapprovedDiagnostic, evidence: false },
+      { label: 'CERTIFIED + EXACT EVIDENCE', row: convergence.approvedEvidence, evidence: true },
+      { label: 'EXACT-RULE V6 PAPER', row: convergence.paperEvaluation, paper: true },
+      { label: 'HARD-VETO / INCOMPLETE DIAGNOSTIC', row: convergence.unapprovedDiagnostic, evidence: false },
     ];
     document.getElementById('cvConvergenceBody').innerHTML = cvCohorts.map((item) => {
       const row = item.row || {};
       return '<tr><td style="font-weight:700;color:' + (item.evidence ? 'var(--green)' : item.paper ? 'var(--yellow)' : 'var(--text-muted)') + ';">' + item.label + '</td><td>' + (row.episodes || 0) + '</td><td>' + (row.pairs || 0) + '</td><td>' + (row.observedProfitableExits || 0) + '</td><td>' + (row.rightCensored || 0) + '</td><td>' + cvDuration(row.observedMedianEventMs) + '</td><td>' + cvProbability(row, '1h') + '</td><td>' + cvProbability(row, '6h') + '</td><td>' + cvProbability(row, '24h') + '</td><td>' + cvProbability(row, '7d') + '</td></tr>';
     }).join('');
     const coverageDays = Number(convergence.coverage?.spanDays || 0);
-    document.getElementById('cvConvergenceCoverage').textContent = 'four fees · right-censored · ' + Number(convergence.coverage?.samples || 0) + ' samples · ' + coverageDays.toFixed(1) + ' observed days';
+    document.getElementById('cvConvergenceCoverage').textContent = 'four fees · hard-vetoed · right-censored · ' + Number(convergence.coverage?.samples || 0) + ' clean samples · ' + Number(convergence.diagnosticSamples || 0) + ' diagnostic samples · ' + coverageDays.toFixed(1) + ' observed days';
+
+    document.getElementById('cvDepthBody').innerHTML = (depth.rows || []).length
+      ? depth.rows.map((row) =>
+        '<tr><td>' + Number(row.quantity).toFixed(0) + '</td><td style="font-weight:700;">' + escapeHtml(row.direction) + '</td><td>' + row.observations + '</td><td>' + row.pairs + '</td><td>' + row.fee_known + '</td><td>' + row.full_entry_depth + '</td><td>' + row.full_exit_depth + '</td><td style="color:' + (Number(row.paper_entry_eligible) ? 'var(--green)' : 'var(--text-muted)') + '">' + row.paper_entry_eligible + '</td><td style="color:' + (Number(row.fee_unknown) ? 'var(--danger)' : 'var(--text-muted)') + '">' + row.fee_unknown + '</td><td style="color:' + _bPnlColor(row.max_terminal_lock) + '">' + _bMoney(row.max_terminal_lock) + '</td><td style="color:' + _bPnlColor(row.mean_immediate_round_trip_pnl) + '">' + _bMoney(row.mean_immediate_round_trip_pnl) + '</td><td style="color:var(--text-muted);">' + (row.latest ? new Date(row.latest).toLocaleTimeString() : '—') + '</td></tr>'
+      ).join('')
+      : '<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">No exact-rule capacity observations yet. Hard mismatches are deliberately excluded.</td></tr>';
 
     const carryPrior = terminalCarry.prior || {};
     const carryLower = carryPrior.agreementLower == null
@@ -3497,14 +3518,28 @@
       : '<tr><td colspan="15" style="text-align:center;color:var(--text-muted);padding:18px;">No quote has cleared the conservative forward hurdle. Zero is a valid result.</td></tr>';
 
     document.getElementById('cvMatchesBody').innerHTML = matches.rows.length ? matches.rows.map((row) => {
-      const flags = Array.isArray(row.mismatch_reasons) && row.mismatch_reasons.length ? row.mismatch_reasons.join(', ') : 'manual rules review pending';
+      const exactFlags = Array.isArray(row.hard_mismatch_reasons)
+        ? row.hard_mismatch_reasons : [];
+      const legacyFlags = Array.isArray(row.mismatch_reasons)
+        ? row.mismatch_reasons : [];
+      const flags = [...new Set([...exactFlags, ...legacyFlags])].join(', ')
+        || 'exact rule extraction pending';
       const rejected = row.identity_status === 'MANUALLY_REJECTED' || row.identity_status === 'REJECTED';
       const relationApproved = row.relation_approved === true;
       const paperApproved = row.paper_eval_approved === true;
-      const decision = relationApproved ? 'RELATION APPROVED' : paperApproved ? 'PAPER APPROVED (>80%)' : row.identity_approved ? 'IDENTITY APPROVED' : rejected ? 'IDENTITY REJECTED' : 'PENDING';
+      const hardVeto = row.hard_mismatch === true;
+      const decision = hardVeto ? 'HARD RULE VETO'
+        : row.exact_rule_eligible ? 'EXACT RULE KEY'
+          : relationApproved ? 'RELATION APPROVED'
+            : paperApproved ? 'PAPER APPROVED (>80%)'
+              : row.identity_approved ? 'IDENTITY APPROVED'
+                : rejected ? 'IDENTITY REJECTED' : 'PENDING';
       const rationale = row.relation_resolution_audit?.rationale || row.resolution_audit?.rationale || '';
       const relationLabel = relationApproved ? row.relation_type : row.identity_status;
-      return '<tr><td title="' + escapeHtml(row.poly_question || '') + '">' + escapeHtml((row.poly_question || '').slice(0, 52)) + '</td><td title="' + escapeHtml(row.kalshi_title || '') + '">' + escapeHtml((row.kalshi_title || '').slice(0, 52)) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(row.kalshi_ticker || '') + '</div></td><td>' + (100 * Number(row.match_score || 0)).toFixed(1) + '%</td><td>' + escapeHtml(relationLabel) + '</td><td style="color:' + (relationApproved || row.identity_approved ? 'var(--green)' : rejected ? 'var(--danger)' : 'var(--yellow)') + '">' + decision + '</td><td>' + (row.end_delta_hours == null ? '—' : Number(row.end_delta_hours).toFixed(1) + 'h') + '</td><td title="' + escapeHtml(flags + (rationale ? ' — ' + rationale : '')) + '">' + escapeHtml(flags.slice(0, 42)) + '</td><td>' + (row.monitored ? (relationApproved ? 'PROVED PAPER' : paperApproved ? 'PAPER TEST' : rejected ? 'DIAGNOSTIC' : 'CONTROL') : rejected ? 'closed' : 'queue') + '</td></tr>';
+      const fee = row.kalshi_fee_type
+        ? row.kalshi_fee_type + ' ×' + Number(row.kalshi_fee_multiplier || 0)
+        : 'fee unknown';
+      return '<tr><td title="' + escapeHtml(row.poly_question || '') + '">' + escapeHtml((row.poly_question || '').slice(0, 52)) + '</td><td title="' + escapeHtml(row.kalshi_title || '') + '">' + escapeHtml((row.kalshi_title || '').slice(0, 52)) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(row.kalshi_ticker || '') + ' · ' + escapeHtml(fee) + '</div></td><td>' + (100 * Number(row.match_score || 0)).toFixed(1) + '%</td><td>' + escapeHtml(relationLabel) + '</td><td style="color:' + (row.exact_rule_eligible || relationApproved || row.identity_approved ? 'var(--green)' : hardVeto || rejected ? 'var(--danger)' : 'var(--yellow)') + '">' + decision + '</td><td>' + (row.end_delta_hours == null ? '—' : Number(row.end_delta_hours).toFixed(1) + 'h') + '</td><td title="' + escapeHtml(flags + (rationale ? ' — ' + rationale : '')) + '">' + escapeHtml(flags.slice(0, 42)) + '</td><td>' + (row.monitored ? (row.exact_rule_eligible ? 'EXACT PAPER' : relationApproved ? 'PROVED PAPER' : paperApproved ? 'PAPER TEST' : rejected ? 'DIAGNOSTIC' : 'CONTROL') : rejected ? 'closed' : 'queue') + '</td></tr>';
     }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;">No comparable pairs discovered in the current active universe</td></tr>';
 
     const relationRows = relationEpisodes.rows || [];

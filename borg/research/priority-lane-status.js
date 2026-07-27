@@ -1,7 +1,7 @@
 'use strict';
 
 const H43_STRATEGY = 'H43_resolution_boundary_buffer';
-const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v4-capacity';
+const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
 const HEARTBEAT_COMPONENTS = Object.freeze([
   'allmarket_lab', 'crossvenue_lab', 'options_surface', 'structural_scanner',
 ]);
@@ -157,12 +157,13 @@ async function buildPriorityLaneStatus(pool, options = {}) {
       priority: 3, program: 'rule_aware_crossvenue', runMode: 'PAPER_LIVE_DATA',
       active: crossActive,
       status: !crossActive ? 'COLLECTOR_STALE_OR_ERROR'
-        : finite(crossMeta.terminalCarryEntries) > 0
-          ? 'RISK_PRICED_TERMINAL_CARRY_ENTRIES_COLLECTING'
-          : finite(crossMeta.paperTradeLeads) > 0 ? 'FORWARD_EPISODES_COLLECTING'
-          : 'ZERO_TRADE_ELIGIBLE_PROVED_EPISODES',
+        : finite(crossMeta.exactRuleMatches) > 0
+          ? 'EXACT_RULE_FORWARD_COHORT_COLLECTING'
+          : 'ZERO_COMPLETE_EXACT_RULE_KEYS',
       evidence: {
         pairs: finite(crossMeta.monitoredMatches), approvedMatches: finite(crossMeta.approvedMatches),
+        exactRuleMatches: finite(crossMeta.exactRuleMatches),
+        hardMismatchMatches: finite(crossMeta.hardMismatchMatches),
         paperApprovedMatches: finite(crossMeta.paperApprovedMatches),
         evaluations: finite(crossMeta.evaluations),
         paperTradeLeads: finite(crossMeta.paperTradeLeads),
@@ -175,7 +176,7 @@ async function buildPriorityLaneStatus(pool, options = {}) {
         ),
         liveness: crossState,
       },
-      nextTest: 'Keep certified locks, early convergence and resolver-risk terminal carry separate; collect 300 fresh match-direction-days over 30 days with synchronized depth and settlement audits.',
+      nextTest: 'V6 only: hard-veto every incomplete/mismatched rule key; collect 300 fresh match-direction-days at the frozen 5-share, +1%, one-hour protocol with 5/10/25-share capacity replays.',
     },
     {
       priority: 4, program: 'options_implied_binary_residual',
