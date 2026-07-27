@@ -13,7 +13,7 @@ EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
 Environment=NODE_ENV=production
 Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
 Environment=BORG_WAL_MIN_FREE_GB=20
-Environment=BORG_CODE_VERSION=options-surface-v2-resolver-exact-expiry
+Environment=BORG_CODE_VERSION=options-daily-threshold-surface-residual-v3
 Environment=OPTIONS_CURRENCIES=BTC,ETH
 Environment=OPTIONS_MAX_INSTRUMENTS=160
 Environment=OPTIONS_DB_SAMPLE_MS=5000

@@ -13,7 +13,7 @@ EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
 Environment=NODE_ENV=production
 Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
 Environment=BORG_WAL_MIN_FREE_GB=20
-Environment=BORG_CODE_VERSION=structural-certified-payoff-v4-capacity
+Environment=BORG_CODE_VERSION=structural-certified-payoff-graph-v5-orphan-reserve
 Environment=STRUCTURAL_MAX_CANDIDATES=48
 Environment=STRUCTURAL_MAX_TOKENS=128
 Environment=STRUCTURAL_CLOB_SHARDS=4

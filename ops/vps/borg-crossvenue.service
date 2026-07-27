@@ -14,7 +14,7 @@ EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
 Environment=NODE_ENV=production
 Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
 Environment=BORG_WAL_MIN_FREE_GB=20
-Environment=BORG_CODE_VERSION=dublin-runtime-v3
+Environment=BORG_CODE_VERSION=crossvenue-exact-rule-convergence-v6
 Environment=CROSSVENUE_KALSHI_POLL_MS=2000
 Environment=CROSSVENUE_MAX_MONITORED=200
 Environment=CROSSVENUE_HOT_MONITORED=200
