@@ -59,7 +59,9 @@ if [ "$PROFILE" = "bounded" ]; then
     exit 1
   fi
   now_epoch=$(date +%s)
-  receipt_mtime=$(stat -c '%Y' "$RAW_RECEIPT")
+  # The public receipt is a stable symlink to an atomically replaced target.
+  # Follow the link so freshness reflects the latest verified upload.
+  receipt_mtime=$(stat -Lc '%Y' "$RAW_RECEIPT")
   if (( now_epoch - receipt_mtime > 10800 )); then
     echo "bounded snapshot refused: raw off-host receipt is stale" >&2
     exit 1

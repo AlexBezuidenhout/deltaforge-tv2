@@ -31,7 +31,11 @@ if [ ! -s "$RECEIPT" ]; then
   exit 1
 fi
 now=$(date +%s)
-receipt_mtime=$(stat -c '%Y' "$RECEIPT")
+# The stable receipt path is a systemd-tmpfiles symlink into the uploader's
+# private state directory. Follow it: the link itself is intentionally created
+# once, while the atomically replaced target carries the successful-upload
+# timestamp.
+receipt_mtime=$(stat -Lc '%Y' "$RECEIPT")
 if [ $((now - receipt_mtime)) -gt "$MAX_RECEIPT_AGE_SEC" ]; then
   echo "retention refused: off-host receipt is stale"
   exit 1
@@ -58,7 +62,7 @@ if [ ! -s "$SNAPSHOT_RECEIPT" ]; then
   echo "snapshot retention skipped: independent off-host snapshot receipt missing"
   exit 0
 fi
-snapshot_receipt_mtime=$(stat -c '%Y' "$SNAPSHOT_RECEIPT")
+snapshot_receipt_mtime=$(stat -Lc '%Y' "$SNAPSHOT_RECEIPT")
 if [ $((now - snapshot_receipt_mtime)) -gt "$MAX_RECEIPT_AGE_SEC" ]; then
   echo "snapshot retention skipped: independent off-host snapshot receipt is stale"
   exit 0
