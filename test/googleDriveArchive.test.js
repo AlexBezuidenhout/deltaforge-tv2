@@ -43,10 +43,10 @@ test('Google Drive archive accepts only a least-privilege drive.file remote', (t
 
 test('Google Drive remote paths reject traversal and colon injection', () => {
   assert.equal(
-    remoteTarget('deltaforge-gdrive', 'DeltaForge/Dublin-VPS', 'wal'),
-    'deltaforge-gdrive:DeltaForge/Dublin-VPS/wal',
+    remoteTarget('deltaforge-gdrive', 'VPS Data', 'wal'),
+    'deltaforge-gdrive:VPS Data/wal',
   );
-  assert.equal(safeRemotePath('/DeltaForge//Dublin-VPS/'), 'DeltaForge/Dublin-VPS');
+  assert.equal(safeRemotePath('/VPS Data/'), 'VPS Data');
   assert.throws(() => safeRemotePath('DeltaForge/../secret'), /unsafe/);
   assert.throws(() => remoteTarget('bad:remote', 'safe'), /must contain/);
 });
@@ -75,7 +75,7 @@ test('combined rclone verification must account for every frozen source file', (
 });
 
 test('manifests and receipts carry SHA-256 evidence and destination identity', () => {
-  const destination = 'gdrive://team@leadlabs.design/DeltaForge/Dublin-VPS';
+  const destination = 'gdrive://team@leadlabs.design/VPS Data';
   const record = {
     id: 'wal:a.ndjson.gz',
     namespace: 'wal',
@@ -89,7 +89,7 @@ test('manifests and receipts carry SHA-256 evidence and destination identity', (
         verified: true,
         destination,
         relative: record.relative,
-        remotePath: 'DeltaForge/Dublin-VPS/wal/a.ndjson.gz',
+        remotePath: 'VPS Data/wal/a.ndjson.gz',
         size: 12,
         mtimeMs: 1000,
         sha256: 'a'.repeat(64),
@@ -116,7 +116,7 @@ test('manifests and receipts carry SHA-256 evidence and destination identity', (
       sha256: 'a'.repeat(64),
     },
     manifest: {
-      remotePath: 'DeltaForge/Dublin-VPS/manifests/run.json',
+      remotePath: 'VPS Data/manifests/run.json',
       size: 99,
       sha256: 'b'.repeat(64),
     },
@@ -170,7 +170,7 @@ test('end-to-end frozen traversal publishes distinct raw and snapshot receipts',
     env: {
       GDRIVE_RCLONE_REMOTE: 'deltaforge-gdrive',
       GDRIVE_ACCOUNT_LABEL: 'team@leadlabs.design',
-      GDRIVE_ARCHIVE_PREFIX: 'DeltaForge/Dublin-VPS',
+      GDRIVE_ARCHIVE_PREFIX: 'VPS Data',
       GDRIVE_RCLONE_CONFIG: config,
       GDRIVE_RCLONE_BINARY: process.execPath,
       GDRIVE_ARCHIVE_STATE_ROOT: state,

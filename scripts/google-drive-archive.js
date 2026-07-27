@@ -27,7 +27,7 @@ const DEFAULT_CONFIG = '/etc/deltaforge/rclone.conf';
 const DEFAULT_STATE_ROOT = '/var/lib/deltaforge/google-drive-archive';
 const DEFAULT_RAW_RECEIPT = '/var/lib/deltaforge/offhost-archive.receipt';
 const DEFAULT_SNAPSHOT_RECEIPT = '/var/lib/deltaforge/offhost-snapshot.receipt';
-const DEFAULT_PREFIX = 'DeltaForge/Dublin-VPS';
+const DEFAULT_PREFIX = 'VPS Data';
 const DEFAULT_MAX_FILES = 5000;
 const DEFAULT_MAX_BYTES = 25 * 1024 * 1024 * 1024;
 
