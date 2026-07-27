@@ -76,7 +76,14 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
   assert.ok(archiveSeed >= 0, 'raw archive seed is present');
   assert.ok(collectorStart >= 0, 'collector start block is present');
   assert.ok(archiveSeed < collectorStart, 'archive seed precedes the hot writers');
-  assert.match(launcher, /backlog-research-v13/);
+  assert.match(
+    launcher,
+    /deployed_release="\$\(basename "\$\(readlink -f \/opt\/deltaforge\/tv2\/current\)"\)"/,
+  );
+  assert.match(
+    launcher,
+    /code_version="\$\{BORG_EPOCH_CODE_VERSION:-\$\{deployed_release\}\}"/,
+  );
   assert.match(launcher, /exact-rule-structural-options-forward-after-runtime-repair/);
 });
 

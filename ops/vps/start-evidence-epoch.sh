@@ -14,7 +14,11 @@ fi
 
 minimum_free_gib="${BORG_EPOCH_MIN_FREE_GIB:-30}"
 warmup_timeout_sec="${BORG_EPOCH_WARMUP_TIMEOUT_SEC:-240}"
-code_version="${BORG_EPOCH_CODE_VERSION:-backlog-research-v13}"
+deployed_release="$(basename "$(readlink -f /opt/deltaforge/tv2/current)")"
+# Default to the immutable release identifier. A human cohort label can still
+# be supplied explicitly, but a forgotten override must never stamp a new
+# evidence epoch with an obsolete hard-coded code version.
+code_version="${BORG_EPOCH_CODE_VERSION:-${deployed_release}}"
 epoch_reason="${BORG_EPOCH_REASON:-exact-rule-structural-options-forward-after-runtime-repair}"
 available_kib="$(df --output=avail /var/lib/postgresql | tail -1 | tr -d ' ')"
 required_kib="$((minimum_free_gib * 1024 * 1024))"
