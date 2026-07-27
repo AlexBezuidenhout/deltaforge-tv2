@@ -174,9 +174,9 @@ async function queryForward(pool, days) {
              END::float8 terminal_payout
         FROM cv_basis_samples b
         LEFT JOIN cv_settlements s USING(match_id)
-       WHERE b.experiment_id=$1
+       WHERE b.experiment_id=$1::text
          AND b.observed_at >= now()-($2::int * interval '1 day')
-         AND b.quantity=$3
+         AND b.quantity=$3::numeric
          AND b.synchronized AND b.books_fresh AND b.full_entry_depth
          AND (b.paper_entry_eligible OR b.entry_economic)
          AND b.data_quality_grade IN ('A','B')
@@ -201,7 +201,7 @@ async function queryForward(pool, days) {
       LEFT JOIN LATERAL (
         SELECT max(x.observed_at) last_at
           FROM cv_basis_samples x
-         WHERE x.experiment_id=$1 AND x.match_id=e.match_id
+         WHERE x.experiment_id=$1::text AND x.match_id=e.match_id
            AND x.direction=e.direction AND x.quantity=e.quantity
            AND x.observed_at>e.observed_at
            AND x.exact_rule_key=e.entry_exact_rule_key
@@ -211,7 +211,7 @@ async function queryForward(pool, days) {
         SELECT x.observed_at,x.net_liquidation_proceeds,
                x.poly_exit_fee,x.kalshi_exit_fee
           FROM cv_basis_samples x
-         WHERE x.experiment_id=$1 AND x.match_id=e.match_id
+         WHERE x.experiment_id=$1::text AND x.match_id=e.match_id
            AND x.direction=e.direction AND x.quantity=e.quantity
            AND x.observed_at>e.observed_at
            AND x.observed_at<=e.observed_at
@@ -222,14 +222,14 @@ async function queryForward(pool, days) {
            AND x.exact_rule_key=e.entry_exact_rule_key
            AND x.exact_rule_eligible AND NOT x.hard_mismatch
            AND x.net_liquidation_proceeds
-             >= e.entry_total_cost*(1+$5)
+             >= e.entry_total_cost*(1+$5::numeric)
          ORDER BY x.observed_at LIMIT 1
       ) target ON true
       LEFT JOIN LATERAL (
         SELECT x.observed_at,x.net_liquidation_proceeds,
                x.poly_exit_fee,x.kalshi_exit_fee
           FROM cv_basis_samples x
-         WHERE x.experiment_id=$1 AND x.match_id=e.match_id
+         WHERE x.experiment_id=$1::text AND x.match_id=e.match_id
            AND x.direction=e.direction AND x.quantity=e.quantity
            AND x.observed_at>=e.observed_at
              + ($4::bigint * interval '1 millisecond')
@@ -263,7 +263,7 @@ async function queryDepth(pool, days) {
            count(*) FILTER (WHERE full_exit_depth)::int full_exit_depth,
            count(DISTINCT match_id)::int pairs
       FROM cv_depth_replays
-     WHERE experiment_id=$1
+     WHERE experiment_id=$1::text
        AND observed_at>=now()-($2::int * interval '1 day')
        AND exact_rule_eligible AND NOT hard_mismatch
      GROUP BY quantity,reason
