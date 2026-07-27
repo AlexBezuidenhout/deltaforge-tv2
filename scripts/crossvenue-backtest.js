@@ -86,6 +86,7 @@ async function main() {
                          terminal_locked_profit::float,immediate_round_trip_pnl::float,
                          entry_economic,paper_eval_approved,paper_entry_eligible,
                          identity_approved,relation_approved,relation_type,books_fresh,
+                         exact_rule_key,exact_rule_eligible,hard_mismatch,
                          full_entry_depth,full_exit_depth,
                          data_quality_grade,execution_fidelity_grade
                     FROM cv_basis_samples
@@ -115,7 +116,9 @@ async function main() {
                      AND experiment_id=$2
                    ORDER BY first_observed_at`, [days, experimentId]),
     ]);
-    const convergence = summarizeConvergence(basis.rows);
+    const convergence = summarizeConvergence(basis.rows, {
+      requireExactRule: experimentId === CURRENT_CROSSVENUE_EXPERIMENT_ID,
+    });
     const relationByMatch = new Map(relationDefinitions.map((row) => [row.matchId, row.relation]));
     const eligibleRetrospective = retrospectiveRows.rows.filter((row) => {
       const relation = relationByMatch.get(row.match_id);

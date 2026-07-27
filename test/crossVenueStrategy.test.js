@@ -603,6 +603,55 @@ test('convergence reports score-approved paper assumptions separately from prove
   assert.equal(report.unapprovedDiagnostic.episodes, 0);
 });
 
+test('V6 convergence hard-vetoes score approval without a clean immutable rule key', () => {
+  const base = Date.parse('2026-07-01T00:00:00Z');
+  const sample = (matchId, minutes, overrides = {}) => ({
+    observed_at: new Date(base + minutes * 60_000), match_id: matchId,
+    direction: 'POLY_NO+KALSHI_YES', quantity: '5', entry_total_cost: '4.5',
+    net_liquidation_proceeds: minutes ? '4.6' : '4.3',
+    terminal_locked_profit: '0.5', entry_economic: false,
+    paper_eval_approved: true, paper_entry_eligible: true,
+    relation_approved: false, books_fresh: true,
+    full_entry_depth: true, full_exit_depth: true,
+    data_quality_grade: 'B', execution_fidelity_grade: 'B',
+    exact_rule_key: `rule:${matchId}`, exact_rule_eligible: true,
+    hard_mismatch: false,
+    ...overrides,
+  });
+  const report = summarizeConvergence([
+    sample('clean', 0), sample('clean', 5),
+    sample('vetoed', 0, { hard_mismatch: true }),
+    sample('vetoed', 5, { hard_mismatch: true }),
+    sample('missing', 0, { exact_rule_key: null, exact_rule_eligible: false }),
+    sample('missing', 5, { exact_rule_key: null, exact_rule_eligible: false }),
+  ], { requireExactRule: true });
+  assert.equal(report.paperEvaluation.episodes, 1);
+  assert.equal(report.paperEvaluation.observedProfitableExits, 1);
+  assert.equal(report.unapprovedDiagnostic.episodes, 2);
+  assert.equal(report.coverage.samples, 2);
+  assert.equal(report.diagnosticSamples, 4);
+});
+
+test('V6 convergence cannot use an exit mark from a changed rule key', () => {
+  const base = Date.parse('2026-07-01T00:00:00Z');
+  const row = (minutes, key, entryEligible, proceeds) => ({
+    observed_at: new Date(base + minutes * 60_000), match_id: 'changed-rule',
+    direction: 'POLY_YES+KALSHI_NO', quantity: '5', entry_total_cost: '4.5',
+    net_liquidation_proceeds: String(proceeds), terminal_locked_profit: '0.5',
+    paper_eval_approved: true, paper_entry_eligible: entryEligible,
+    books_fresh: true, full_entry_depth: true, full_exit_depth: true,
+    data_quality_grade: 'B', execution_fidelity_grade: 'B',
+    exact_rule_key: key, exact_rule_eligible: true, hard_mismatch: false,
+  });
+  const report = summarizeConvergence([
+    row(0, 'rule:a', true, 4.3),
+    row(5, 'rule:b', false, 4.7),
+  ], { requireExactRule: true });
+  assert.equal(report.paperEvaluation.episodes, 1);
+  assert.equal(report.paperEvaluation.observedProfitableExits, 0);
+  assert.equal(report.paperEvaluation.rightCensored, 1);
+});
+
 test('cross-venue inference counts only the first episode per pair direction and UTC day', () => {
   const base = Date.parse('2026-07-01T00:00:00Z');
   const sample = (minutes, eligible, net) => ({
@@ -683,5 +732,6 @@ test('full-universe discovery runs outside the live collector event loop', () =>
 test('cross-venue CLI convergence report retains the paper cohort flags', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'crossvenue-backtest.js'), 'utf8');
   assert.match(source, /entry_economic,paper_eval_approved,paper_entry_eligible/);
-  assert.match(source, /summarizeConvergence\(basis\.rows\)/);
+  assert.match(source, /summarizeConvergence\(basis\.rows,\s*\{/);
+  assert.match(source, /requireExactRule: experimentId === CURRENT_CROSSVENUE_EXPERIMENT_ID/);
 });

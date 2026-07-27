@@ -79,7 +79,7 @@ function candidateRows({
   polyOutcome, kalshiOutcome, polyBook, kalshiBook,
   agreementLower, quantities, minQuantity, maxQuantity,
   totalCapitalUsd, polyCapitalUsd, kalshiCapitalUsd,
-  polyFeeRate, polyFeeExponent, kalshiFeeMultiplier,
+  polyFeeRate, polyFeeExponent, kalshiFeeMultiplier, kalshiFeeSchedule,
   polyTick, kalshiTick, booksFresh,
 }) {
   const minimum = Math.max(0.0001, finite(minQuantity, 1));
@@ -92,7 +92,7 @@ function candidateRows({
 
   const evaluate = (quantity) => evaluateCombination({
     polyOutcome, kalshiOutcome, quantity, polyBook, kalshiBook,
-    polyFeeRate, polyFeeExponent, kalshiFeeMultiplier,
+    polyFeeRate, polyFeeExponent, kalshiFeeMultiplier, kalshiFeeSchedule,
     polyTick, kalshiTick,
     identityApproved: false,
     // Internal pricing switch only: agreementLower is a statistical payout
@@ -197,6 +197,7 @@ function evaluateTerminalCarry({
   minQuantity = 1, maxQuantity = 10_000,
   totalCapitalUsd = 500, polyCapitalUsd = 250, kalshiCapitalUsd = 250,
   polyFeeRate = 0, polyFeeExponent = 1, kalshiFeeMultiplier = 1,
+  kalshiFeeSchedule = undefined,
   polyTick = 0.01, kalshiTick = 0.01,
   minPriorClusters = DEFAULT_MIN_PRIOR_CLUSTERS,
   minGlobalPriorClusters = DEFAULT_MIN_GLOBAL_PRIOR_CLUSTERS,
@@ -234,6 +235,7 @@ function evaluateTerminalCarry({
       polyFeeRate,
       polyFeeExponent,
       kalshiFeeMultiplier,
+      kalshiFeeSchedule,
       polyTick,
       kalshiTick,
       booksFresh,

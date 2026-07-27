@@ -109,6 +109,7 @@ test('score policy approves only non-rejected rows strictly above 80% for paper 
   const approved = applyPaperEvaluationPolicy({
     matchId: 'approved', score: '0.800001', identityStatus: 'STRUCTURED_CANDIDATE',
     identityApproved: false, relationApproved: false,
+    exactRuleEligible: true, hardMismatch: false,
   }, options);
   assert.equal(approved.paperEvalApproved, true);
   assert.equal(approved.paperEvalStatus, 'OPERATOR_APPROVED_PAPER_ONLY');
@@ -117,10 +118,32 @@ test('score policy approves only non-rejected rows strictly above 80% for paper 
   assert.equal(approved.paperEvalApprovedAt, '2026-07-19T21:14:45.000Z');
   assert.equal(applyPaperEvaluationPolicy({
     matchId: 'floor', score: 0.8, identityStatus: 'CANDIDATE',
+    exactRuleEligible: true, hardMismatch: false,
   }, options).paperEvalApproved, false);
   assert.equal(applyPaperEvaluationPolicy({
     matchId: 'rejected', score: 0.99, identityStatus: 'REJECTED',
   }, options).paperEvalApproved, false);
+  const mismatch = applyPaperEvaluationPolicy({
+    matchId: 'mismatch', score: 0.99, identityStatus: 'CANDIDATE',
+    exactRuleEligible: false, hardMismatch: true,
+  }, options);
+  assert.equal(mismatch.paperEvalApproved, false);
+  assert.equal(mismatch.paperEvalStatus, 'HARD_RULE_MISMATCH_VETO');
+});
+
+test('frozen exact-rule protocol needs no unrelated title-score threshold', () => {
+  const approved = applyPaperEvaluationPolicy({
+    matchId: 'exact', score: 0.4, identityStatus: 'CANDIDATE',
+    exactRuleEligible: true, hardMismatch: false,
+  }, {
+    exactRuleApproval: true,
+    paperScoreApproval: false,
+    paperApprovedAt: '2026-07-27T00:00:00Z',
+  });
+  assert.equal(approved.paperEvalApproved, true);
+  assert.equal(approved.paperEvalStatus, 'EXACT_RULE_KEY_APPROVED_PAPER_ONLY');
+  assert.equal(approved.paperEvalSource, 'frozen_exact_rule_key_v1');
+  assert.equal(approved.paperEvalThreshold, null);
 });
 
 test('paper monitoring prioritizes the complete approved cohort over exploratory reserves', () => {

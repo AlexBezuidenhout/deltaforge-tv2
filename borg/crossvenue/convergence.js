@@ -44,12 +44,22 @@ function normalizeSample(row) {
     identityApproved: flag(row.identity_approved ?? row.identityApproved),
     relationApproved: flag(row.relation_approved ?? row.relationApproved
       ?? row.identity_approved ?? row.identityApproved),
+    exactRuleKey: String(row.exact_rule_key ?? row.exactRuleKey ?? ''),
+    exactRuleEligible: flag(row.exact_rule_eligible ?? row.exactRuleEligible),
+    hardMismatch: row.hard_mismatch == null && row.hardMismatch == null
+      ? true : flag(row.hard_mismatch ?? row.hardMismatch),
     booksFresh: flag(row.books_fresh ?? row.booksFresh),
     fullEntryDepth: flag(row.full_entry_depth ?? row.fullEntryDepth),
     fullExitDepth: flag(row.full_exit_depth ?? row.fullExitDepth),
     quality: String(row.data_quality_grade ?? row.dataQualityGrade ?? 'F'),
     fidelity: String(row.execution_fidelity_grade ?? row.executionFidelityGrade ?? 'F'),
   };
+}
+
+function cleanExactRuleSample(sample) {
+  return Boolean(sample?.exactRuleKey)
+    && sample.exactRuleEligible === true
+    && sample.hardMismatch !== true;
 }
 
 function baseEligibleSample(sample) {
@@ -83,7 +93,12 @@ function buildConvergenceEpisodes(rawRows, { maxHorizonMs = HORIZONS_MS.at(-1) }
   for (const raw of rawRows || []) {
     const sample = normalizeSample(raw);
     if (!baseEligibleSample(sample)) continue;
-    const key = `${sample.matchId}:${sample.direction}:${sample.quantity}`;
+    const key = [
+      sample.matchId,
+      sample.direction,
+      sample.quantity,
+      sample.exactRuleKey || 'NO_EXACT_RULE_KEY',
+    ].join(':');
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(sample);
   }
@@ -122,6 +137,9 @@ function buildConvergenceEpisodes(rawRows, { maxHorizonMs = HORIZONS_MS.at(-1) }
         terminalLockedProfit: entry.terminalLockedProfit,
         identityApproved: entry.identityApproved,
         relationApproved: entry.relationApproved,
+        exactRuleKey: entry.exactRuleKey,
+        exactRuleEligible: entry.exactRuleEligible,
+        hardMismatch: entry.hardMismatch,
         paperEvalApproved: entry.paperEvalApproved,
         paperEntryEligible: entry.paperEntryEligible,
         event: eventAt != null,
@@ -211,20 +229,28 @@ function summarizeCohort(episodes) {
 
 function summarizeConvergence(rows, options = {}) {
   const episodes = buildConvergenceEpisodes(rows, options);
-  const approved = episodes.filter((row) => row.relationApproved);
-  const paper = episodes.filter((row) => row.paperEvalApproved && !row.relationApproved);
-  const diagnostic = episodes.filter((row) => !row.paperEvalApproved && !row.relationApproved);
-  const eligible = (rows || []).map(normalizeSample).filter(eligibleSample)
+  const requireExactRule = options.requireExactRule === true;
+  const clean = (row) => !requireExactRule || cleanExactRuleSample(row);
+  const approved = episodes.filter((row) => clean(row) && row.relationApproved);
+  const paper = episodes.filter((row) =>
+    clean(row) && row.paperEvalApproved && !row.relationApproved);
+  const diagnostic = episodes.filter((row) =>
+    !clean(row) || (!row.paperEvalApproved && !row.relationApproved));
+  const allEligible = (rows || []).map(normalizeSample).filter(eligibleSample)
     .sort((a, b) => a.observedAt - b.observedAt);
+  const eligible = requireExactRule
+    ? allEligible.filter(cleanExactRuleSample)
+    : allEligible;
   const firstAt = eligible.length ? new Date(eligible[0].observedAt).toISOString() : null;
   const lastAt = eligible.length ? new Date(eligible.at(-1).observedAt).toISOString() : null;
   const spanDays = firstAt && lastAt ? (Date.parse(lastAt) - Date.parse(firstAt)) / 86_400_000 : 0;
   const approvedSummary = summarizeCohort(approved);
   const paperSummary = summarizeCohort(paper);
   return {
-    methodology: 'First profitable executable liquidation after fixed ask-side entry; entry and exit fees charged on all four legs; Kaplan-Meier right-censoring.',
+    methodology: `First profitable executable liquidation after fixed ask-side entry; entry and exit fees charged on all four legs; Kaplan-Meier right-censoring.${requireExactRule ? ' Entry must carry a complete immutable exact-rule key with no hard mismatch.' : ''}`,
     horizons: HORIZONS_MS.map((ms) => HORIZON_LABELS.get(ms)),
     coverage: { firstAt, lastAt, spanDays, samples: eligible.length },
+    diagnosticSamples: allEligible.length - eligible.length,
     approvedEvidence: approvedSummary,
     paperEvaluation: paperSummary,
     unapprovedDiagnostic: summarizeCohort(diagnostic),
@@ -232,12 +258,14 @@ function summarizeConvergence(rows, options = {}) {
       && approvedSummary.spanDays >= 30,
     paperEvaluationReady: paperSummary.independentPairDirectionDays >= 300
       && paperSummary.spanDays >= 14,
-    warning: 'Score-approved rows are paper tests of an assumed $1 parity relationship. They are not contractual-identity approvals, terminal locks, or live-trading evidence.',
+    warning: requireExactRule
+      ? 'V6 paper rows require a complete exact-rule key and hard-mismatch veto. Certified rows are reported separately; all incomplete or mismatched title candidates remain diagnostics and cannot enter evidence.'
+      : 'Legacy score-approved rows are paper tests of an assumed $1 parity relationship. They are not contractual-identity approvals, terminal locks, or live-trading evidence.',
   };
 }
 
 module.exports = {
-  HORIZONS_MS, baseEligibleSample, buildConvergenceEpisodes,
+  HORIZONS_MS, baseEligibleSample, buildConvergenceEpisodes, cleanExactRuleSample,
   eligibleEntrySample, eligibleExitSample, eligibleSample, kmAt,
   firstEpisodePerPairDirectionDay, normalizeSample, pairDirectionDayKey,
   summarizeCohort, summarizeConvergence,

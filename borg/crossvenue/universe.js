@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { GAMMA, normalizeMarket } = require('../allmarket/universe');
 const { compareContracts, finite, tokens } = require('./strategy');
+const { compareExactRuleKeys } = require('./exact-rule-key');
+const { normalizeKalshiFeeSchedule } = require('./kalshi-fees');
 const {
   compileCrossVenueRelation, exactIdentityRelation, validateManualRelation,
 } = require('./payoff-relations');
@@ -82,7 +84,39 @@ function normalizeKalshiMarket(raw, event = null) {
     status: raw.status || null,
     canCloseEarly: raw.can_close_early === true,
     provisional: raw.is_provisional === true,
+    feeSchedule: raw.fee_type || raw.fee_multiplier != null
+      ? normalizeKalshiFeeSchedule(raw, {
+        seriesTicker: event?.series_ticker || String(raw.ticker).split('-')[0] || null,
+        source: 'kalshi_market_payload',
+      }) : null,
   };
+}
+
+async function fetchKalshiSeriesFeeSchedules(seriesTickers, options = {}) {
+  const tickers = [...new Set((seriesTickers || []).map(String).filter(Boolean))].sort();
+  const paceMs = Math.max(0, Number(options.paceMs ?? 250));
+  const observedAt = new Date().toISOString();
+  const schedules = new Map();
+  for (const ticker of tickers) {
+    if (paceMs) await new Promise((resolve) => setTimeout(resolve, paceMs));
+    try {
+      const { payload } = await fetchJson(`${KALSHI}/series/${encodeURIComponent(ticker)}`);
+      const raw = payload?.series || payload || {};
+      schedules.set(ticker, normalizeKalshiFeeSchedule(raw, {
+        seriesTicker: ticker,
+        source: 'kalshi_get_series',
+        observedAt,
+      }));
+    } catch (error) {
+      schedules.set(ticker, normalizeKalshiFeeSchedule({}, {
+        seriesTicker: ticker,
+        source: `kalshi_get_series_error:${error?.status || error?.code || 'unknown'}`,
+        observedAt,
+      }));
+      options.onError?.(ticker, error);
+    }
+  }
+  return schedules;
 }
 
 function normalizePolyMarket(market) {
@@ -388,20 +422,28 @@ function selectMonitoredCandidates(candidates, maxMonitored, rejectedControlLimi
  */
 function applyPaperEvaluationPolicy(candidate, options = {}) {
   const floor = Math.max(0, Math.min(1, finite(options.paperScoreFloor, 0.8)));
-  const approved = options.paperScoreApproval === true
-    && !isRejectedIdentity(candidate)
+  const exactRuleApproval = options.exactRuleApproval === true;
+  const scoreApproval = options.paperScoreApproval === true
     && finite(candidate?.score, 0) > floor;
+  const approved = (exactRuleApproval || scoreApproval)
+    && !isRejectedIdentity(candidate)
+    && candidate.exactRuleEligible === true
+    && candidate.hardMismatch !== true;
   const approvedAt = Number.isFinite(Date.parse(options.paperApprovedAt || ''))
     ? new Date(options.paperApprovedAt).toISOString() : null;
   return {
     ...candidate,
     paperEvalApproved: approved,
-    paperEvalStatus: approved ? 'OPERATOR_APPROVED_PAPER_ONLY'
-      : isRejectedIdentity(candidate) ? 'IDENTITY_REJECTED' : 'NOT_APPROVED',
-    paperEvalSource: approved ? 'operator_score_threshold' : null,
+    paperEvalStatus: approved ? exactRuleApproval
+      ? 'EXACT_RULE_KEY_APPROVED_PAPER_ONLY' : 'OPERATOR_APPROVED_PAPER_ONLY'
+      : candidate.hardMismatch === true ? 'HARD_RULE_MISMATCH_VETO'
+        : isRejectedIdentity(candidate) ? 'IDENTITY_REJECTED' : 'NOT_APPROVED',
+    paperEvalSource: approved ? exactRuleApproval
+      ? 'frozen_exact_rule_key_v1' : 'exact_rule_key_and_operator_score_threshold'
+      : null,
     paperEvalApprovedAt: approved ? approvedAt : null,
     paperEvalScoreAtApproval: approved ? finite(candidate.score, 0) : null,
-    paperEvalThreshold: floor,
+    paperEvalThreshold: approved && exactRuleApproval ? null : floor,
   };
 }
 
@@ -412,7 +454,8 @@ function selectPaperMonitoredCandidates(candidates, options = {}) {
   const structuredLimit = Math.max(0, Math.min(maxMonitored,
     Number(options.structuredMonitored ?? Math.ceil(maxMonitored / 2))));
   const required = candidates.filter((row) => row.relationApproved || row.paperEvalApproved)
-    .sort((left, right) => Number(right.relationApproved) - Number(left.relationApproved)
+    .sort((left, right) => Number(right.exactRuleEligible) - Number(left.exactRuleEligible)
+      || Number(right.relationApproved) - Number(left.relationApproved)
       || Number(right.paperEvalApproved) - Number(left.paperEvalApproved)
       || finite(right.score, 0) - finite(left.score, 0));
   const requiredIds = new Set(required.map((row) => row.matchId));
@@ -635,9 +678,22 @@ function buildCandidates(polyMarkets, kalshiMarkets, options = {}) {
         ? 'frozen_payoff_relation_review' : candidate.approvalSource,
     });
   }
-  return [...candidates.values()].sort((left, right) =>
+  return [...candidates.values()].map((candidate) => {
+    const audit = compareExactRuleKeys(
+      candidate.poly, candidate.kalshi, candidate.structuredEvidence,
+    );
+    return {
+      ...candidate,
+      exactRuleKey: audit.candidateKey,
+      exactRuleEligible: audit.exactRuleEligible,
+      hardMismatch: audit.hardMismatch,
+      hardMismatchReasons: audit.hardMismatchReasons,
+      exactRuleAudit: audit,
+    };
+  }).sort((left, right) =>
     Number(right.relationApproved) - Number(left.relationApproved)
     || Number(right.identityApproved) - Number(left.identityApproved)
+    || Number(right.exactRuleEligible) - Number(left.exactRuleEligible)
     || Number(!isRejectedIdentity(right)) - Number(!isRejectedIdentity(left))
     // Within the same confidence decile, collect the pair with greater
     // observable capacity rather than wasting scarce sockets on empty books.
@@ -729,6 +785,22 @@ async function discoverCrossVenue(options = {}) {
     rejectedControlLimit: Number(options.rejectedControlLimit || 0),
     structuredMonitored: Number(options.structuredMonitored ?? Math.ceil(maxMonitored / 2)),
   });
+  const feeSchedules = await fetchKalshiSeriesFeeSchedules(
+    selection.monitored.map((row) => row.kalshi.seriesTicker),
+    {
+      paceMs: Number(options.kalshiFeePaceMs ?? 250),
+      onError: options.onCryptoError,
+    },
+  );
+  for (const candidate of candidates) {
+    const schedule = feeSchedules.get(candidate.kalshi.seriesTicker)
+      || candidate.kalshi.feeSchedule
+      || normalizeKalshiFeeSchedule({}, {
+        seriesTicker: candidate.kalshi.seriesTicker,
+        source: 'not_monitored_not_fetched',
+      });
+    candidate.kalshi.feeSchedule = schedule;
+  }
   return {
     polyCount: poly.length, kalshiCount: kalshi.length,
     polyEventCount: polyScan.eventCount,
@@ -754,6 +826,7 @@ async function discoverCrossVenue(options = {}) {
 
 module.exports = {
   KALSHI, MATCH_FILE, buildCandidates, candidateId, discoverCrossVenue,
+  fetchKalshiSeriesFeeSchedules,
   fetchJson, fetchKalshiCryptoUniverse, fetchKalshiEventUniverse, fetchKalshiSeriesUniverse,
   fetchKalshiSportsUniverse, fetchKalshiUniverse,
   fetchPolyUniverseCompact, isRejectedIdentity,

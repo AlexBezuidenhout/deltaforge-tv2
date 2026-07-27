@@ -58,6 +58,7 @@
     "crossvenue:collect": "node borg/crossvenue/collector.js",
     "crossvenue:backtest": "node scripts/crossvenue-backtest.js",
     "research:crossvenue-risky": "node scripts/crossvenue-risky-convergence-pnl.js",
+    "research:crossvenue-exact": "node scripts/crossvenue-exact-rule-forward.js",
     "research:crossvenue-terminal": "node scripts/crossvenue-terminal-carry-report.js",
     "structural:collect": "node borg/structural/scanner.js",
     "options:collect": "node borg/options/collector.js",

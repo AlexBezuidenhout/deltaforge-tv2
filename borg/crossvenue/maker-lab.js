@@ -61,6 +61,7 @@ class MakerLab {
   step(matchId, match, direction, polyTop, kalshiTop, { synchronized, booksFresh, now }) {
     const key = this.key(matchId, direction.name);
     let state = this.states.get(key);
+    if (match?.kalshi?.feeSchedule && match.kalshi.feeSchedule.supported !== true) return;
     if (!synchronized || !booksFresh) {
       if (state) {
         state.staleObservations += 1;
@@ -83,6 +84,7 @@ class MakerLab {
         },
         requotes: 0, observations: 0, staleObservations: 0,
         feeRate: finite(match.poly.feeRate, 0), feeExponent: finite(match.poly.feeExponent, 1),
+        kalshiFeeSchedule: match?.kalshi?.feeSchedule ?? 1,
       };
       this.states.set(key, state);
     }
@@ -127,7 +129,10 @@ class MakerLab {
     // Upper bound: both fills charged as takers, one share per leg.
     const polyFee = polymarketTakerFee(
       [{ size: 1, price: state.legs.poly.price }], state.feeRate, state.feeExponent);
-    const kalshiFee = kalshiTakerFee([{ size: 1, price: state.legs.kalshi.price }], 1);
+    const kalshiFee = kalshiTakerFee(
+      [{ size: 1, price: state.legs.kalshi.price }],
+      state.kalshiFeeSchedule,
+    );
     return { polyFee, kalshiFee, total: polyFee + kalshiFee };
   }
 
@@ -159,7 +164,11 @@ class MakerLab {
       const leg = state.legs[filled];
       const exitFee = filled === 'poly'
         ? polymarketTakerFee([{ size: 1, price: exitBid }], state.feeRate, state.feeExponent)
-        : kalshiTakerFee([{ size: 1, price: exitBid }], 1);
+        : kalshiTakerFee(
+          [{ size: 1, price: exitBid }],
+          state.kalshiFeeSchedule,
+          'sell',
+        );
       row.orphanLeg = filled;
       row.orphanUnwindPnl = +(exitBid - leg.price - exitFee).toFixed(6);
     }

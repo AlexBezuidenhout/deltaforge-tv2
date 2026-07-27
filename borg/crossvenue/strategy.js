@@ -1,5 +1,10 @@
 'use strict';
 
+const {
+  feeForFills: kalshiFeeForFills,
+  roundUpCenticent,
+} = require('./kalshi-fees');
+
 /**
  * Pure helpers for the Polymarket/Kalshi cross-venue laboratory.
  *
@@ -365,14 +370,8 @@ function walk(levels, quantity) {
   return { quantity, cost, vwap: cost / quantity, fills };
 }
 
-function roundUpCenticent(value) {
-  return Math.ceil((finite(value, 0) - 1e-12) * 10_000) / 10_000;
-}
-
-function kalshiTakerFee(fills, multiplier = 1) {
-  const raw = (fills || []).reduce((sum, fill) =>
-    sum + 0.07 * Math.max(0, finite(multiplier, 1)) * fill.size * fill.price * (1 - fill.price), 0);
-  return roundUpCenticent(raw);
+function kalshiTakerFee(fills, scheduleOrMultiplier = 1, cashflow = 'buy') {
+  return kalshiFeeForFills(fills, scheduleOrMultiplier, 'taker', cashflow);
 }
 
 function polymarketTakerFee(fills, rate = 0, exponent = 1) {
@@ -386,6 +385,15 @@ function immediateUnwind(book, quantity, feeForFills) {
   const fill = walk(book?.bids, quantity);
   if (!fill) return { fullDepth: false, grossProceeds: null, fee: null, netProceeds: null };
   const fee = feeForFills(fill.fills);
+  if (!Number.isFinite(fee)) {
+    return {
+      fullDepth: false,
+      grossProceeds: fill.cost,
+      fee: null,
+      netProceeds: null,
+      reason: 'FEE_SCHEDULE_UNKNOWN',
+    };
+  }
   return {
     fullDepth: true,
     grossProceeds: fill.cost,
@@ -397,6 +405,7 @@ function immediateUnwind(book, quantity, feeForFills) {
 function evaluateCombination({
   polyOutcome, kalshiOutcome, quantity, polyBook, kalshiBook,
   polyFeeRate = 0, polyFeeExponent = 1, kalshiFeeMultiplier = 1,
+  kalshiFeeSchedule = undefined,
   polyTick = 0.01, kalshiTick = 0.01, identityApproved = false,
   paperEvalApproved = false,
   relationApproved = false, relationType = 'UNREVIEWED',
@@ -408,7 +417,10 @@ function evaluateCombination({
   const kalshiFill = walk(kalshiBook?.asks, quantity);
   if (!polyFill || !kalshiFill) return null;
   const polyFee = polymarketTakerFee(polyFill.fills, polyFeeRate, polyFeeExponent);
-  const kalshiFee = kalshiTakerFee(kalshiFill.fills, kalshiFeeMultiplier);
+  const kalshiFeeInput = kalshiFeeSchedule === undefined
+    ? kalshiFeeMultiplier : kalshiFeeSchedule;
+  const kalshiFee = kalshiTakerFee(kalshiFill.fills, kalshiFeeInput);
+  if (!Number.isFinite(kalshiFee)) return null;
   const polyCashRequired = polyFill.cost + polyFee;
   const kalshiCashRequired = kalshiFill.cost + kalshiFee;
   const totalCost = polyCashRequired + kalshiCashRequired;
@@ -434,7 +446,7 @@ function evaluateCombination({
   const polyUnwind = immediateUnwind(polyBook, quantity,
     (fills) => polymarketTakerFee(fills, polyFeeRate, polyFeeExponent));
   const kalshiUnwind = immediateUnwind(kalshiBook, quantity,
-    (fills) => kalshiTakerFee(fills, kalshiFeeMultiplier));
+    (fills) => kalshiTakerFee(fills, kalshiFeeInput, 'sell'));
   const polyOnlyImmediateUnwindPnl = polyUnwind.fullDepth
     ? polyUnwind.netProceeds - polyCashRequired : null;
   const kalshiOnlyImmediateUnwindPnl = kalshiUnwind.fullDepth
@@ -622,6 +634,7 @@ function optimizePair(options) {
 function evaluateBasisCombination({
   polyOutcome, kalshiOutcome, quantity, polyBook, kalshiBook,
   polyFeeRate = 0, polyFeeExponent = 1, kalshiFeeMultiplier = 1,
+  kalshiFeeSchedule = undefined,
   polyTick = 0.01, kalshiTick = 0.01,
   identityApproved = false, relationApproved = false,
   paperEvalApproved = false,
@@ -635,10 +648,15 @@ function evaluateBasisCombination({
   if (!polyEntry || !kalshiEntry) return null;
 
   const polyEntryFee = polymarketTakerFee(polyEntry.fills, polyFeeRate, polyFeeExponent);
-  const kalshiEntryFee = kalshiTakerFee(kalshiEntry.fills, kalshiFeeMultiplier);
-  const fullExitDepth = Boolean(polyExit && kalshiExit);
+  const kalshiFeeInput = kalshiFeeSchedule === undefined
+    ? kalshiFeeMultiplier : kalshiFeeSchedule;
+  const kalshiEntryFee = kalshiTakerFee(kalshiEntry.fills, kalshiFeeInput);
+  if (!Number.isFinite(kalshiEntryFee)) return null;
   const polyExitFee = polyExit ? polymarketTakerFee(polyExit.fills, polyFeeRate, polyFeeExponent) : null;
-  const kalshiExitFee = kalshiExit ? kalshiTakerFee(kalshiExit.fills, kalshiFeeMultiplier) : null;
+  const kalshiExitFee = kalshiExit
+    ? kalshiTakerFee(kalshiExit.fills, kalshiFeeInput, 'sell') : null;
+  const kalshiExitDepthUsable = Boolean(kalshiExit && Number.isFinite(kalshiExitFee));
+  const fullExitDepth = Boolean(polyExit && kalshiExitDepthUsable);
   const entryTotalCost = polyEntry.cost + kalshiEntry.cost + polyEntryFee + kalshiEntryFee;
   const grossLiquidationProceeds = fullExitDepth ? polyExit.cost + kalshiExit.cost : null;
   const netLiquidationProceeds = fullExitDepth
