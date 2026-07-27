@@ -1,0 +1,61 @@
+{
+  "experiment_id": "crossvenue-exact-rule-convergence-v6",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-07-27T13:05:00.000Z",
+  "frozen_at": "2026-07-27T13:05:00.000Z",
+  "evidence_started_at": "2026-07-27T13:05:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "rule_aware_crossvenue",
+  "supersedes": "crossvenue-rule-aware-convergence-v5",
+  "strategy_version": "crossvenue-exact-rule-convergence-v6",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "hypothesis": "Contracts with complete and equal rule keys may exhibit executable cross-venue price convergence after all four taker fees.",
+  "eligibility": {
+    "rule_key_version": "crossvenue-exact-rule-key-v1",
+    "required_dimensions": [
+      "subject",
+      "predicate",
+      "comparator",
+      "strike",
+      "resolver",
+      "observationAt",
+      "timezone",
+      "fallback",
+      "settlementPrecision"
+    ],
+    "hard_mismatch": "automatic veto regardless of text score",
+    "books": "synchronized A/B-grade executable L2 with no stale leg",
+    "quantity_shares": 5
+  },
+  "exit_rule": {
+    "target_net_roi": 0.01,
+    "maximum_hold_seconds": 3600,
+    "timeout": "first executable two-venue bid VWAP at or immediately after one hour",
+    "terminal_fallback": "only for independently hash-certified identical settlement rules"
+  },
+  "independent_unit": "first eligible entry per match_id, direction and UTC day",
+  "promotion": {
+    "minimum_fresh_pair_direction_days": 300,
+    "minimum_calendar_days": 30,
+    "positive_2x_cost_pnl_in_both_chronological_halves": true,
+    "market_and_day_clustered_lower_bound_above_zero": true,
+    "multiple_testing_correction": true
+  },
+  "provisional": [
+    "The 1% target was inspected in the prior contaminated discovery grid and must be treated as provisional.",
+    "No v5 or earlier observation may be pooled with this trial."
+  ],
+  "strategy_bindings": [{
+    "strategy": "crossvenue_exact_rule_convergence_v6",
+    "family": "rule_aware_crossvenue",
+    "arm": "five_share_one_percent_one_hour",
+    "phase": "eval",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "net_convergence_pnl_2x_cost_one_tick"
+  }]
+}

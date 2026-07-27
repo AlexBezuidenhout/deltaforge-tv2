@@ -1,0 +1,55 @@
+{
+  "experiment_id": "options-daily-threshold-surface-residual-v3",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-07-27T13:05:00Z",
+  "frozen_at": "2026-07-27T13:05:00Z",
+  "evidence_started_at": "2026-07-27T13:05:00Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "options_implied_binary_residual",
+  "supersedes": "options-implied-binary-v2-resolver-exact-expiry",
+  "strategy_version": "options-daily-threshold-surface-residual-v3",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "selection_disclosure": "V2 collected option surfaces but found zero eligible Polymarket targets. V3 begins a fresh cohort and admits every resolver-certified BTC/ETH daily threshold strictly inside a listed Deribit expiry bracket.",
+  "target_rules": {
+    "contracts": "BTC and ETH daily threshold markets with an explicit Binance BTC/USDT or ETH/USDT Close rule whose named one-minute or one-hour candle interval is preserved exactly",
+    "fidelity_a": "target timestamp exactly equals a listed Deribit expiry",
+    "fidelity_b": "target timestamp is strictly bounded by listed lower and upper expiries and total variance is interpolated",
+    "rejected": [
+      "expiry extrapolation",
+      "DVOL substitution",
+      "missing bid/ask IV interval",
+      "uncertified resolver wording",
+      "unknown fee schedule or minimum order size"
+    ]
+  },
+  "model": {
+    "strike_interpolation": "log strike",
+    "term_interpolation": "total implied variance",
+    "uncertainty": "Deribit bid/ask IV plus resolver-basis interval",
+    "benchmark": "executable Polymarket ask after 2x fees, depth and perpetual hedge stress",
+    "diagnostic": "persist option fair minus contemporaneous Polymarket midpoint as the surface residual"
+  },
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bound_above_zero": true,
+    "require_positive_at_latency_ms": [100, 250, 500],
+    "multiple_testing": "Holm correction across asset, side, fidelity and expiry band",
+    "null_outcome": "A well-calibrated option surface may add no tradable residual beyond the prediction-market quote."
+  },
+  "strategy_bindings": [{
+    "strategy": "options_daily_threshold_surface_residual_v3",
+    "family": "options_implied_binary_residual",
+    "arm": "exact_or_bounded_term_surface",
+    "phase": "eval",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "realized_pnl_after_2x_fees_depth_and_hedge_cost"
+  }]
+}

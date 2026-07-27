@@ -1,0 +1,51 @@
+{
+  "experiment_id": "structural-certified-payoff-graph-v5-orphan-reserve",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-07-27T13:05:00.000Z",
+  "frozen_at": "2026-07-27T13:05:00.000Z",
+  "evidence_started_at": "2026-07-27T13:05:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "certified_payoff_graph",
+  "supersedes": "structural-certified-payoff-graph-v4-capacity",
+  "strategy_version": "structural-certified-payoff-graph-v5-orphan-reserve",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "mechanism": "Deterministically enumerate valid terminal states for complements, ordered strikes, disjoint ranges and complete event sets, then buy only bundles whose minimum payoff exceeds executable cost.",
+  "required_gates": [
+    "content-addressed payoff proof",
+    "content-addressed exact rule certification",
+    "fresh event-driven books",
+    "current fee schedule",
+    "two-times fee stress",
+    "full equal-share FOK depth",
+    "minimum displayed profit capacity",
+    "immediate executable unwind for every possible incomplete proper subset of filled legs",
+    "positive profit after reserving the worst proper-subset unwind loss"
+  ],
+  "execution": {
+    "atomic": false,
+    "orphan_reserve": "max(0, -minimum immediate unwind PnL across every non-empty proper subset of filled legs)",
+    "qualification": "displayed 2x-cost profit minus orphan reserve remains above the frozen capacity floor"
+  },
+  "promotion": {
+    "minimum_fresh_independent_markets": 300,
+    "positive_both_chronological_halves": true,
+    "paper_only_until_authenticated_fill_pilot": true
+  },
+  "provisional": [
+    "A qualified paper bundle is still non-atomic.",
+    "Displayed unwind liquidity is not a guarantee of an acknowledged fill."
+  ],
+  "strategy_bindings": [{
+    "strategy": "structural_certified_payoff_graph_v5",
+    "family": "certified_payoff_graph",
+    "arm": "orphan_reserved_taker_and_passive",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "worst_state_profit_after_2x_costs_and_orphan_reserve"
+  }]
+}

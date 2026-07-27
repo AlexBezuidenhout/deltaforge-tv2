@@ -806,6 +806,9 @@ CREATE TABLE IF NOT EXISTS borg_structural_evaluations (
   pass_capacity BOOLEAN NOT NULL,
   pass_orphan_risk BOOLEAN NOT NULL,
   orphan_loss_stress_usd NUMERIC,
+  orphan_unwind_available BOOLEAN NOT NULL DEFAULT false,
+  orphan_reserve_usd NUMERIC,
+  orphan_safe_profit_2x_usd NUMERIC,
   economic_candidate BOOLEAN NOT NULL,
   qualified BOOLEAN NOT NULL,
   detail JSONB NOT NULL
@@ -826,6 +829,48 @@ ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS pass_proof BOOL
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS payoff_proof_hash TEXT;
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS pass_rule_certification BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS rule_certification_hash TEXT;
+ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS orphan_unwind_available BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS orphan_reserve_usd NUMERIC;
+ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS orphan_safe_profit_2x_usd NUMERIC;
+
+CREATE TABLE IF NOT EXISTS borg_structural_passive_quotes (
+  quote_id TEXT PRIMARY KEY,
+  candidate_id TEXT NOT NULL,
+  structure_type TEXT NOT NULL,
+  passive_leg_index INT NOT NULL,
+  passive_token TEXT NOT NULL,
+  passive_outcome TEXT,
+  quoted_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  filled_at TIMESTAMPTZ,
+  closed_at TIMESTAMPTZ,
+  status TEXT NOT NULL,
+  latency_ms INT NOT NULL,
+  quote_price NUMERIC NOT NULL,
+  shares NUMERIC NOT NULL,
+  queue_ahead_shares NUMERIC,
+  proposed_cash_required NUMERIC,
+  proposed_stressed_profit NUMERIC,
+  proposed_orphan_reserve_usd NUMERIC,
+  proposed_orphan_safe_profit_usd NUMERIC,
+  hedge_cost_2x_usd NUMERIC,
+  total_cost_2x_usd NUMERIC,
+  locked_pnl_2x_usd NUMERIC,
+  orphan_unwind_pnl_2x_usd NUMERIC,
+  observations BIGINT NOT NULL DEFAULT 0,
+  payoff_proof_hash TEXT NOT NULL,
+  rule_certification_hash TEXT NOT NULL,
+  paper_only BOOLEAN NOT NULL DEFAULT true,
+  post_only BOOLEAN NOT NULL DEFAULT true,
+  data_quality_grade TEXT NOT NULL,
+  execution_fidelity_grade TEXT NOT NULL,
+  detail JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS borg_structural_passive_quotes_candidate_time
+  ON borg_structural_passive_quotes (candidate_id,quoted_at DESC);
+CREATE INDEX IF NOT EXISTS borg_structural_passive_quotes_status_time
+  ON borg_structural_passive_quotes (status,quoted_at DESC);
 `;
 
 async function migrateStructural() {
@@ -898,11 +943,16 @@ CREATE TABLE IF NOT EXISTS borg_option_shadow_marks (
   asset TEXT NOT NULL,
   strike NUMERIC NOT NULL,
   target_expiry_at TIMESTAMPTZ NOT NULL,
+  target_surface_mode TEXT,
+  lower_anchor_expiry_at TIMESTAMPTZ,
+  upper_anchor_expiry_at TIMESTAMPTZ,
   trigger_source TEXT NOT NULL,
   side TEXT NOT NULL,
   poly_ask NUMERIC,
   poly_ask_size NUMERIC,
   model_fair NUMERIC,
+  market_mid NUMERIC,
+  surface_residual NUMERIC,
   fair_lower NUMERIC,
   fair_upper NUMERIC,
   fee_rate NUMERIC,
@@ -921,6 +971,11 @@ CREATE TABLE IF NOT EXISTS borg_option_shadow_marks (
 );
 ALTER TABLE borg_option_shadow_marks ADD COLUMN IF NOT EXISTS experiment_id TEXT
   NOT NULL DEFAULT 'options-implied-binary-v1';
+ALTER TABLE borg_option_shadow_marks ADD COLUMN IF NOT EXISTS target_surface_mode TEXT;
+ALTER TABLE borg_option_shadow_marks ADD COLUMN IF NOT EXISTS lower_anchor_expiry_at TIMESTAMPTZ;
+ALTER TABLE borg_option_shadow_marks ADD COLUMN IF NOT EXISTS upper_anchor_expiry_at TIMESTAMPTZ;
+ALTER TABLE borg_option_shadow_marks ADD COLUMN IF NOT EXISTS market_mid NUMERIC;
+ALTER TABLE borg_option_shadow_marks ADD COLUMN IF NOT EXISTS surface_residual NUMERIC;
 CREATE INDEX IF NOT EXISTS borg_option_shadow_marks_market_time
   ON borg_option_shadow_marks (market_id, observed_at DESC);
 CREATE INDEX IF NOT EXISTS borg_option_shadow_marks_experiment_time
@@ -1583,8 +1638,20 @@ ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_source TEXT;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_approved_at TIMESTAMPTZ;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_score_at_approval NUMERIC;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_threshold NUMERIC;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS exact_rule_key TEXT;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS exact_rule_eligible BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS hard_mismatch BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS hard_mismatch_reasons JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS exact_rule_audit JSONB;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS kalshi_fee_type TEXT;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS kalshi_fee_multiplier NUMERIC;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS kalshi_fee_source TEXT;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS kalshi_fee_observed_at TIMESTAMPTZ;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS kalshi_fee_schedule JSONB;
 CREATE INDEX IF NOT EXISTS cv_contract_matches_rank
   ON cv_contract_matches (identity_approved DESC, match_score DESC, refreshed_at DESC);
+CREATE INDEX IF NOT EXISTS cv_contract_matches_exact_rule
+  ON cv_contract_matches (exact_rule_eligible DESC, exact_rule_key, refreshed_at DESC);
 CREATE INDEX IF NOT EXISTS cv_contract_matches_relation_rank
   ON cv_contract_matches (relation_approved DESC, identity_approved DESC, match_score DESC, refreshed_at DESC);
 CREATE INDEX IF NOT EXISTS cv_contract_matches_poly
@@ -1759,6 +1826,9 @@ CREATE TABLE IF NOT EXISTS cv_opportunities (
   relation_approved BOOLEAN NOT NULL DEFAULT false,
   guaranteed_min_payout_per_share NUMERIC,
   payoff_proof_hash TEXT,
+  exact_rule_key TEXT,
+  exact_rule_eligible BOOLEAN NOT NULL DEFAULT false,
+  hard_mismatch BOOLEAN NOT NULL DEFAULT true,
   books_fresh BOOLEAN NOT NULL,
   full_depth BOOLEAN NOT NULL,
   atomic BOOLEAN NOT NULL DEFAULT false,
@@ -1787,6 +1857,12 @@ ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS relation_type TEXT NOT NUL
 ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS relation_approved BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS guaranteed_min_payout_per_share NUMERIC;
 ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS payoff_proof_hash TEXT;
+ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS exact_rule_key TEXT;
+ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS exact_rule_eligible BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cv_opportunities ADD COLUMN IF NOT EXISTS hard_mismatch BOOLEAN NOT NULL DEFAULT true;
+CREATE INDEX IF NOT EXISTS cv_opportunities_exact_time
+  ON cv_opportunities (experiment_id,observed_at DESC)
+  WHERE exact_rule_eligible AND NOT hard_mismatch;
 
 -- Prospective relation-event ledger. This is the independent-sample table:
 -- many synchronized quote observations update one row per approved relation,
@@ -1909,6 +1985,60 @@ ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS relation_type TEXT NOT NUL
 ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS relation_approved BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS guaranteed_min_payout_per_share NUMERIC;
 ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS payoff_proof_hash TEXT;
+ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS exact_rule_key TEXT;
+ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS exact_rule_eligible BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cv_basis_samples ADD COLUMN IF NOT EXISTS hard_mismatch BOOLEAN NOT NULL DEFAULT true;
+CREATE INDEX IF NOT EXISTS cv_basis_samples_exact_entry_time
+  ON cv_basis_samples (observed_at DESC)
+  WHERE exact_rule_eligible AND NOT hard_mismatch;
+
+-- Frozen-size capacity tape.  Unlike cv_basis_samples, a replay row survives
+-- missing depth or an unknown fee schedule, so absence cannot masquerade as
+-- an unobserved rather than failed $5/$10/$25 capacity check.
+CREATE TABLE IF NOT EXISTS cv_depth_replays (
+  replay_id TEXT PRIMARY KEY,
+  observed_at TIMESTAMPTZ NOT NULL,
+  match_id TEXT NOT NULL,
+  direction TEXT NOT NULL,
+  quantity NUMERIC NOT NULL,
+  exact_rule_key TEXT,
+  exact_rule_eligible BOOLEAN NOT NULL DEFAULT false,
+  hard_mismatch BOOLEAN NOT NULL DEFAULT true,
+  fee_schedule_known BOOLEAN NOT NULL DEFAULT false,
+  kalshi_fee_type TEXT,
+  kalshi_fee_multiplier NUMERIC,
+  kalshi_fee_observed_at TIMESTAMPTZ,
+  poly_entry_vwap NUMERIC,
+  kalshi_entry_vwap NUMERIC,
+  poly_exit_vwap NUMERIC,
+  kalshi_exit_vwap NUMERIC,
+  poly_entry_fee NUMERIC,
+  kalshi_entry_fee NUMERIC,
+  poly_exit_fee NUMERIC,
+  kalshi_exit_fee NUMERIC,
+  entry_total_cost NUMERIC,
+  net_liquidation_proceeds NUMERIC,
+  terminal_locked_profit NUMERIC,
+  immediate_round_trip_pnl NUMERIC,
+  full_entry_depth BOOLEAN NOT NULL DEFAULT false,
+  full_exit_depth BOOLEAN NOT NULL DEFAULT false,
+  paper_entry_eligible BOOLEAN NOT NULL DEFAULT false,
+  reason TEXT NOT NULL,
+  data_quality_grade TEXT NOT NULL,
+  execution_fidelity_grade TEXT NOT NULL,
+  book_signature TEXT NOT NULL,
+  experiment_id TEXT NOT NULL,
+  synchronized BOOLEAN NOT NULL DEFAULT false,
+  fee_schedule JSONB,
+  detail JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS cv_depth_replays_pair_time
+  ON cv_depth_replays (match_id,direction,quantity,observed_at DESC);
+CREATE INDEX IF NOT EXISTS cv_depth_replays_experiment_time
+  ON cv_depth_replays (experiment_id,observed_at DESC);
+CREATE INDEX IF NOT EXISTS cv_depth_replays_exact_capacity
+  ON cv_depth_replays (quantity,observed_at DESC)
+  WHERE exact_rule_eligible AND full_entry_depth;
 
 CREATE TABLE IF NOT EXISTS cv_runtime (
   run_id TEXT PRIMARY KEY,
