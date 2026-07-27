@@ -20,6 +20,7 @@ const makeV6Strategies = require('./research-v6');
 const makeV7Strategies = require('./research-v7');
 const makeV8Strategies = require('./research-v8');
 const makeV9Strategies = require('./research-v9');
+const makeV10Strategies = require('./research-v10');
 const makeH52Strategies = require('./research-h52');
 const makeH53Strategies = require('./research-h53');
 const makeMainV2Strategies = require('./main-v2');
@@ -1515,6 +1516,7 @@ function makeBaseStrategies() {
   ...makeV7Strategies(),
   ...makeV8Strategies(),
   ...makeV9Strategies(),
+  ...makeV10Strategies(),
   ];
 }
 

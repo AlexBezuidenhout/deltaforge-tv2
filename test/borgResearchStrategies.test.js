@@ -130,6 +130,7 @@ test('research portfolio registers the H1-H75 strategies', () => {
     'H73_market_prior_calibration_residual',
     'H74_markov_regime_residual',
     'H75_4h_dynamic_liquidity_leadlag',
+    'H58_source_causal_residual_v2',
   ]);
 });
 

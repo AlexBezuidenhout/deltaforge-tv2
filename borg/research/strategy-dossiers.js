@@ -8,6 +8,7 @@ const RUNTIME_STALE_AFTER_SEC = 130;
 // recommendations. They make the operator's current, pre-registered work queue
 // explicit without changing any strategy rule.
 const PRIORITY_RESEARCH = Object.freeze({
+  H58_source_causal_residual_v2: { rank: 1, tier: 'PRIORITY' },
   FWD_H24_hourly_flow_breakout_v1: { rank: 3, tier: 'PRIORITY' },
   FWD_H40_directional_entropy_breakout_v1: { rank: 4, tier: 'PRIORITY' },
   H43_resolution_boundary_buffer: { rank: 5, tier: 'PRIORITY' },
@@ -91,6 +92,7 @@ const PREMISES = Object.freeze({
   H56_hawkes_excitation_continuation: 'Follow clustered, self-exciting trade arrivals only when fresh resolver evidence confirms continuation.',
   H57_adaptive_venue_leader_residual: 'Learn the causal venue leader online and trade only when its Wilson-bounded lead relationship predicts a residual in the token.',
   H58_resolver_event_stale_quote: 'Trade only when a fresh resolver event occurs after the displayed Polymarket quote and the quote remains stale after doubled costs.',
+  H58_source_causal_residual_v2: 'Trade only when venue source timestamps prove that an executable CLOB quote predates a new Chainlink resolver tick, using the ask as prior and adding only the conservative event residual.',
   H59_resolver_cross_persistence: 'Require a resolver boundary crossing to persist across three distinct ticks and receive secondary-venue confirmation before trading the stale token.',
   H60_bipower_jump_envelope: 'Price the binary across both total and jump-robust bipower volatility, accepting only edge that survives the full uncertainty envelope.',
   H61_vol_regime_envelope: 'Price across short- and long-horizon volatility regimes and trade only the conservative overlap.',
@@ -128,6 +130,7 @@ const FORWARD_SOURCE = Object.freeze({
 
 const PRIOR_OUTCOMES = Object.freeze({
   H58_resolver_event_stale_quote: 'The causal audit invalidated the premise: all inspected books were newer than the Chainlink source event even though they arrived locally just before the delayed RTDS packet.',
+  H58_source_causal_residual_v2: 'The parent H58 evidence is excluded because it used local packet order. This successor starts at zero and is expected to remain quiet unless source-time causality is genuinely observable.',
   H59_resolver_cross_persistence: 'The complete result was weak and unstable, the second chronological half was negative, and most apparent profit depended on BTC. A new mechanism is required rather than a threshold edit.',
   H43_resolution_boundary_buffer: 'The historical point estimate was fragile: removing the best day erased the profit, and the clean epoch has not yet supplied enough new fills.',
   FWD_H24_hourly_flow_breakout_v1: 'The original broad H24 cohort was negative. A later capital-normalized diagnostic subset looked positive, so this unchanged successor tests replication without reusing those rows.',
@@ -251,6 +254,8 @@ function dossierFor(strategy, context = {}) {
   const priorOutcome = PRIOR_OUTCOMES[strategy] || null;
   const design = sourceStrategy
     ? 'Prospective identity-only clone: source thresholds, assets, sizing and execution model are unchanged; discovery rows are excluded.'
+    : strategy === 'H58_source_causal_residual_v2'
+      ? 'New source-time successor: the executable ask is the prior, only a conservative resolver-event residual can create edge, and all eight asset/timeframe reporting arms were frozen before evidence.'
     : /^H7[4-5]_/.test(strategy)
       ? 'New H74–H75 minute-horizon mechanism frozen after a development-tape falsification; all development rows are excluded and thresholds cannot be tuned from the forward cohort.'
       : /^H6[4-9]_/.test(strategy) || /^H7[0-3]_/.test(strategy)

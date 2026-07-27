@@ -1,0 +1,87 @@
+{
+  "experiment_id": "research-h58-source-causal-residual-v2",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-07-27T01:30:00.000Z",
+  "evidence_started_at": "2026-07-27T01:30:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "resolver_source_causal_residual",
+  "strategy_version": "research-h58-source-causal-residual-v2",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "max_stake_usd": 10,
+  "max_touch_participation": 0.2,
+  "provisional": true,
+  "parent_strategy": "H58_resolver_event_stale_quote",
+  "parent_evidence_reused": false,
+  "research_design": {
+    "mechanism_repair": "The selected CLOB book source timestamp plus 1000 ms clock uncertainty must be no later than the new Chainlink source timestamp, while the previous distinct Chainlink source tick must be no later than the book. Local packet arrival order is never treated as causal evidence.",
+    "probability_prior": "The selected executable ask is the prior. Only the least-favourable incremental digital-probability change between the previous and current resolver ticks is added; an absolute GBM probability cannot manufacture the edge.",
+    "economic_hurdle": "The incremental lower-bound residual must clear the documented crypto taker curve at 2x cost plus one token tick at the executable ask.",
+    "execution": "Event-order arrival is scored at 250 ms with quote survival, displayed depth, partial/non-fills and at most 20% touch participation.",
+    "null_outcome": "Zero intents is the correct conclusion when the current RTDS packet arrives after CLOB source timestamps have already incorporated the resolver event.",
+    "selection_control": "BTC, ETH, SOL and XRP across five- and fifteen-minute windows are all pre-registered. No profitable asset/timeframe cell may be selected from this cohort without a new matched forward experiment."
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "H58_source_causal_residual_v2",
+      "family": "resolver_source_causal_residual",
+      "arm": "source_ordered_market_prior_residual",
+      "phase": "eval",
+      "market_types": [
+        "direction_5m",
+        "direction_15m"
+      ],
+      "assets": [
+        "btc",
+        "eth",
+        "sol",
+        "xrp"
+      ],
+      "asset_timeframe_reporting_arms": [
+        "btc_direction_5m",
+        "btc_direction_15m",
+        "eth_direction_5m",
+        "eth_direction_15m",
+        "sol_direction_5m",
+        "sol_direction_15m",
+        "xrp_direction_5m",
+        "xrp_direction_15m"
+      ],
+      "fixed_rules": {
+        "source_clock_uncertainty_ms": 1000,
+        "maximum_local_quote_age_ms": 3000,
+        "decision_tte_seconds": [
+          15,
+          180
+        ],
+        "fee_multiplier": 2,
+        "edge_buffer_per_share": 0.01,
+        "market_prior": "selected executable ask",
+        "model_contribution": "least-favourable resolver-event probability residual only"
+      },
+      "min_independent_markets": 2400,
+      "minimum_independent_markets_per_asset_timeframe_arm": 300,
+      "min_days": 14,
+      "primary_metric": "incremental_net_pnl_2x_clustered_by_market_asset_timeframe_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets_per_asset_timeframe_arm": 300,
+    "minimum_calendar_days": 14,
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_asset_timeframe_and_day_clustered_lower_bounds_above_zero": true,
+    "require_latency_profiles_ms": [
+      100,
+      250,
+      500
+    ],
+    "multiple_testing": "Holm-family correction includes the rejected H58 parent, this successor, all BORG arms and every inspected asset/timeframe reporting cell.",
+    "shared_bankroll": "One shared $500 research bankroll; reporting-arm PnL cannot be naively summed.",
+    "promotion": "No live path. A mechanical pass would trigger a separate 50-fill authenticated $1-$2 canary review.",
+    "no_posthoc_asset_selection": true
+  }
+}
