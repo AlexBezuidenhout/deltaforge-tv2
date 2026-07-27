@@ -6,7 +6,7 @@ Type=oneshot
 User=deltaforge
 Group=deltaforge
 Environment=DELTAFORGE_VPS_HOT_RETENTION_DAYS=2
-Environment=DELTAFORGE_VPS_RAW_RETENTION_HOURS=6
+Environment=DELTAFORGE_VPS_RAW_RETENTION_HOURS=1
 Environment=DELTAFORGE_VPS_PARQUET_RETENTION_MINUTES=60
 ExecStart=/opt/deltaforge/tv2/current/ops/vps/local-hot-tier-retention.sh
 UMask=0077
