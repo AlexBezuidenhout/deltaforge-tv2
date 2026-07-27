@@ -3626,6 +3626,44 @@
     const label = String(lifecycle || 'PAUSED').toUpperCase();
     return '<span class="borg-lifecycle ' + label.toLowerCase() + '">' + escapeHtml(label) + '</span>';
   };
+  const _bDiagnosticObject = (value) => {
+    const raw = value?.diagnostics ?? value ?? {};
+    if (raw && typeof raw === 'object') return raw;
+    if (typeof raw !== 'string') return {};
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  };
+  const _bReasonLabel = (reason) =>
+    String(reason || 'unspecified rejection').replaceAll('_', ' ');
+  const _bGateInfo = (value) => {
+    const diagnostics = _bDiagnosticObject(value);
+    const gate = diagnostics.gateDiagnostics &&
+      typeof diagnostics.gateDiagnostics === 'object'
+      ? diagnostics.gateDiagnostics : {};
+    const runtimeEvaluation = diagnostics.runtimeEvaluation &&
+      typeof diagnostics.runtimeEvaluation === 'object'
+      ? diagnostics.runtimeEvaluation : {};
+    const entries = Object.entries(gate.rejectionCounts || {})
+      .map(([reason, count]) => [reason, Number(count || 0)])
+      .filter(([, count]) => count > 0)
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+    const rejected = Number(gate.rejectedEvaluations ||
+      entries.reduce((sum, [, count]) => sum + count, 0));
+    const top = entries[0] || null;
+    return {
+      entries,
+      rejected,
+      top,
+      evaluations: Number(runtimeEvaluation.evaluations ?? gate.evaluations ?? value?.evaluations ?? 0),
+      actionEvaluations: Number(runtimeEvaluation.actionEvaluations ?? gate.actionEvaluations ?? 0),
+      noActionEvaluations: Number(runtimeEvaluation.noActionEvaluations ??
+        Math.max(0, Number(value?.evaluations || 0) - Number(value?.actions || 0))),
+    };
+  };
 
   function borgSetLifecycleFilter(filter) {
     _borgLifecycleFilter = String(filter || 'ALL').toUpperCase();
@@ -3754,6 +3792,14 @@
       const runtimeNote = lifecycle === 'TESTING' || lifecycle === 'STALE'
         ? 'heartbeat ' + _bAge(row.runtimeAgeSec)
         : String(row.trial_status || lifecycle).replaceAll('_', ' ');
+      const gateInfo = _bGateInfo(row);
+      const gateNote = gateInfo.top
+        ? '<div class="borg-cell-sub" title="' + escapeHtml(gateInfo.rejected +
+          ' attributed no-action evaluations in this collector run') + '">top block · ' +
+          escapeHtml(_bReasonLabel(gateInfo.top[0])) + ' · ' + gateInfo.top[1] + '</div>'
+        : gateInfo.noActionEvaluations > 0
+          ? '<div class="borg-cell-sub">no action · ' + gateInfo.noActionEvaluations + ' evals</div>'
+          : '';
       const premise = String(row.premise || '');
       const shortPremise = premise.length > 128 ? premise.slice(0, 125) + '…' : premise;
       return '<tr class="borg-strategy-row is-' + lifecycle.toLowerCase() + '" tabindex="0" role="button" ' +
@@ -3762,7 +3808,7 @@
           '<div class="borg-strategy-name">' + escapeHtml(row.strategy) + priority + '</div>' +
           '<div class="borg-strategy-premise">' + escapeHtml(shortPremise) + '</div></td>' +
         '<td>' + _bLifecycleBadge(lifecycle) +
-          '<div class="borg-runtime-note">' + escapeHtml(runtimeNote) + '</div></td>' +
+          '<div class="borg-runtime-note">' + escapeHtml(runtimeNote) + '</div>' + gateNote + '</td>' +
         '<td class="borg-evidence-meter"><div class="borg-evidence-value">' + currentMarkets + ' / ' + target + '</div>' +
           '<div class="borg-meter-track"><div class="borg-meter-fill" style="width:' + progress.toFixed(2) + '%;"></div></div>' +
           '<div class="borg-cell-sub">' + currentFills + ' eligible fills · ' + escapeHtml(row.current_trial_phase || row.phase || '—') + '</div></td>' +
@@ -3853,6 +3899,14 @@
     const firstHalf = Number(halves.first_half_2x || 0);
     const secondHalf = Number(halves.second_half_2x || 0);
     const runtimeMarkets = Array.isArray(runtime.market_types) ? runtime.market_types.join(', ') : '—';
+    const gateInfo = _bGateInfo(runtime);
+    const gateRows = gateInfo.entries.length ? gateInfo.entries.slice(0, 8).map(([reason, count]) =>
+      '<tr><td>' + escapeHtml(_bReasonLabel(reason)) + '</td><td>' + count + '</td><td>' +
+      (gateInfo.rejected ? (100 * count / gateInfo.rejected).toFixed(1) + '%' : '—') +
+      '</td></tr>').join('') : emptyRows(3,
+        gateInfo.noActionEvaluations
+          ? gateInfo.noActionEvaluations + ' no-action evaluations recorded; this rule has generic runtime attribution only.'
+          : 'No no-action predicate has been recorded in this collector run.');
 
     body.innerHTML =
       '<div class="borg-dossier-verdict">' + _bLifecycleBadge(lifecycle) +
@@ -3897,13 +3951,19 @@
           (data.runtime
             ? Number(runtime.evaluations || 0) + ' evaluations · ' + Number(runtime.actions || 0) + ' intents · ' +
               Number(runtime.errors || 0) + ' errors<br>cadence ' + escapeHtml(runtime.cadence || '—') +
-              ' · markets ' + escapeHtml(runtimeMarkets) + '<br>heartbeat ' + escapeHtml(_bAgeFromDate(runtime.updated_at))
+              ' · markets ' + escapeHtml(runtimeMarkets) + '<br>' +
+              gateInfo.actionEvaluations + ' action evaluations · ' + gateInfo.noActionEvaluations +
+              ' no-action evaluations<br>heartbeat ' + escapeHtml(_bAgeFromDate(runtime.updated_at))
             : 'Not registered in the active collector run.') + '</div></div>' +
         '<div class="borg-dossier-card"><div class="borg-dossier-label">Frozen trial contract</div><div class="borg-dossier-copy">' +
           escapeHtml(String(trial.status || summaryRow?.trial_status || 'unregistered').replaceAll('_', ' ')) +
           '<br>' + targetMarkets + ' markets · ' + targetDays + ' days<br>evidence since ' +
           escapeHtml(_bDateTime(trial.evidence_started_at || summaryRow?.current_evidence_started_at)) + '</div></div>' +
       '</div>' +
+      '<details open><summary>Why no order? · current collector run</summary><div style="overflow:auto;">' +
+        '<div class="borg-dossier-copy muted" style="padding:10px 10px 0;">Telemetry only; counters reset on collector restart and do not alter the strategy rule.</div>' +
+        '<table class="borg-dossier-table"><thead><tr><th>Failed predicate</th><th>Count</th><th>Share</th></tr></thead><tbody>' +
+        gateRows + '</tbody></table></div></details>' +
       '<details><summary>Experiment history</summary><div style="overflow:auto;"><table class="borg-dossier-table"><thead><tr><th>Experiment</th><th>Status</th><th>Phase</th><th>Frozen</th></tr></thead><tbody>' +
         historyRows + '</tbody></table></div></details>' +
       '<details><summary>Recent current-cohort orders</summary><div style="overflow:auto;"><table class="borg-dossier-table"><thead><tr><th>Time</th><th>Asset</th><th>Intent</th><th>Price</th><th>Fill</th><th>2× P&L</th></tr></thead><tbody>' +
