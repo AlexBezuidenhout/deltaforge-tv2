@@ -27,8 +27,9 @@ same read-only benchmark measured Polymarket CLOB HTTP near 20 ms.
    immutable gzip NDJSON. Sealed WAL/archive files are also compacted to
    immutable Parquet.
 5. A daily custom-format PostgreSQL snapshot is list-verified before publish.
-6. The Mac launch agent copies WAL, archives, Parquet and database snapshots to
-   iCloud with append-only `rsync --ignore-existing` and no delete propagation.
+6. The VPS uploads closed WAL, archive and database-snapshot objects directly
+   into the operator's Google Drive folder `VPS Data`. Every object is remotely
+   checksum-verified before a SHA-256 manifest or retention receipt is issued.
 7. VPS sealed files may be removed after two days only when a successful
    off-host receipt is less than three hours old. Missing/stale receipts fail
    closed.

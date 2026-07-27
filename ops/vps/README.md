@@ -46,7 +46,8 @@ copy into an iCloud File Provider directory did not prove that Apple had
 completed an off-host upload.
 
 The canonical archive path is now direct from the VPS to the operator's Google
-Drive through `deltaforge-google-drive-archive.{service,timer}`. Its rclone
+Drive top-level folder `VPS Data` through
+`deltaforge-google-drive-archive.{service,timer}`. Its rclone
 remote is required to use the least-privilege `drive.file` OAuth scope, so it
 cannot read unrelated Drive contents. Closed immutable files are copied with
 `--immutable`, verified against Google Drive's MD5 metadata with `rclone check`,
@@ -62,8 +63,10 @@ automatically after login or a network interruption. The passwordless GUIs
 must never be exposed directly on a public interface. VPS systemd units bind
 TV2 to loopback and UFW permits inbound SSH only.
 
-The legacy Mac relay is retained only as a disaster-recovery fallback under
-`~/.deltaforge-vps`; it must remain disabled during normal operation.
+The legacy Mac relay code is retained under `~/.deltaforge-vps` only for
+forensic recovery. Its launch agent is disabled and removed from the active
+`~/Library/LaunchAgents` directory; it is not part of archive liveness or
+retention authority.
 
 Install the root-owned, mode-`0600` environment as
 `/etc/deltaforge/google-drive-archive.env`. The refreshable rclone token lives
@@ -87,9 +90,9 @@ ARCHIVE_S3_SECRET_ACCESS_KEY=replace_me
 
 The timer is inert while that file is absent. It supports any S3-compatible
 store, multipart-uploads large dumps, verifies remote size and SHA-256
-metadata, and publishes the same raw/snapshot receipts as the iCloud pull only
-after a complete traversal. The two transports may coexist; neither may issue
-a receipt from an unverified or partial copy.
+metadata, and publishes the same raw/snapshot receipts as the Google Drive
+transport only after a complete traversal. The two transports may coexist;
+neither may issue a receipt from an unverified or partial copy.
 
 `gla-paper.service` runs the G-late-arbitrage mirror with a minimal environment
 containing only `DATABASE_URL` and an explicit `LIVE_TRADING_ENABLED=0`. It

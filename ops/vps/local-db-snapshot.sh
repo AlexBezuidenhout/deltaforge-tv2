@@ -1,7 +1,7 @@
 #!/bin/bash
-# Immutable local-Postgres snapshot. The 15-minute Mac archive pull stages,
-# checksum-verifies and copies these off-host; no running service waits for this
-# job.
+# Immutable local-Postgres snapshot. The direct off-host archive transport
+# checksum-verifies and copies completed snapshots; no running service waits
+# for this job.
 set -euo pipefail
 
 : "${DATABASE_URL:?DATABASE_URL is required}"
