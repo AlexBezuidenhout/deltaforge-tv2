@@ -18,6 +18,7 @@
 'use strict';
 
 const ShadowEngine = require('./engine');
+const GateDiagnostics = require('./gate-diagnostics');
 const makeV3Strategies = require('./research-v3');
 const makeV4Strategies = require('./research-v4');
 const { TARGET_STAKE_USD } = require('../research/capital-policy');
@@ -448,15 +449,22 @@ class HawkesExcitationContinuation {
     this.marketTypes = ['direction_5m'];
     this.cadence = 'sampled';
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
 
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
+  }
+
   evaluate(ctx, engine) {
+    this._gates.begin();
     const marketId = ctx.market?.id;
-    if (marketId == null || this._fired.has(marketId)
-        || typeof ctx.prints !== 'function'
-        || !inBand(ctx.tteSec, 30, 180)) return [];
+    if (marketId == null) return this._gates.reject('missing_market_id', ctx.now);
+    if (this._fired.has(marketId)) return this._gates.reject('already_fired_market', ctx.now);
+    if (typeof ctx.prints !== 'function') return this._gates.reject('print_tape_unavailable', ctx.now);
+    if (!inBand(ctx.tteSec, 30, 180)) return this._gates.reject('outside_tte_window', ctx.now);
     const rows = [
       { sign: 1, tokenId: ctx.upTokenId },
       { sign: -1, tokenId: ctx.downTokenId },
@@ -472,9 +480,14 @@ class HawkesExcitationContinuation {
       && row.burst.recentMedian >= row.burst.olderMedian + 0.01)
       .sort((left, right) => right.burst.z - left.burst.z);
     const best = rows[0];
-    if (!best) return [];
+    if (!best) return this._gates.reject('no_hawkes_print_burst', ctx.now);
     const resolverReturn = finite(ctx.rtdsChainlink10?.returnBps);
-    if (!Number.isFinite(resolverReturn) || best.sign * resolverReturn < 1) return [];
+    if (!Number.isFinite(resolverReturn)) {
+      return this._gates.reject('missing_resolver_return', ctx.now);
+    }
+    if (best.sign * resolverReturn < 1) {
+      return this._gates.reject('resolver_does_not_confirm_burst', ctx.now);
+    }
     const action = takerAction(ctx, engine, this.name, best.sign, fairEnvelope(ctx),
       `hawkes_z=${best.burst.z.toFixed(2)} recent=${best.burst.recent} ` +
       `expected=${best.burst.expected.toFixed(2)} resolver10=${resolverReturn.toFixed(2)}bp`, {
@@ -484,9 +497,9 @@ class HawkesExcitationContinuation {
         baseline_prints_27s: best.burst.baseline,
         recent_print_volume: best.burst.recentVolume,
       });
-    if (!action) return [];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
     boundedRemember(this._fired, marketId);
-    return [action];
+    return this._gates.accept([action], ctx.now);
   }
 }
 
@@ -532,6 +545,7 @@ class AdaptiveVenueLeaderResidual {
     this._pending = new Map();
     this._stats = new Map();
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
@@ -549,13 +563,17 @@ class AdaptiveVenueLeaderResidual {
   }
 
   evaluate(ctx, engine) {
+    this._gates.begin();
     const asset = ctx.market?.asset;
     const marketId = ctx.market?.id;
-    if (!DIRECTION_ASSETS.has(asset) || marketId == null) return [];
+    if (!DIRECTION_ASSETS.has(asset)) return this._gates.reject('unsupported_asset', ctx.now);
+    if (marketId == null) return this._gates.reject('missing_market_id', ctx.now);
     const prices = sourcePrices(ctx);
     const previous = this._last.get(asset);
     this._last.set(asset, { at: ctx.now, prices });
-    if (!previous || ctx.now - previous.at > 2500) return [];
+    if (!previous || ctx.now - previous.at > 2500) {
+      return this._gates.reject('cross_venue_state_warmup_or_gap', ctx.now);
+    }
     const triggerSource = normalizeSource(ctx.triggerEvent?.source);
     let pending = this._pending.get(asset);
     let confirmed = null;
@@ -598,9 +616,14 @@ class AdaptiveVenueLeaderResidual {
         });
       }
     }
-    if (!confirmed || this._fired.has(marketId) || !inBand(ctx.tteSec, 30, 240)) return [];
+    if (!confirmed) return this._gates.reject('no_confirmed_leader_episode', ctx.now);
+    if (this._fired.has(marketId)) return this._gates.reject('already_fired_market', ctx.now);
+    if (!inBand(ctx.tteSec, 30, 240)) return this._gates.reject('outside_tte_window', ctx.now);
     const lower = wilsonLower(confirmed.stats.successes, confirmed.stats.trials);
-    if (confirmed.stats.trials < 30 || lower <= 0.50) return [];
+    if (confirmed.stats.trials < 30) {
+      return this._gates.reject('leader_sample_below_30', ctx.now);
+    }
+    if (lower <= 0.50) return this._gates.reject('leader_wilson_lower_not_above_chance', ctx.now);
     const action = takerAction(ctx, engine, this.name, confirmed.pending.sign,
       fairEnvelope(ctx),
       `leader=${confirmed.pending.source} trials=${confirmed.stats.trials} ` +
@@ -612,9 +635,9 @@ class AdaptiveVenueLeaderResidual {
         leader_wilson_lower_95: lower,
         confirmation_sources: confirmed.confirmations.map((row) => row.source),
       });
-    if (!action) return [];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
     boundedRemember(this._fired, marketId);
-    return [action];
+    return this._gates.accept([action], ctx.now);
   }
 
   diagnostics() {
@@ -625,6 +648,7 @@ class AdaptiveVenueLeaderResidual {
         key,
         { ...value, wilsonLower95: wilsonLower(value.successes, value.trials) },
       ])),
+      gateDiagnostics: this._gates.snapshot(),
     };
   }
 }
@@ -1071,25 +1095,36 @@ class RangeSimplexResidual {
     this.cadence = 'sampled';
     this._events = new Map();
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
 
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
+  }
+
   evaluate(ctx, engine) {
+    this._gates.begin();
     const remembered = rememberEvent(this._events, ctx)
       .filter((row) => Number.isFinite(row.modelFair));
     const proof = certifiedDisjointRanges(remembered);
-    if (!proof.valid || this._fired.has(ctx.market?.id) || !inBand(ctx.tteSec, 60, 3600)) return [];
+    if (!proof.valid) return this._gates.reject(`range_proof_${String(proof.reason || 'invalid').toLowerCase()}`, ctx.now);
+    if (this._fired.has(ctx.market?.id)) return this._gates.reject('already_fired_market', ctx.now);
+    if (!inBand(ctx.tteSec, 60, 3600)) return this._gates.reject('outside_tte_window', ctx.now);
     const probabilitySum = proof.rows.reduce((sum, row) => sum + row.probability, 0);
-    if (probabilitySum <= 1.03) return [];
+    if (probabilitySum <= 1.03) return this._gates.reject('no_simplex_overpricing', ctx.now);
     const projected = projectSimplex(proof.rows.map((row) => row.probability));
     const index = proof.rows.findIndex((row) => row.marketId === ctx.market?.id);
-    if (index < 0) return [];
+    if (index < 0) return this._gates.reject('current_market_not_in_certified_family', ctx.now);
     const current = proof.rows[index];
     const residual = projected[index] - current.probability;
     const sign = Math.sign(residual);
-    if (sign !== -1 || Math.abs(residual) < 0.03
-        || sign * (current.modelFair - current.probability) <= 0) return [];
+    if (sign !== -1) return this._gates.reject('residual_not_overpriced_direction', ctx.now);
+    if (Math.abs(residual) < 0.03) return this._gates.reject('simplex_residual_below_three_ticks', ctx.now);
+    if (sign * (current.modelFair - current.probability) <= 0) {
+      return this._gates.reject('analytic_model_disagrees_with_residual', ctx.now);
+    }
     const envelope = {
       lower: Math.min(projected[index], current.modelFair),
       upper: Math.max(projected[index], current.modelFair),
@@ -1110,9 +1145,9 @@ class RangeSimplexResidual {
         analytic_model_probability: current.modelFair,
         true_arbitrage: false,
       });
-    if (!action) return [];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
     boundedRemember(this._fired, current.marketId);
-    return [action];
+    return this._gates.accept([action], ctx.now);
   }
 }
 

@@ -15,6 +15,7 @@
 
 const makeV4Strategies = require('./research-v4');
 const makeV7Strategies = require('./research-v7');
+const GateDiagnostics = require('./gate-diagnostics');
 const { TARGET_STAKE_USD } = require('../research/capital-policy');
 const H73_CALIBRATION = require('../research/models/h73-market-prior-calibration-2026-07-26.json');
 
@@ -285,9 +286,14 @@ class MultiVenueCusumBreak {
     this.cadence = 'sampled';
     this._states = new Map();
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
+
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
+  }
 
   _observe(ctx) {
     const asset = ctx.market?.asset;
@@ -345,11 +351,15 @@ class MultiVenueCusumBreak {
   }
 
   evaluate(ctx, engine) {
+    this._gates.begin();
     const signal = this._observe(ctx);
     const marketId = ctx.market?.id;
-    if (!signal || marketId == null || this._fired.has(marketId)
-        || ctx.now - signal.at > 1200 || !inBand(ctx.tteSec, 20, 240)
-        || signal.sourceCount < 2) return [];
+    if (!signal) return this._gates.reject('no_page_cusum_alarm', ctx.now);
+    if (marketId == null) return this._gates.reject('missing_market_id', ctx.now);
+    if (this._fired.has(marketId)) return this._gates.reject('already_fired_market', ctx.now);
+    if (ctx.now - signal.at > 1200) return this._gates.reject('cusum_alarm_expired', ctx.now);
+    if (!inBand(ctx.tteSec, 20, 240)) return this._gates.reject('outside_tte_window', ctx.now);
+    if (signal.sourceCount < 2) return this._gates.reject('insufficient_fresh_venues', ctx.now);
     const action = takerAction(ctx, engine, this.name, signal.sign,
       fairEnvelope(ctx),
       `page_cusum=${signal.cusum.toFixed(2)} z=${signal.z.toFixed(2)} ` +
@@ -362,9 +372,9 @@ class MultiVenueCusumBreak {
         source_count: signal.sourceCount,
         consensus_spot: signal.consensus,
       });
-    if (!action) return [];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
     boundedRemember(this._fired, marketId);
-    return [action];
+    return this._gates.accept([action], ctx.now);
   }
 }
 
@@ -528,9 +538,14 @@ class RangeThresholdPartitionLock {
     this.cadence = 'sampled';
     this._groups = new Map();
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
+
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
+  }
 
   _remember(ctx) {
     const row = marketSnapshot(ctx);
@@ -546,8 +561,9 @@ class RangeThresholdPartitionLock {
   }
 
   evaluate(ctx, engine) {
+    this._gates.begin();
     const rows = this._remember(ctx);
-    if (rows.length < 3) return [];
+    if (rows.length < 3) return this._gates.reject('fewer_than_three_synchronized_contracts', ctx.now);
     const ranges = rows.filter((row) => row.marketType === 'range_daily'
       && row.lower != null && row.upper != null && row.lower < row.upper);
     const thresholds = rows.filter((row) => row.marketType === 'threshold_daily'
@@ -595,9 +611,12 @@ class RangeThresholdPartitionLock {
         }
       }
     }
-    if (!best || best.residual < EDGE_BUFFER) return [];
+    if (!best) return this._gates.reject('no_exact_range_threshold_partition', ctx.now);
+    if (best.residual < EDGE_BUFFER) {
+      return this._gates.reject('partition_does_not_clear_2x_costs', ctx.now);
+    }
     const key = `${best.identity}:${best.range.marketId}:${best.low.marketId}:${best.high.marketId}`;
-    if (this._fired.has(key)) return [];
+    if (this._fired.has(key)) return this._gates.reject('already_fired_partition', ctx.now);
     const actions = structuralBundleActions(engine, this.name, best.legs,
       best.payout, best.residual,
       `partition=${best.identity} lower=${best.range.lower} upper=${best.range.upper}`, {
@@ -609,8 +628,9 @@ class RangeThresholdPartitionLock {
         human_rule_text_review_required: true,
         true_arbitrage_claim: false,
       });
-    if (actions.length) boundedRemember(this._fired, key);
-    return actions;
+    if (!actions.length) return this._gates.reject('insufficient_bundle_capacity', ctx.now);
+    boundedRemember(this._fired, key);
+    return this._gates.accept(actions, ctx.now);
   }
 }
 
@@ -647,9 +667,14 @@ class QueueDepletionHazard {
     this.cadence = 'event';
     this._states = new Map();
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
+
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
+  }
 
   _observe(ctx) {
     if (String(ctx.triggerEvent?.source || '') !== 'clob') return null;
@@ -689,16 +714,27 @@ class QueueDepletionHazard {
   }
 
   evaluate(ctx, engine) {
+    this._gates.begin();
     const state = this._observe(ctx);
     const marketId = ctx.market?.id;
-    if (!state || marketId == null || this._fired.has(marketId)
-        || !inBand(ctx.tteSec, 20, 240)) return [];
+    if (!state) return this._gates.reject('queue_hazard_warmup_or_non_clob_event', ctx.now);
+    if (marketId == null) return this._gates.reject('missing_market_id', ctx.now);
+    if (this._fired.has(marketId)) return this._gates.reject('already_fired_market', ctx.now);
+    if (!inBand(ctx.tteSec, 20, 240)) {
+      return this._gates.reject('outside_tte_window', ctx.now);
+    }
     const sign = state.up.conditional >= state.down.conditional ? 1 : -1;
     const selected = sign > 0 ? state.up : state.down;
     const opposite = sign > 0 ? state.down : state.up;
-    if (selected.conditional < 0.75
-        || selected.conditional - opposite.conditional < 0.25
-        || selected.intensity < 0.5) return [];
+    if (selected.conditional < 0.75) {
+      return this._gates.reject('depletion_probability_below_threshold', ctx.now);
+    }
+    if (selected.conditional - opposite.conditional < 0.25) {
+      return this._gates.reject('depletion_probability_separation_below_threshold', ctx.now);
+    }
+    if (selected.intensity < 0.5) {
+      return this._gates.reject('queue_pressure_intensity_below_threshold', ctx.now);
+    }
     const action = takerAction(ctx, engine, this.name, sign, fairEnvelope(ctx),
       `queue_hazard=${selected.conditional.toFixed(3)} opposite=${opposite.conditional.toFixed(3)} ` +
       `intensity=${selected.intensity.toFixed(2)}/s events=${state.events}`, {
@@ -710,9 +746,9 @@ class QueueDepletionHazard {
         queue_events: state.events,
         cancellation_trade_ambiguity: true,
       });
-    if (!action) return [];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
     boundedRemember(this._fired, marketId);
-    return [action];
+    return this._gates.accept([action], ctx.now);
   }
 }
 
@@ -804,9 +840,14 @@ class MultiLevelOfiImpact {
     this.cadence = 'event';
     this._states = new Map();
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
+
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
+  }
 
   _observe(ctx) {
     if (String(ctx.triggerEvent?.source || '') !== 'clob') return null;
@@ -856,14 +897,21 @@ class MultiLevelOfiImpact {
   }
 
   evaluate(ctx, engine) {
+    this._gates.begin();
     const state = this._observe(ctx);
     const marketId = ctx.market?.id;
     const profile = state?.profile;
-    if (!state || !profile || marketId == null || this._fired.has(marketId)
-        || profile.n < 50 || !(profile.beta > 0)
-        || !(profile.betaT >= 2.576)
-        || Math.abs(state.forecastProbability - state.probability) < 0.01
-        || !inBand(ctx.tteSec, 20, 240)) return [];
+    if (!state) return this._gates.reject('no_causal_clob_ofi_observation', ctx.now);
+    if (!profile) return this._gates.reject('impact_regression_warmup', ctx.now);
+    if (marketId == null) return this._gates.reject('missing_market_id', ctx.now);
+    if (this._fired.has(marketId)) return this._gates.reject('already_fired_market', ctx.now);
+    if (profile.n < 50) return this._gates.reject('impact_sample_below_50', ctx.now);
+    if (!(profile.beta > 0)) return this._gates.reject('impact_beta_not_positive', ctx.now);
+    if (!(profile.betaT >= 2.576)) return this._gates.reject('impact_beta_not_99pct_significant', ctx.now);
+    if (Math.abs(state.forecastProbability - state.probability) < 0.01) {
+      return this._gates.reject('forecast_token_move_below_one_tick', ctx.now);
+    }
+    if (!inBand(ctx.tteSec, 20, 240)) return this._gates.reject('outside_tte_window', ctx.now);
     const sign = Math.sign(state.forecastLogit);
     const action = takerAction(ctx, engine, this.name, sign, fairEnvelope(ctx),
       `mlofi=${state.x.toFixed(4)} beta=${profile.beta.toFixed(4)} ` +
@@ -877,9 +925,9 @@ class MultiLevelOfiImpact {
         regression_observations: profile.n,
         next_event_probability_forecast: state.forecastProbability,
       });
-    if (!action) return [];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
     boundedRemember(this._fired, marketId);
-    return [action];
+    return this._gates.accept([action], ctx.now);
   }
 }
 
@@ -935,18 +983,29 @@ class QuarticityConfidenceEnvelope {
     this.cadence = 'sampled';
     this._prices = new Map();
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
 
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
+  }
+
   evaluate(ctx, engine) {
+    this._gates.begin();
     const asset = ctx.market?.asset;
     const marketId = ctx.market?.id;
     const spot = median(sourcePrices(ctx));
     const rows = rememberSecond(this._prices, asset, ctx.now, spot, 130000);
     const profile = quarticityProfile(rows);
-    if (!DIRECTION_ASSETS.has(asset) || marketId == null || this._fired.has(marketId)
-        || !profile || !inBand(ctx.tteSec, 20, 180)) return [];
+    if (!DIRECTION_ASSETS.has(asset)) return this._gates.reject('unsupported_asset', ctx.now);
+    if (marketId == null) return this._gates.reject('missing_market_id', ctx.now);
+    if (this._fired.has(marketId)) return this._gates.reject('already_fired_market', ctx.now);
+    if (!profile) return this._gates.reject('quarticity_history_warmup', ctx.now);
+    if (!inBand(ctx.tteSec, 20, 180)) {
+      return this._gates.reject('outside_tte_window', ctx.now);
+    }
     const envelope = fairEnvelope(ctx, {
       spots: sourcePrices(ctx),
       sigmas: [profile.sigmaLower5m, profile.sigmaUpper5m],
@@ -962,9 +1021,9 @@ class QuarticityConfidenceEnvelope {
         sigma_lower_99_5m: profile.sigmaLower5m,
         sigma_upper_99_5m: profile.sigmaUpper5m,
       });
-    if (!action) return [];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
     boundedRemember(this._fired, marketId);
-    return [action];
+    return this._gates.accept([action], ctx.now);
   }
 }
 
@@ -1060,19 +1119,27 @@ class StationaryBlockBootstrapDigital {
     this.cadence = 'sampled';
     this._prices = new Map();
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
 
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
+  }
+
   evaluate(ctx, engine) {
+    this._gates.begin();
     const asset = ctx.market?.asset;
     const marketId = ctx.market?.id;
     const spot = median(sourcePrices(ctx));
     const rows = rememberSecond(this._prices, asset, ctx.now, spot);
-    if (!DIRECTION_ASSETS.has(asset) || marketId == null || this._fired.has(marketId)
-        || !inBand(ctx.tteSec, 118, 122)) return [];
+    if (!DIRECTION_ASSETS.has(asset)) return this._gates.reject('unsupported_asset', ctx.now);
+    if (marketId == null) return this._gates.reject('missing_market_id', ctx.now);
+    if (this._fired.has(marketId)) return this._gates.reject('already_fired_market', ctx.now);
+    if (!inBand(ctx.tteSec, 118, 122)) return this._gates.reject('outside_fixed_t120_window', ctx.now);
     const returns = logReturns(rows);
-    if (returns.length < 300) return [];
+    if (returns.length < 300) return this._gates.reject('return_history_below_300', ctx.now);
     const refs = [finite(ctx.ref), finite(ctx.resolverRef)]
       .filter((value) => value > 0);
     const model = bootstrapTerminalProbabilities({
@@ -1083,7 +1150,7 @@ class StationaryBlockBootstrapDigital {
       paths: 512,
       seed: `${asset}:${marketId}:T120`,
     });
-    if (!model) return [];
+    if (!model) return this._gates.reject('bootstrap_model_unavailable', ctx.now);
     const envelope = {
       lower: clampProbability(model.lower),
       upper: clampProbability(model.upper),
@@ -1101,9 +1168,9 @@ class StationaryBlockBootstrapDigital {
         empirical_drift_removed: true,
         fixed_decision_tte_sec: 120,
       });
-    if (!action) return [];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
     boundedRemember(this._fired, marketId);
-    return [action];
+    return this._gates.accept([action], ctx.now);
   }
 }
 

@@ -13,6 +13,7 @@
  * inside the collector's 1s tick.
  */
 const ShadowEngine = require('./engine');
+const GateDiagnostics = require('./gate-diagnostics');
 const makeV3Strategies = require('./research-v3');
 const makeV4Strategies = require('./research-v4');
 const makeV5Strategies = require('./research-v5');
@@ -822,30 +823,44 @@ class StructuralPairArb {
     this.name = 'H1_pair_arb_2x';
     this.cfg = { tteMin: 20, tteMax: 270, minNetPerShare: 0.01, costMultiplier: 2 };
     this._fired = new Set();
+    this._gates = new GateDiagnostics(this.name);
   }
 
   onHalt() { return []; }
 
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
+  }
+
   evaluate(ctx, engine) {
+    this._gates.begin();
     const { market, tteSec, upBook, downBook } = ctx;
-    if (!market || this._fired.has(market.id) || !inBand(tteSec, this.cfg.tteMin, this.cfg.tteMax)) return [];
+    if (!market) return this._gates.reject('missing_market', ctx.now);
+    if (this._fired.has(market.id)) return this._gates.reject('already_fired_market', ctx.now);
+    if (!inBand(tteSec, this.cfg.tteMin, this.cfg.tteMax)) {
+      return this._gates.reject('outside_tte_window', ctx.now);
+    }
     const [upAsk, upSize] = upBook?.asks?.[0] || [];
     const [downAsk, downSize] = downBook?.asks?.[0] || [];
-    if (!(upAsk > 0 && downAsk > 0 && upSize > 0 && downSize > 0)) return [];
+    if (!(upAsk > 0 && downAsk > 0 && upSize > 0 && downSize > 0)) {
+      return this._gates.reject('missing_two_sided_executable_depth', ctx.now);
+    }
     const allIn = upAsk + downAsk
       + feePerShare(upAsk, this.cfg.costMultiplier)
       + feePerShare(downAsk, this.cfg.costMultiplier);
     const locked = 1 - allIn;
-    if (locked < this.cfg.minNetPerShare) return [];
+    if (locked < this.cfg.minNetPerShare) {
+      return this._gates.reject('pair_does_not_clear_2x_cost_identity', ctx.now);
+    }
     const shares = Math.min(upSize, downSize, RESEARCH_STAKE_USD / (upAsk + downAsk));
-    if (!(shares > 0)) return [];
+    if (!(shares > 0)) return this._gates.reject('insufficient_pair_capacity', ctx.now);
     boundedRemember(this._fired, market.id);
     const groupId = `${this.name}:${market.id}:${Math.floor(ctx.now / 1000)}`;
     const note = `all_in_2x=${allIn.toFixed(4)} locked=${locked.toFixed(4)} pair_shares=${shares.toFixed(3)}`;
-    return [
+    return this._gates.accept([
       { ...researchTaker({ engine, strategy: this.name, token: 'UP', ask: upAsk, askSize: shares, note, groupId }), size: shares },
       { ...researchTaker({ engine, strategy: this.name, token: 'DOWN', ask: downAsk, askSize: shares, note, groupId }), size: shares },
-    ];
+    ], ctx.now);
   }
 }
 

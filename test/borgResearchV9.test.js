@@ -69,6 +69,16 @@ test('V9 registers two frozen paper-only strategies with no live-order dependenc
   const source = fs.readFileSync(require.resolve('../borg/shadow/research-v9'), 'utf8');
   assert.doesNotMatch(source,
     /createAndPostOrder|process\.env\.(?:PRIVATE_KEY|POLYMARKET_PRIVATE_KEY)|@polymarket\/clob-client|require\(['"]ethers['"]\)/i);
+
+  for (const strategy of strategies) {
+    assert.deepEqual(strategy.evaluate(context(), {
+      _coid: () => 'unused',
+    }), []);
+    const gate = strategy.diagnostics().gateDiagnostics;
+    assert.equal(gate.evaluations, 1);
+    assert.equal(gate.rejectedEvaluations, 1);
+    assert.ok(gate.topRejection?.reason);
+  }
 });
 
 test('V9 governance excludes development rows and keeps every asset arm', () => {

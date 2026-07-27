@@ -63,7 +63,15 @@ test('proves every eligible shadow strategy is being evaluated even when it stay
   assert.equal(runtime.actions, 0);
   assert.equal(runtime.errors, 0);
   assert.equal(runtime.lastEvaluatedAt.getTime(), now);
-  assert.deepEqual(runtime.diagnostics, { outcomes: { NO_ACTION: 1 } });
+  assert.deepEqual(runtime.diagnostics, {
+    outcomes: { NO_ACTION: 1 },
+    runtimeEvaluation: {
+      evaluations: 1,
+      actionEvaluations: 0,
+      noActionEvaluations: 1,
+      haltedEvaluations: 0,
+    },
+  });
 });
 
 test('a missing complementary book halts evaluation instead of creating one-sided evidence', () => {

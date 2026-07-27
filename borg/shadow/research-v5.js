@@ -11,6 +11,7 @@
 'use strict';
 
 const { TARGET_STAKE_USD } = require('../research/capital-policy');
+const GateDiagnostics = require('./gate-diagnostics');
 const makeV3Strategies = require('./research-v3');
 const makeV4Strategies = require('./research-v4');
 
@@ -391,29 +392,42 @@ class AutocorrelationRegime extends OncePerMarket {
 class DirectionalEntropyBreakout extends OncePerMarket {
   constructor() {
     super(); this.name = 'H40_directional_entropy_breakout'; this.marketTypes = ['direction_5m']; this._prices = new Map();
+    this._gates = new GateDiagnostics(this.name);
+  }
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
   }
   evaluate(ctx, engine) {
+    this._gates.begin();
     const asset = ctx.market?.asset;
-    if (!(ctx.btc > 0) || !DIRECTION_ASSETS.has(asset)) return [];
+    if (!(ctx.btc > 0) || !DIRECTION_ASSETS.has(asset)) {
+      return this._gates.reject('missing_supported_spot', ctx.now);
+    }
     const history = remember(this._prices, asset, { at: ctx.now, price: ctx.btc }, ctx.now, 50000, 20);
-    if (!this.available(ctx) || history.length < 25 || !inBand(ctx.tteSec, 75, 210)) return [];
+    if (!this.available(ctx)) return this._gates.reject('market_unavailable_or_already_fired', ctx.now);
+    if (history.length < 25) return this._gates.reject('price_history_warmup', ctx.now);
+    if (!inBand(ctx.tteSec, 75, 210)) return this._gates.reject('outside_tte_window', ctx.now);
     const signs = []; let cumulative = 0;
     for (let index = 1; index < history.length; index += 1) {
       const ret = 10000 * Math.log(history[index].price / history[index - 1].price);
       if (Math.abs(ret) < 0.05) continue;
       signs.push(Math.sign(ret)); cumulative += ret;
     }
-    if (signs.length < 20) return [];
+    if (signs.length < 20) return this._gates.reject('insufficient_nonflat_returns', ctx.now);
     const positiveShare = signs.filter((sign) => sign > 0).length / signs.length;
     const p = Math.max(1e-6, Math.min(1 - 1e-6, positiveShare));
     const entropy = -(p * Math.log2(p) + (1 - p) * Math.log2(1 - p));
     const sign = positiveShare >= 0.5 ? 1 : -1;
-    if (entropy > 0.72 || Math.max(positiveShare, 1 - positiveShare) < 0.70 || sign * cumulative < 4) return [];
+    if (entropy > 0.72) return this._gates.reject('sign_entropy_too_high', ctx.now);
+    if (Math.max(positiveShare, 1 - positiveShare) < 0.70) {
+      return this._gates.reject('direction_share_not_dominant', ctx.now);
+    }
+    if (sign * cumulative < 4) return this._gates.reject('cumulative_move_too_small', ctx.now);
     const fair = directionFair(ctx); const action = forcedDirectionAction(ctx, engine, this.name, sign, fair,
       `sign_entropy=${entropy.toFixed(3)} dominant=${Math.max(p, 1 - p).toFixed(2)} cumulative=${cumulative.toFixed(2)}bp`,
       { mechanismFamily: 'path_entropy' });
-    if (!action) return [];
-    this.fired(ctx); return [action];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
+    this.fired(ctx); return this._gates.accept([action], ctx.now);
   }
 }
 
@@ -566,25 +580,44 @@ class ThresholdDistanceVelocity extends OncePerMarket {
 class RangeBoundaryMigration extends OncePerMarket {
   constructor() {
     super(); this.name = 'H46_range_boundary_migration'; this.marketTypes = ['range_daily']; this._prices = new Map();
+    this._gates = new GateDiagnostics(this.name);
+  }
+  diagnostics() {
+    return { gateDiagnostics: this._gates.snapshot() };
   }
   evaluate(ctx, engine) {
+    this._gates.begin();
     const id = ctx.market?.id;
-    if (id == null || !(ctx.btc > 0) || (ctx.lowerBound == null && ctx.upperBound == null)) return [];
+    if (id == null) return this._gates.reject('missing_market_id', ctx.now);
+    if (!(ctx.btc > 0)) return this._gates.reject('missing_spot', ctx.now);
+    if (ctx.lowerBound == null && ctx.upperBound == null) {
+      return this._gates.reject('missing_range_boundaries', ctx.now);
+    }
     const history = remember(this._prices, id, { at: ctx.now, price: ctx.btc }, ctx.now, 60000);
     const old = atLeastOld(history, ctx.now, 20000);
-    if (!old || !this.available(ctx) || !inBand(ctx.tteSec, 300, 1800)) return [];
+    if (!old) return this._gates.reject('boundary_history_warmup', ctx.now);
+    if (!this.available(ctx)) return this._gates.reject('market_unavailable_or_already_fired', ctx.now);
+    if (!inBand(ctx.tteSec, 300, 1800)) return this._gates.reject('outside_tte_window', ctx.now);
     const inside = (price) => (ctx.lowerBound == null || price >= ctx.lowerBound) &&
       (ctx.upperBound == null || price < ctx.upperBound);
     const wasInside = inside(old.price); const isInside = inside(ctx.btc);
-    if (wasInside === isInside || !Number.isFinite(ctx.micro10?.returnBps)) return [];
+    if (wasInside === isInside) return this._gates.reject('no_range_boundary_crossing', ctx.now);
+    if (!Number.isFinite(ctx.micro10?.returnBps)) {
+      return this._gates.reject('missing_post_crossing_return', ctx.now);
+    }
     const crossedUp = ctx.btc > old.price; const continuationSign = Math.sign(ctx.micro10.returnBps);
-    if (continuationSign !== (crossedUp ? 1 : -1) || Math.abs(ctx.micro10.returnBps) < 1.5) return [];
+    if (continuationSign !== (crossedUp ? 1 : -1)) {
+      return this._gates.reject('crossing_not_confirmed', ctx.now);
+    }
+    if (Math.abs(ctx.micro10.returnBps) < 1.5) {
+      return this._gates.reject('post_crossing_move_too_small', ctx.now);
+    }
     const fair = rangeFair(ctx);
     const action = forcedDirectionAction(ctx, engine, this.name, isInside ? 1 : -1, fair,
       `range=[${ctx.lowerBound ?? '-inf'},${ctx.upperBound ?? 'inf'}) old=${old.price} now=${ctx.btc} entered=${isInside}`,
       { mechanismFamily: 'range_boundary_migration' });
-    if (!action) return [];
-    this.fired(ctx); return [action];
+    if (!action) return this._gates.reject('executable_edge_or_capacity_failed', ctx.now);
+    this.fired(ctx); return this._gates.accept([action], ctx.now);
   }
 }
 

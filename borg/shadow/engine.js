@@ -89,6 +89,8 @@ class ShadowEngine {
       lastEvaluatedAt: null,
       evaluations: 0,
       haltedEvaluations: 0,
+      actionEvaluations: 0,
+      noActionEvaluations: 0,
       actions: 0,
       errors: 0,
       lastActionAt: null,
@@ -149,6 +151,8 @@ class ShadowEngine {
         continue;
       }
       const actionList = actions || [];
+      if (actionList.length) runtime.actionEvaluations += 1;
+      else runtime.noActionEvaluations += 1;
       runtime.actions += actionList.length;
       if (actionList.length) runtime.lastActionAt = new Date(ctx.now);
       for (const a of actionList) this._record(strat.name, ctx, a, features);
@@ -156,10 +160,22 @@ class ShadowEngine {
   }
 
   runtimeStatus() {
-    return [...this._runtime.values()].map((row) => ({
-      ...row,
-      diagnostics: this._strategyByName.get(row.strategy)?.diagnostics?.() ?? null,
-    }));
+    return [...this._runtime.values()].map((row) => {
+      const strategyDiagnostics =
+        this._strategyByName.get(row.strategy)?.diagnostics?.() ?? {};
+      return {
+        ...row,
+        diagnostics: {
+          ...strategyDiagnostics,
+          runtimeEvaluation: {
+            evaluations: row.evaluations,
+            actionEvaluations: row.actionEvaluations,
+            noActionEvaluations: row.noActionEvaluations,
+            haltedEvaluations: row.haltedEvaluations,
+          },
+        },
+      };
+    });
   }
 
   _features(ctx, cadence = 'sampled') {

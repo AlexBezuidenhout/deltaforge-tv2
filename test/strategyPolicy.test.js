@@ -1,7 +1,9 @@
 'use strict';
 
+const fs = require('node:fs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const makeStrategies = require('../borg/shadow/strategies');
 const {
   activeStrategyAllowlist,
   filterStrategiesByAllowlist,
@@ -70,4 +72,21 @@ test('runtime policy reads only the latest trial disposition for each strategy',
   assert.deepEqual(result.parked, [
     { strategy: 'failed', status: 'NEGATIVE_CONTROL' },
   ]);
+});
+
+test('VPS allowlist activates the causal H58 successor and omits retired resolver arms', () => {
+  const service = fs.readFileSync(
+    require.resolve('../ops/vps/borg-collector.service'),
+    'utf8',
+  );
+  const line = service.split('\n')
+    .find((value) => value.startsWith('Environment=BORG_ACTIVE_STRATEGIES='));
+  assert.ok(line);
+  const allowlist = activeStrategyAllowlist({
+    BORG_ACTIVE_STRATEGIES: line.split('=').slice(2).join('='),
+  });
+  assert.ok(allowlist.has('H58_source_causal_residual_v2'));
+  assert.equal(allowlist.has('H58_resolver_event_stale_quote'), false);
+  assert.equal(allowlist.has('H59_resolver_cross_persistence'), false);
+  assert.doesNotThrow(() => filterStrategiesByAllowlist(makeStrategies(), allowlist));
 });
