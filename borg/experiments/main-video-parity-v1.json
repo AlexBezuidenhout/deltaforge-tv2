@@ -1,0 +1,52 @@
+{
+  "manifest_format": "borg-experiment-v1",
+  "experiment_id": "main-video-parity-v1",
+  "status": "FROZEN_FORWARD_EVAL",
+  "phase": "eval",
+  "family": "main_video_parity_falsification",
+  "strategy_version": "main-video-parity-v1",
+  "frozen_at_utc": "2026-07-27T12:00:00.000Z",
+  "evidence_started_at": "2026-07-27T12:00:00.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "research_capital_version": "500usd-v1",
+  "starting_bankroll_usd": 500,
+  "target_notional_usd": 10,
+  "primary_metric": "net_pnl_2x",
+  "strategy_bindings": [
+    {
+      "strategy": "MAIN_VIDEO_PARITY_V1__taker250",
+      "family": "main_video_parity_falsification",
+      "arm": "honest_taker_250ms",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x"
+    },
+    {
+      "strategy": "MAIN_VIDEO_PARITY_V1__postonly",
+      "family": "main_video_parity_falsification",
+      "arm": "postonly_queue",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x"
+    }
+  ],
+  "hypothesis": "The visible DeltaForge X-PRO signal recipe may retain positive executable value when its quote-relative heuristic, Phi blend, five-second cadence, informational Gate 1, 2% EV floor, 3-cent spread cap and 5bp directional confirmation are tested prospectively with honest fills and fees.",
+  "mechanism": {
+    "markets": "BTC five-minute direction binaries only",
+    "signal": "60% Phi fair plus 40% quote-relative momentum/microstructure heuristic from the untouched purchased archive",
+    "visible_settings": "5s cadence, Gate 1=0.45 informational, Gate 2=2%, Gate 3 strong-delta threshold=0.050%, maximum spread=3 cents",
+    "safety_repairs": "45-second new-entry guard, one intent per market, executable depth, no midpoint or Gamma fills",
+    "taker_arm": "real ask, 250ms event-tape quote survival, <=20% displayed touch, 2x dynamic crypto taker fees plus one tick stress",
+    "postonly_arm": "one-tick-improved non-crossing bid, public-print queue depletion, partial fills and adverse-selection scoring",
+    "sizing": "$10 target from a frozen $500 paper bankroll; displayed capacity may reduce it",
+    "exit": "hold to terminal resolution; no interim mark-price stop"
+  },
+  "selection_disclosure": "This experiment was created after forensic review of a promotional video and purchased code. The video PnL, all legacy MAIN trades, and all pre-manifest replays are excluded. The two execution arms are separate hypotheses and may not be pooled.",
+  "decision_rule": "After at least 300 fresh independent markets and 14 calendar days per arm, require positive 2x-cost PnL in both chronological halves, market/day-clustered lower confidence bounds above zero, multiple-testing correction including every prior MAIN variant, non-negative 1/5/30-second adverse selection, and positive performance at 100/250/500ms. Otherwise reject the advertised edge.",
+  "zero_edge_disclosure": "The expected and fully valid conclusion is that the quote-relative heuristic manufactures apparent EV and the executable edge is approximately zero or negative.",
+  "no_optional_stopping": true,
+  "provisional": true
+}

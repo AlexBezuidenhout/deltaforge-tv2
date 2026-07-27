@@ -27,6 +27,7 @@ const makeH53Strategies = require('./research-h53');
 const makeMainV2Strategies = require('./main-v2');
 const makeMainV3Strategies = require('./main-v3');
 const makeMainV4Strategies = require('./main-v4');
+const makeMainVideoParityStrategies = require('./main-video-parity');
 const { EthGLateExactForward } = require('./eth-g-late-forward');
 const {
   RESEARCH_CAPITAL_VERSION,
@@ -1522,6 +1523,7 @@ function makeBaseStrategies() {
   ...makeMainV2Strategies(),
   ...makeMainV3Strategies(),
   ...makeMainV4Strategies(),
+  ...makeMainVideoParityStrategies(),
   ...makeV3Strategies(),
   ...makeV4Strategies(),
   ...makeV5Strategies(),
