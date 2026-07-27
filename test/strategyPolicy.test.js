@@ -86,6 +86,8 @@ test('VPS allowlist activates the causal H58 successor and omits retired resolve
     BORG_ACTIVE_STRATEGIES: line.split('=').slice(2).join('='),
   });
   assert.ok(allowlist.has('H58_source_causal_residual_v2'));
+  assert.ok(allowlist.has('MAIN_VIDEO_PARITY_V1__taker250'));
+  assert.ok(allowlist.has('MAIN_VIDEO_PARITY_V1__postonly'));
   assert.equal(allowlist.has('H58_resolver_event_stale_quote'), false);
   assert.equal(allowlist.has('H59_resolver_cross_persistence'), false);
   assert.doesNotThrow(() => filterStrategiesByAllowlist(makeStrategies(), allowlist));

@@ -9,6 +9,8 @@ const RUNTIME_STALE_AFTER_SEC = 130;
 // explicit without changing any strategy rule.
 const PRIORITY_RESEARCH = Object.freeze({
   H58_source_causal_residual_v2: { rank: 1, tier: 'PRIORITY' },
+  MAIN_VIDEO_PARITY_V1__taker250: { rank: 2, tier: 'FALSIFICATION' },
+  MAIN_VIDEO_PARITY_V1__postonly: { rank: 2, tier: 'FALSIFICATION' },
   FWD_H24_hourly_flow_breakout_v1: { rank: 3, tier: 'PRIORITY' },
   FWD_H40_directional_entropy_breakout_v1: { rank: 4, tier: 'PRIORITY' },
   H43_resolution_boundary_buffer: { rank: 5, tier: 'PRIORITY' },
@@ -29,6 +31,8 @@ const PREMISES = Object.freeze({
   MAIN_V2_resolver_quorum: 'Trade only when multiple resolver-aware references agree with MAIN’s directional forecast.',
   MAIN_V3_robust_source_envelope: 'Price the binary across a conservative envelope of spot and resolver sources, then trade only edge that survives the worst plausible source.',
   MAIN_V4_warm_vol_temporal_consensus: 'Require warmed volatility and agreement across several recent observations before accepting MAIN’s directional signal.',
+  MAIN_VIDEO_PARITY_V1__taker250: 'Falsify the purchased MAIN/video signal recipe at the executable ask with 250 ms quote survival, doubled dynamic taker fees and one tick of stress.',
+  MAIN_VIDEO_PARITY_V1__postonly: 'Test the same purchased MAIN/video signal behind a non-crossing post-only bid with queue-ahead, partial-fill and adverse-selection accounting.',
   T240_four_state_residual_v1: 'At four minutes to expiry, model the joint state of price direction and market quote, then trade only the residual not already reflected in the token.',
   H1_pair_arb_2x: 'Buy a complementary YES/NO bundle only when its executable cost remains below the guaranteed $1 payout after doubled fees.',
   H2_cex_impulse_lag__sampled: 'Test whether a ten-second CEX impulse predicts a lagged Polymarket move when evaluated on the sampled clock.',
@@ -150,6 +154,8 @@ const PRIOR_OUTCOMES = Object.freeze({
   MAIN_V2_resolver_quorum: 'The frozen forward cohort was materially negative with its clustered interval below zero.',
   MAIN_V3_robust_source_envelope: 'The conservative source envelope reduced false certainty but did not produce positive executable expectancy.',
   MAIN_V4_warm_vol_temporal_consensus: 'Warm-volatility and temporal agreement did not repair MAIN’s negative forward economics.',
+  MAIN_VIDEO_PARITY_V1__taker250: 'The promotional win rate is inadmissible: two of three visible BUY rows bought the official losing side, and the purchased paper engine used synthetic fills. This fresh arm starts at zero.',
+  MAIN_VIDEO_PARITY_V1__postonly: 'The video claims resting GTC behaviour that the purchased execution path does not implement. This fresh post-only reinterpretation starts at zero and cannot inherit the promotional PnL.',
   H74_markov_regime_residual: 'The 30-day development prior was negative across BTC, ETH, SOL and XRP. H74 is retained as a strict forward falsification arm, not a promising backtest.',
   H75_4h_dynamic_liquidity_leadlag: 'The only encouraging development cell was ETH over three minutes (23 episodes, +2.645 bps), but its Wilson interval included chance and no Polymarket execution costs were available. All four asset arms remain in the fresh test.',
 });
