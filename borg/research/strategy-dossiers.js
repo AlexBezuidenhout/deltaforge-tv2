@@ -8,6 +8,7 @@ const RUNTIME_STALE_AFTER_SEC = 130;
 // recommendations. They make the operator's current, pre-registered work queue
 // explicit without changing any strategy rule.
 const PRIORITY_RESEARCH = Object.freeze({
+  META_CHAMPION_STREAK_V1: { rank: 3, tier: 'EXPLORATORY' },
   H58_source_causal_residual_v2: { rank: 1, tier: 'PRIORITY' },
   MAIN_VIDEO_PARITY_V1__taker250: { rank: 2, tier: 'FALSIFICATION' },
   MAIN_VIDEO_PARITY_V1__postonly: { rank: 2, tier: 'FALSIFICATION' },
@@ -33,6 +34,7 @@ const PREMISES = Object.freeze({
   MAIN_V4_warm_vol_temporal_consensus: 'Require warmed volatility and agreement across several recent observations before accepting MAIN’s directional signal.',
   MAIN_VIDEO_PARITY_V1__taker250: 'Falsify the purchased MAIN/video signal recipe at the executable ask with 250 ms quote survival, doubled dynamic taker fees and one tick of stress.',
   MAIN_VIDEO_PARITY_V1__postonly: 'Test the same purchased MAIN/video signal behind a non-crossing post-only bid with queue-ahead, partial-fill and adverse-selection accounting.',
+  META_CHAMPION_STREAK_V1: 'Test whether strategy-level performance persists long enough to allocate only to a causally observed, cost-stressed winning source without hindsight or same-market outcome leakage.',
   T240_four_state_residual_v1: 'At four minutes to expiry, model the joint state of price direction and market quote, then trade only the residual not already reflected in the token.',
   H1_pair_arb_2x: 'Buy a complementary YES/NO bundle only when its executable cost remains below the guaranteed $1 payout after doubled fees.',
   H2_cex_impulse_lag__sampled: 'Test whether a ten-second CEX impulse predicts a lagged Polymarket move when evaluated on the sampled clock.',
@@ -156,6 +158,7 @@ const PRIOR_OUTCOMES = Object.freeze({
   MAIN_V4_warm_vol_temporal_consensus: 'Warm-volatility and temporal agreement did not repair MAIN’s negative forward economics.',
   MAIN_VIDEO_PARITY_V1__taker250: 'The promotional win rate is inadmissible: two of three visible BUY rows bought the official losing side, and the purchased paper engine used synthetic fills. This fresh arm starts at zero.',
   MAIN_VIDEO_PARITY_V1__postonly: 'The video claims resting GTC behaviour that the purchased execution path does not implement. This fresh post-only reinterpretation starts at zero and cannot inherit the promotional PnL.',
+  META_CHAMPION_STREAK_V1: 'This selector starts at zero. Winning-streak routing is especially exposed to winner’s curse and multiple testing, so source PnL is only an input feature; only the meta-strategy’s fresh forward PnL can validate it.',
   H74_markov_regime_residual: 'The 30-day development prior was negative across BTC, ETH, SOL and XRP. H74 is retained as a strict forward falsification arm, not a promising backtest.',
   H75_4h_dynamic_liquidity_leadlag: 'The only encouraging development cell was ETH over three minutes (23 episodes, +2.645 bps), but its Wilson interval included chance and no Polymarket execution costs were available. All four asset arms remain in the fresh test.',
 });
@@ -260,6 +263,8 @@ function dossierFor(strategy, context = {}) {
   const priorOutcome = PRIOR_OUTCOMES[strategy] || null;
   const design = sourceStrategy
     ? 'Prospective identity-only clone: source thresholds, assets, sizing and execution model are unchanged; discovery rows are excluded.'
+    : strategy === 'META_CHAMPION_STREAK_V1'
+      ? 'Causal paper-only allocator: uses only resolved current-epoch A/B-quality fills, requires two distinct evidence confirmations, mirrors only one-leg BUY takers, and applies dwell/switch hysteresis.'
     : strategy === 'H58_source_causal_residual_v2'
       ? 'New source-time successor: the executable ask is the prior, only a conservative resolver-event residual can create edge, and all eight asset/timeframe reporting arms were frozen before evidence.'
     : /^H7[4-5]_/.test(strategy)

@@ -30,6 +30,7 @@ const { syncExperimentRegistry } = require('../research/experiment-registry');
 const { loadActiveStrategies } = require('../research/strategy-policy');
 const { createCapturePolicy } = require('./capture-policy');
 const { LegacyPaperAdapter } = require('../shadow/legacy-paper-adapter');
+const { loadPerformanceRows } = require('../research/meta-champion-performance');
 
 // Standard normal CDF (Abramowitz–Stegun; prior art PhiModel.js)
 function phiCdf(x) {
@@ -191,6 +192,52 @@ async function main() {
     parkedStrategies: strategyPolicy.parked,
     includeParkedControls: process.env.BORG_INCLUDE_PARKED_CONTROLS === 'true',
   });
+  const metaStrategies = shadow?.strategies
+    .filter((strategy) => typeof strategy.updatePerformanceRows === 'function') || [];
+  const activeStrategyNames = new Set(shadow?.strategies.map((strategy) => strategy.name) || []);
+  const metaPerformanceHealth = {
+    lastSuccessAt: null,
+    lastError: null,
+    sourceRows: 0,
+  };
+  const refreshMetaPerformance = async () => {
+    if (!metaStrategies.length) return 0;
+    const sourceStrategies = [...new Set(metaStrategies.flatMap((strategy) =>
+      strategy.sourceStrategies.filter((name) => activeStrategyNames.has(name))))];
+    const asOf = new Date();
+    const rows = await loadPerformanceRows(pool, {
+      sourceStrategies,
+      epochId: collection.epochId,
+      epochStartedAt: collection.epochStartedAt,
+      asOf,
+    });
+    const loadedAtMs = Date.now();
+    for (const strategy of metaStrategies) {
+      strategy.updatePerformanceRows(rows, {
+        asOfMs: asOf.getTime(),
+        loadedAtMs,
+      });
+    }
+    metaPerformanceHealth.lastSuccessAt = loadedAtMs;
+    metaPerformanceHealth.lastError = null;
+    metaPerformanceHealth.sourceRows = rows.length;
+    return rows.length;
+  };
+  if (metaStrategies.length) {
+    try {
+      const sourceRows = await refreshMetaPerformance();
+      await logEvent('INFO', 'shadow', 'meta-strategy performance snapshot loaded', {
+        strategies: metaStrategies.map((strategy) => strategy.name),
+        sourceRows,
+        currentEpochOnly: collection.epochId,
+        dataAndExecutionGrades: ['A', 'B'],
+      });
+    } catch (error) {
+      metaPerformanceHealth.lastError = error.message;
+      await logEvent('WARN', 'shadow',
+        `meta-strategy performance snapshot unavailable: ${error.message}`);
+    }
+  }
   // Four-hour state models remain in memory on the hot path, but a routine
   // process restart must not create a four-hour blind spot. Warm them once
   // from complete, locally persisted minute bars. Binance persistence is
@@ -423,6 +470,15 @@ async function main() {
     await paperAdapter.poll();
     timers.push(setInterval(() => paperAdapter.poll().catch(() => {}), 5000));
   }
+  if (metaStrategies.length) {
+    timers.push(setInterval(() => {
+      refreshMetaPerformance().catch((error) => {
+        metaPerformanceHealth.lastError = error.message;
+        logEvent('ERROR', 'shadow',
+          `meta-strategy performance refresh failed: ${error.message}`);
+      });
+    }, 60000));
+  }
   timers.push(setInterval(() => markets.discover().then(subscribeActive).catch(() => {}), 10000));
   timers.push(setInterval(() => chainlink.poll().catch(() => {}), 15000));
   timers.push(setInterval(() => clob.checkStale(), 30000));
@@ -630,6 +686,11 @@ async function main() {
     if (fs !== 'ok') stale.push(fs.replace('STALE: ', ''));
     if (Date.now() - clob.lastWsMsgAt > 60000) stale.push('clob_ws>60s');
     if (rtds.checkStale(15000)) stale.push('rtds_chainlink>15s');
+    if (metaStrategies.length
+        && (!metaPerformanceHealth.lastSuccessAt
+          || Date.now() - metaPerformanceHealth.lastSuccessAt > 180000)) {
+      stale.push('meta_performance_snapshot>180s');
+    }
     await persistStrategyRuntime().catch((err) => {
       stale.push('strategy_runtime_write');
       logEvent('ERROR', 'shadow', `runtime heartbeat write failed: ${err.message}`);
@@ -653,6 +714,13 @@ async function main() {
         strategyDiagnostics: Object.fromEntries(strategyRuntime
           .filter((row) => row.diagnostics != null)
           .map((row) => [row.strategy, row.diagnostics])),
+        metaPerformance: {
+          lastSuccessAt: metaPerformanceHealth.lastSuccessAt
+            ? new Date(metaPerformanceHealth.lastSuccessAt).toISOString()
+            : null,
+          lastError: metaPerformanceHealth.lastError,
+          sourceRows: metaPerformanceHealth.sourceRows,
+        },
         wal: walHealth,
         active: evaluationMarkets().map((m) => `${m.asset}:${m.market_type || 'direction_5m'}`).join(',') || null,
         capturePolicy: capturePolicy.describe(),

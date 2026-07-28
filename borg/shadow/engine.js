@@ -79,6 +79,7 @@ class ShadowEngine {
     this._haltedByAsset = new Map(); // keyed by asset:market; isolates one damaged book
     this._coidSeq = 0;
     this._runId = Date.now().toString(36);
+    this._sourceActionsThisTick = new Map();
     this.counters = { orders: 0, dropped: 0 };
     const startedAt = new Date();
     this._runtime = new Map(strategies.map((strategy) => [strategy.name, {
@@ -131,13 +132,23 @@ class ShadowEngine {
     this.halted = stale; // per-tick view for _features / strategies
 
     const features = this._features(ctx, cadence);
-    for (const strat of this.strategies) {
-      if ((strat.cadence || 'sampled') !== cadence) continue;
+    this._sourceActionsThisTick = new Map();
+    const eligible = this.strategies.filter((strat) => {
+      if ((strat.cadence || 'sampled') !== cadence) return false;
       // Legacy H1-H21 were designed and frozen against five-minute direction
       // contracts. New market families are opt-in so a wider collector cannot
       // silently change an old strategy's population.
       const allowedTypes = strat.marketTypes || ['direction_5m'];
-      if (!allowedTypes.includes(marketType)) continue;
+      return allowedTypes.includes(marketType);
+    });
+    // Meta strategies are deliberately evaluated after every ordinary
+    // strategy, even if their registration order changes. They can inspect
+    // same-tick paper intents but never stale intents or future scores.
+    const ordered = [
+      ...eligible.filter((strat) => strat.isMetaStrategy !== true),
+      ...eligible.filter((strat) => strat.isMetaStrategy === true),
+    ];
+    for (const strat of ordered) {
       const runtime = this._runtime.get(strat.name);
       runtime.evaluations += 1;
       runtime.lastEvaluatedAt = new Date(ctx.now);
@@ -151,12 +162,27 @@ class ShadowEngine {
         continue;
       }
       const actionList = actions || [];
+      if (strat.isMetaStrategy !== true) {
+        this._sourceActionsThisTick.set(
+          strat.name,
+          actionList.map((action) => ({ ...action })),
+        );
+      }
       if (actionList.length) runtime.actionEvaluations += 1;
       else runtime.noActionEvaluations += 1;
       runtime.actions += actionList.length;
       if (actionList.length) runtime.lastActionAt = new Date(ctx.now);
       for (const a of actionList) this._record(strat.name, ctx, a, features);
     }
+  }
+
+  /**
+   * Read-only same-tick intent view for paper meta-strategies. Returning
+   * shallow copies prevents an allocator from mutating the source evidence.
+   */
+  sourceActionsForTick(strategy) {
+    return (this._sourceActionsThisTick.get(strategy) || [])
+      .map((action) => ({ ...action }));
   }
 
   runtimeStatus() {
