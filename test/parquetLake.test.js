@@ -13,6 +13,7 @@ const {
   envelopeFor,
   selectVerifiedRawObjects,
   sourceFromRelative,
+  stageRawRecords,
 } = require('../borg/research/parquet-lake');
 const { runParquetQuery } = require('../borg/research/parquet-query');
 
@@ -79,6 +80,34 @@ test('unsafe segment paths are rejected', () => {
   assert.equal(sourceFromRelative('binance/2026-08-03/a.ndjson.gz').source, 'binance');
   assert.throws(() => sourceFromRelative('../secrets/2026-08-03/a.ndjson.gz'));
   assert.throws(() => sourceFromRelative('bad/source/a.ndjson.gz'));
+});
+
+test('staging uses one bounded files-from transfer before per-file SHA verification', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'df-parquet-stage-test-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const sourceRoot = path.join(root, 'source');
+  const stageRoot = path.join(root, 'stage');
+  const records = [
+    segment(sourceRoot, 'binance', '2026-08-03', 'a', [{ source_timestamp_ms: 1785751200000 }]),
+    segment(sourceRoot, 'coinbase', '2026-08-03', 'b', [{ source_timestamp_ms: 1785751200001 }]),
+  ];
+  const calls = [];
+  const rclone = async (args) => {
+    calls.push(args);
+    assert.equal(args[0], 'copy');
+    const target = args[2];
+    for (const record of records) {
+      const destination = path.join(target, ...record.relative.split('/'));
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.copyFileSync(record.file, destination);
+    }
+  };
+  const staged = await stageRawRecords(records, {
+    remote: 'drive', prefix: 'VPS Data', configFile: '/tmp/rclone.conf',
+    rclone, stageRoot, env: {},
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(staged.length, 2);
 });
 
 test('DuckDB compactor writes queryable ZSTD Parquet with causal clock coverage', async (t) => {

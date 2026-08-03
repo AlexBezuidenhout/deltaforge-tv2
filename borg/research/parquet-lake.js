@@ -494,16 +494,19 @@ function rcloneCommon(env, configFile) {
 
 async function stageRawRecords(records, options) {
   const { remote, prefix, configFile, rclone, stageRoot, env } = options;
+  const rawRoot = path.join(stageRoot, 'raw');
+  const listFile = path.join(stageRoot, 'raw.files');
+  await fs.promises.mkdir(rawRoot, { recursive: true });
+  writeFileList(listFile, records.map((record) => record.relative));
+  await rclone([
+    'copy', remoteTarget(remote, prefix, 'wal'), rawRoot,
+    '--files-from-raw', listFile,
+    '--checksum', '--fast-list',
+    ...rcloneCommon(env, configFile),
+  ]);
   const staged = [];
   for (const record of records) {
-    const file = path.join(stageRoot, 'raw', ...record.relative.split('/'));
-    await fs.promises.mkdir(path.dirname(file), { recursive: true });
-    if (!fs.existsSync(file)) {
-      await rclone([
-        'copyto', remoteTarget(remote, prefix, 'wal', record.relative), file,
-        ...rcloneCommon(env, configFile),
-      ]);
-    }
+    const file = path.join(rawRoot, ...record.relative.split('/'));
     const stagedRecord = { ...record, file };
     await verifyStagedRecord(stagedRecord);
     staged.push(stagedRecord);
@@ -761,6 +764,7 @@ module.exports = {
   pruneHotParquet,
   selectVerifiedRawObjects,
   sourceFromRelative,
+  stageRawRecords,
   streamSegment,
   timeMilliseconds,
   verifyStagedRecord,
