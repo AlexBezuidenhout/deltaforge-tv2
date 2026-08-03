@@ -32,18 +32,24 @@ const {
 const {
   TARGET_UNIVERSE_VERSION, selectSurfaceBracketedThresholds,
 } = require('./target-universe');
+const { TransitionMarkSampler } = require('./mark-sampler');
+const { OPTIONS_EXPERIMENT_ID } = require('./experiment');
 
 const DERIBIT_HTTP = 'https://www.deribit.com/api/v2';
 const DERIBIT_WS = 'wss://www.deribit.com/ws/api/v2';
 const GAMMA = 'https://gamma-api.polymarket.com';
-const OPTIONS_EXPERIMENT_ID = 'options-daily-threshold-surface-residual-v3';
 const CURRENCIES = String(process.env.OPTIONS_CURRENCIES || 'BTC,ETH')
   .split(',').map((value) => value.trim().toUpperCase()).filter(Boolean);
 const REFRESH_MS = Math.max(60_000, Number(process.env.OPTIONS_REFRESH_MS || 300_000));
 const DB_SAMPLE_MS = Math.max(250, Number(process.env.OPTIONS_DB_SAMPLE_MS || 5000));
-const MARK_SAMPLE_MS = Math.max(100, Number(process.env.OPTIONS_MARK_SAMPLE_MS || 5000));
-const EXECUTABLE_MARK_SAMPLE_MS = Math.max(100,
-  Number(process.env.OPTIONS_EXECUTABLE_MARK_SAMPLE_MS || 250));
+const DIAGNOSTIC_HEARTBEAT_MS = Math.max(30_000,
+  Number(process.env.OPTIONS_DIAGNOSTIC_HEARTBEAT_MS || 300_000));
+const EXECUTABLE_HEARTBEAT_MS = Math.max(5_000,
+  Number(process.env.OPTIONS_EXECUTABLE_HEARTBEAT_MS || 60_000));
+const MARK_TRANSITION_DWELL_MS = Math.max(0,
+  Number(process.env.OPTIONS_MARK_TRANSITION_DWELL_MS || 250));
+const REQUIRE_EXACT_EXPIRY = String(process.env.OPTIONS_REQUIRE_EXACT_EXPIRY || 'true')
+  .toLowerCase() !== 'false';
 const MAX_INSTRUMENTS = Math.max(8, Number(process.env.OPTIONS_MAX_INSTRUMENTS || 160));
 const TARGET_BUDGET_USD = Math.max(1, Number(process.env.OPTIONS_TARGET_BUDGET_USD || 10));
 const HEDGE_COST_BPS = Math.max(0, Number(process.env.OPTIONS_HEDGE_COST_BPS || 5));
@@ -102,12 +108,20 @@ async function retryTransientDb(action, options = {}) {
 
 function classifyExecutionBarrier({
   valuation, optimized, freshBook, book, bookAgeMs, resolverAgeMs, chainlinkAgeMs,
-  feesKnown, minimumOrderSize,
+  feesKnown, minimumOrderSize, requireExactExpiry = REQUIRE_EXACT_EXPIRY,
+  targetSurfaceMode = null,
 }) {
   if (!valuation) return 'NO_SURFACE_VALUATION';
   if (!valuation.ivIntervalComplete) return 'INCOMPLETE_BID_ASK_IV_INTERVAL';
   if (!['A', 'B'].includes(valuation.fidelity)) {
     return `UNSUPPORTED_${String(valuation.surface?.mode || 'SURFACE_EXTRAPOLATION')}`;
+  }
+  if (requireExactExpiry && (targetSurfaceMode !== 'EXACT_EXPIRY'
+      || valuation.surface?.mode !== 'EXACT_EXPIRY')) {
+    return targetSurfaceMode === 'TERM_INTERPOLATED'
+      || valuation.surface?.mode === 'TERM_INTERPOLATED'
+      ? 'TERM_INTERPOLATION_DIAGNOSTIC_ONLY'
+      : 'NON_EXACT_EXPIRY_DIAGNOSTIC_ONLY';
   }
   if (!book) return 'POLYMARKET_BOOK_UNAVAILABLE';
   if (!freshBook) return bookAgeMs == null
@@ -350,6 +364,11 @@ class OptionsObserver {
     this.latestTick = new Map();
     this.touchBuffer = new Map();
     this.markBuffer = new Map();
+    this.markSampler = new TransitionMarkSampler({
+      diagnosticHeartbeatMs: DIAGNOSTIC_HEARTBEAT_MS,
+      executableHeartbeatMs: EXECUTABLE_HEARTBEAT_MS,
+      transitionDwellMs: MARK_TRANSITION_DWELL_MS,
+    });
     this.flushPromise = null;
     this.lastEventAt = 0;
     this.lastMarkAt = 0;
@@ -357,7 +376,7 @@ class OptionsObserver {
       rawFrames: 0, tickerEvents: 0, storedTouches: 0, shadowMarks: 0,
       parseErrors: 0, refreshErrors: 0, clobTriggers: 0, deribitTriggers: 0,
       executableMarks: 0, executionBarriers: {}, surfaceFidelity: {},
-      flushRetries: 0, persistenceErrors: 0,
+      flushRetries: 0, persistenceErrors: 0, suppressedDerivedMarks: 0,
     };
     this.clob = new ClobMultiplex((token) => this.targetByToken.get(String(token))?.id || null, {
       shardCount: Number(process.env.OPTIONS_CLOB_SHARDS || 2),
@@ -546,23 +565,33 @@ class OptionsObserver {
         strike: target.strike, annualizedVol: valuation.surface.markIv,
         secondsToExpiry: tteSec, hedgeBase: hedge.hedgeBase,
       }) : null;
-      const fullSurface = ['A', 'B'].includes(valuation.fidelity);
       const freshBook = bookAgeMs != null && bookAgeMs <= POLY_BOOK_MAX_AGE_MS;
-      const executable = Boolean(optimized && fullSurface && freshBook
-        && resolverAgeMs != null && resolverAgeMs <= 3000 && target.fees.known);
       const executionBarrier = classifyExecutionBarrier({
         valuation, optimized, freshBook, book, bookAgeMs,
         resolverAgeMs,
         feesKnown: target.fees.known, minimumOrderSize,
+        requireExactExpiry: REQUIRE_EXACT_EXPIRY,
+        targetSurfaceMode: target.surfaceTarget?.surfaceMode || null,
       });
+      const executable = executionBarrier == null;
       const grade = executable ? 'A' : valuation.fidelity === 'D' || !target.fees.known
         ? 'D' : freshBook ? 'B' : 'C';
-      // Sparse diagnostic marks are enough when a target cannot clear its
-      // execution gates. Preserve high-rate marks only for genuinely
-      // executable states; every upstream raw frame remains in the WAL.
-      const markSampleMs = executable ? EXECUTABLE_MARK_SAMPLE_MS : MARK_SAMPLE_MS;
-      const bucket = Math.floor(now / markSampleMs) * markSampleMs;
-      const dedupKey = `${this.runId}:${target.id}:${side}:${bucket}`;
+      // Derived SQL is a query tier, not the replay source. Persist initial
+      // state, stable transitions and bounded heartbeats; every upstream
+      // Deribit/CLOB/resolver frame remains in the append-before-parse WAL.
+      const sampled = this.markSampler.observe(`${target.id}:${side}`, {
+        executable,
+        executionBarrier,
+        surfaceFidelity: valuation.fidelity,
+        targetSurfaceMode: target.surfaceTarget?.surfaceMode || null,
+        valuationSurfaceMode: valuation.surface?.mode || null,
+        dataQualityGrade: grade,
+      }, now);
+      if (!sampled.persist) {
+        this.metrics.suppressedDerivedMarks += 1;
+        continue;
+      }
+      const dedupKey = `${this.runId}:${sampled.dedupSuffix}`;
       this.markBuffer.set(dedupKey, {
         dedupKey, observedAt: now, marketId: target.id,
         conditionId: target.conditionId, asset: target.asset, strike: target.strike,
@@ -598,6 +627,14 @@ class OptionsObserver {
           resolverUncertaintyBps: RESOLVER_UNCERTAINTY_BPS,
           surface: valuation.surface, ivIntervalComplete: valuation.ivIntervalComplete,
           executionBarrier,
+          persistenceEventKind: sampled.eventKind,
+          persistencePolicy: {
+            mode: 'STATE_TRANSITIONS_AND_BOUNDED_HEARTBEATS',
+            transitionDwellMs: MARK_TRANSITION_DWELL_MS,
+            executableHeartbeatMs: EXECUTABLE_HEARTBEAT_MS,
+            diagnosticHeartbeatMs: DIAGNOSTIC_HEARTBEAT_MS,
+            rawReplaySource: 'append_before_parse_WAL',
+          },
           bookAgeMs, minimumOrderSize, fees: target.fees,
           targetBudgetUsd: TARGET_BUDGET_USD, hedgeCostBps: HEDGE_COST_BPS,
           optimized, hedge,
@@ -669,6 +706,9 @@ class OptionsObserver {
     this.archiveTargets = archiveTargets;
     this.targetByToken = new Map(targets.flatMap((target) => [
       [target.yesToken, target], [target.noToken, target],
+    ]));
+    this.markSampler.prune(targets.flatMap((target) => [
+      `${target.id}:YES`, `${target.id}:NO`,
     ]));
     this.instrumentByName = new Map(selection.instruments
       .map((row) => [row.instrumentName, row]));
@@ -810,8 +850,11 @@ class OptionsObserver {
       surfaceMaxAgeMs: SURFACE_MAX_AGE_MS,
       polyBookMaxAgeMs: POLY_BOOK_MAX_AGE_MS,
       dbSampleMs: DB_SAMPLE_MS,
-      markSampleMs: MARK_SAMPLE_MS,
-      executableMarkSampleMs: EXECUTABLE_MARK_SAMPLE_MS,
+      requireExactExpiry: REQUIRE_EXACT_EXPIRY,
+      diagnosticHeartbeatMs: DIAGNOSTIC_HEARTBEAT_MS,
+      executableHeartbeatMs: EXECUTABLE_HEARTBEAT_MS,
+      markTransitionDwellMs: MARK_TRANSITION_DWELL_MS,
+      markSampler: { ...this.markSampler.metrics, states: this.markSampler.states.size },
       targetBudgetUsd: TARGET_BUDGET_USD,
       archiveAnchors: this.archiveTargets,
       exactExpiry: this.exactExpirySummary,
@@ -938,7 +981,8 @@ if (require.main === module) main().catch(async (error) => {
 });
 
 module.exports = {
-  DB_SAMPLE_MS, EXECUTABLE_MARK_SAMPLE_MS, MARK_SAMPLE_MS,
+  DB_SAMPLE_MS, DIAGNOSTIC_HEARTBEAT_MS, EXECUTABLE_HEARTBEAT_MS,
+  MARK_TRANSITION_DWELL_MS, OPTIONS_EXPERIMENT_ID, REQUIRE_EXACT_EXPIRY,
   OptionsObserver, classifyExecutionBarrier, feeMetadata, fetchIndexPrice,
   fetchThresholdEvents, isRetryableDbError, listedCallExpiries, loadTargets,
   resolverFeed, retryTransientDb, syncPolymarketSubscriptions,

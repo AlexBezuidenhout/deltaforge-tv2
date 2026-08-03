@@ -1,0 +1,69 @@
+{
+  "experiment_id": "options-exact-expiry-residual-v4",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-03T12:40:00.000Z",
+  "frozen_at": "2026-08-03T12:40:00.000Z",
+  "evidence_started_at": "2026-08-03T12:40:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "options_implied_binary_residual",
+  "supersedes": "options-daily-threshold-surface-residual-v3",
+  "strategy_version": "options-exact-expiry-residual-v4",
+  "starting_bankroll_usd": 500,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "selection_disclosure": "V3 mixed exact-expiry and bounded term-interpolated diagnostics and produced no validated trade cohort. V4 starts at zero and permits only exact listed Deribit expiries to become executable evidence; bounded term interpolation remains an explicitly excluded diagnostic lane.",
+  "target_rules": {
+    "contracts": "BTC and ETH threshold markets with a rule-certified resolver source and target timestamp exactly equal to a listed Deribit option expiry",
+    "fidelity_required": "A: exact expiry with complete executable bid/ask IV interval",
+    "diagnostic_only": [
+      "bounded total-variance term interpolation",
+      "mark-IV-only surfaces",
+      "unsupported expiry extrapolation"
+    ],
+    "entry_benchmark": "conservative fair lower bound - executable Polymarket ask - doubled dynamic taker fee - perpetual hedge stress > 0",
+    "required_execution_inputs": [
+      "fresh synchronized Polymarket L2",
+      "fresh contract resolver price",
+      "known Polymarket fee schedule",
+      "known venue minimum",
+      "complete displayed ask depth"
+    ]
+  },
+  "model": {
+    "strike_interpolation": "log strike inside the exact-expiry surface",
+    "uncertainty": "Deribit bid/ask IV interval plus resolver-basis interval",
+    "market_prior": "contemporaneous executable Polymarket quote",
+    "hedge": "quantified perpetual delta hedge with residual binary gamma, basis risk and 5bp cost stress",
+    "exit": "terminal token resolution plus recorded hedge PnL; no claimed-fair markout"
+  },
+  "persistence": {
+    "raw_events": "append-before-parse immutable WAL at source fidelity",
+    "derived_sql": "initial state, stable state transitions and bounded 60s executable/300s diagnostic heartbeats",
+    "transition_dwell_ms": 250,
+    "purpose": "retain deterministic replay while preventing repetitive derived rows from exhausting the hot database"
+  },
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bound_above_zero": true,
+    "require_positive_at_latency_ms": [100, 250, 500],
+    "multiple_testing": "Holm correction across asset, side and expiry band",
+    "shared_bankroll_usd": 500,
+    "no_dominant_market_asset_or_day": true,
+    "null_outcome": "The exact options surface may add no tradable residual beyond the prediction-market quote."
+  },
+  "strategy_bindings": [{
+    "strategy": "options_exact_expiry_residual_v4",
+    "family": "options_implied_binary_residual",
+    "arm": "exact_expiry_a_fidelity",
+    "phase": "eval",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "realized_pnl_after_2x_fees_depth_and_hedge_cost"
+  }],
+  "no_optional_stopping": true
+}

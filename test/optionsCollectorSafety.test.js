@@ -5,14 +5,29 @@ const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  DB_SAMPLE_MS, EXECUTABLE_MARK_SAMPLE_MS, MARK_SAMPLE_MS,
-  feeMetadata, isRetryableDbError, retryTransientDb,
+  DB_SAMPLE_MS, DIAGNOSTIC_HEARTBEAT_MS, EXECUTABLE_HEARTBEAT_MS,
+  MARK_TRANSITION_DWELL_MS, REQUIRE_EXACT_EXPIRY,
+  classifyExecutionBarrier, feeMetadata, isRetryableDbError, retryTransientDb,
 } = require('../borg/options/collector');
 
-test('option query-tier sampling is sparse unless a mark is executable', () => {
+test('option query tier uses transitions and bounded heartbeats', () => {
   assert.equal(DB_SAMPLE_MS, 5000);
-  assert.equal(MARK_SAMPLE_MS, 5000);
-  assert.equal(EXECUTABLE_MARK_SAMPLE_MS, 250);
+  assert.equal(DIAGNOSTIC_HEARTBEAT_MS, 300000);
+  assert.equal(EXECUTABLE_HEARTBEAT_MS, 60000);
+  assert.equal(MARK_TRANSITION_DWELL_MS, 250);
+  assert.equal(REQUIRE_EXACT_EXPIRY, true);
+});
+
+test('term interpolation is retained as diagnostic but cannot become executable evidence', () => {
+  assert.equal(classifyExecutionBarrier({
+    valuation: {
+      fidelity: 'B', ivIntervalComplete: true,
+      surface: { mode: 'TERM_INTERPOLATED' },
+    },
+    targetSurfaceMode: 'TERM_INTERPOLATED',
+    optimized: {}, freshBook: true, book: {}, bookAgeMs: 10,
+    resolverAgeMs: 10, feesKnown: true, minimumOrderSize: 5,
+  }), 'TERM_INTERPOLATION_DIAGNOSTIC_ONLY');
 });
 
 test('option observer parses the current dynamic fee schedule and fails unknown fees closed', () => {

@@ -143,6 +143,7 @@ test('options evidence fails closed with an explicit primary barrier', () => {
     valuation: {
       fidelity: 'A', ivIntervalComplete: true, surface: { mode: 'EXACT_EXPIRY' },
     },
+    targetSurfaceMode: 'EXACT_EXPIRY',
     optimized: null, freshBook: true, book: {}, bookAgeMs: 10,
     chainlinkAgeMs: 10, feesKnown: true, minimumOrderSize: 5,
   }), 'NO_POSITIVE_DEPTH_WALK_AFTER_2X_COSTS');

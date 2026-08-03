@@ -5,9 +5,11 @@ const path = require('node:path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { createResearchPool } = require('./lib/research-pool');
 
-const OPTIONS_EXPERIMENT_ID = 'options-daily-threshold-surface-residual-v3';
-const OPTIONS_STRATEGY = 'options_daily_threshold_surface_residual_v3';
-const MANIFEST_EVIDENCE_START = '2026-07-27T13:05:00Z';
+const {
+  OPTIONS_EVIDENCE_START: MANIFEST_EVIDENCE_START,
+  OPTIONS_EXPERIMENT_ID,
+  OPTIONS_STRATEGY,
+} = require('../borg/options/experiment');
 
 function finite(value) {
   const parsed = parseFloat(value);
@@ -156,14 +158,14 @@ async function buildReport(pool) {
     generatedAt: new Date().toISOString(),
     evidenceStartedAt: evidenceStart,
     trial,
-    policy: 'first executable A/B surface signal per market; no stacking or best-in-hindsight replacement',
+    policy: 'first executable exact-expiry A-fidelity surface signal per market; no stacking or best-in-hindsight replacement',
     runtime: runtime[0] || null,
     capture: inventory[0] || null,
     evidenceProduction: {
       diagnostics: diagnosticRows,
-      interpretation: diagnosticRows.some((row) => ['A', 'B'].includes(row.surface_fidelity))
-        ? 'At least one non-extrapolated surface cohort is present; executable rows still require every book, resolver, fee, minimum-size and positive-depth constraint.'
-        : 'No A/B surface exists for the observed target expiries. C/D marks are diagnostic collection, not executable evidence and are excluded from PnL.',
+      interpretation: diagnosticRows.some((row) => row.surface_fidelity === 'A')
+        ? 'At least one exact-expiry A-fidelity surface cohort is present; executable rows still require every book, resolver, fee, minimum-size and positive-depth constraint.'
+        : 'No exact-expiry A-fidelity surface exists for the observed targets. Term interpolation and C/D marks are diagnostic collection, not executable evidence and are excluded from PnL.',
     },
     pendingOrUnscorable: rows.length - scored.length,
     overall: summarize(scored),

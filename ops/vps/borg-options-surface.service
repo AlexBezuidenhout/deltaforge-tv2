@@ -13,12 +13,14 @@ EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
 Environment=NODE_ENV=production
 Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
 Environment=BORG_WAL_MIN_FREE_GB=20
-Environment=BORG_CODE_VERSION=options-daily-threshold-surface-residual-v3
+Environment=BORG_CODE_VERSION=options-exact-expiry-residual-v4
 Environment=OPTIONS_CURRENCIES=BTC,ETH
 Environment=OPTIONS_MAX_INSTRUMENTS=160
 Environment=OPTIONS_DB_SAMPLE_MS=5000
-Environment=OPTIONS_MARK_SAMPLE_MS=5000
-Environment=OPTIONS_EXECUTABLE_MARK_SAMPLE_MS=250
+Environment=OPTIONS_REQUIRE_EXACT_EXPIRY=true
+Environment=OPTIONS_DIAGNOSTIC_HEARTBEAT_MS=300000
+Environment=OPTIONS_EXECUTABLE_HEARTBEAT_MS=60000
+Environment=OPTIONS_MARK_TRANSITION_DWELL_MS=250
 Environment=OPTIONS_DB_FLUSH_MAX_ATTEMPTS=4
 Environment=OPTIONS_DB_FLUSH_RETRY_BASE_MS=25
 Environment=OPTIONS_TARGET_BUDGET_USD=10
