@@ -38,13 +38,14 @@ async function main() {
   if (command === 'status') {
     const stateRoot = process.env.PARQUET_LAKE_STATE_ROOT || '/var/lib/deltaforge/parquet-lake';
     const state = loadLakeState(path.join(stateRoot, 'state.json'));
+    const receipt = process.env.PARQUET_LAKE_RECEIPT || path.join(stateRoot, 'receipt');
     console.log(JSON.stringify({
       format: state.format,
       updatedAt: state.updatedAt || null,
       sourceFiles: Object.keys(state.sources).length,
       batches: Object.keys(state.batches).length,
       verifiedBatches: Object.values(state.batches).filter((row) => row.verified).length,
-      receiptPresent: fs.existsSync(process.env.PARQUET_LAKE_RECEIPT || '/var/lib/deltaforge/parquet-lake.receipt'),
+      receiptPresent: fs.existsSync(receipt),
     }, null, 2));
     return;
   }

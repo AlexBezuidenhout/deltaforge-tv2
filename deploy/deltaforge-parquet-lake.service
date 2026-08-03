@@ -16,6 +16,7 @@ EnvironmentFile=/etc/deltaforge/tv2.env
 EnvironmentFile=/etc/deltaforge/google-drive-archive.env
 Environment=NODE_ENV=production
 Environment=PARQUET_LAKE_STATE_ROOT=/var/lib/deltaforge/parquet-lake
+Environment=PARQUET_LAKE_RECEIPT=/var/lib/deltaforge/parquet-lake/receipt
 Environment=PARQUET_HOT_ROOT=/var/lib/deltaforge/parquet-hot
 Environment=PARQUET_STAGE_ROOT=/var/lib/deltaforge/parquet-stage
 Environment=PARQUET_MAX_FILES=25

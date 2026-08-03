@@ -13,6 +13,8 @@ const {
   compactStagedBatch,
   diskFreeBytes,
   envelopeFor,
+  latestVerifiedBatch,
+  receiptFile,
   selectVerifiedRawObjects,
   sourceFromRelative,
   stageRawRecords,
@@ -89,6 +91,16 @@ test('compaction refuses to consume the configured disk reserve', () => {
   assert.ok(free > 0);
   assert.throws(() => assertDiskReserve(os.tmpdir(), Number.MAX_SAFE_INTEGER),
     /below the .* byte reserve/);
+});
+
+test('receipt stays inside the service-owned state directory and can recover the latest checkpoint', () => {
+  assert.equal(receiptFile({}, '/var/lib/deltaforge/parquet-lake'),
+    '/var/lib/deltaforge/parquet-lake/receipt');
+  assert.equal(latestVerifiedBatch({ batches: {
+    older: { verified: true, verifiedAt: '2026-08-03T10:00:00.000Z', sourceFiles: 1 },
+    failed: { verified: false, verifiedAt: '2026-08-03T12:00:00.000Z' },
+    latest: { verified: true, verifiedAt: '2026-08-03T11:00:00.000Z', sourceFiles: 2 },
+  } }).batchHash, 'latest');
 });
 
 test('staging uses one bounded files-from transfer before per-file SHA verification', async (t) => {

@@ -23,7 +23,7 @@ const STATE_FORMAT = 'deltaforge-parquet-lake-state-v1';
 const DEFAULT_STATE_ROOT = '/var/lib/deltaforge/parquet-lake';
 const DEFAULT_HOT_ROOT = '/var/lib/deltaforge/parquet-hot';
 const DEFAULT_STAGE_ROOT = '/var/lib/deltaforge/parquet-stage';
-const DEFAULT_RECEIPT = '/var/lib/deltaforge/parquet-lake.receipt';
+const DEFAULT_RECEIPT_NAME = 'receipt';
 const DEFAULT_RAW_STATE = '/var/lib/deltaforge/google-drive-archive/state.json';
 const DEFAULT_CONFIG = '/var/lib/deltaforge/google-drive-archive/rclone.conf';
 const DEFAULT_PREFIX = 'VPS Data';
@@ -182,6 +182,20 @@ function loadLakeState(file) {
   state.sources ||= {};
   state.batches ||= {};
   return state;
+}
+
+function receiptFile(env, stateRoot) {
+  return path.resolve(env.PARQUET_LAKE_RECEIPT || path.join(stateRoot, DEFAULT_RECEIPT_NAME));
+}
+
+function latestVerifiedBatch(state) {
+  const rows = Object.entries(state?.batches || {})
+    .filter(([, batch]) => batch?.verified === true)
+    .sort((left, right) => String(right[1].verifiedAt || '')
+      .localeCompare(String(left[1].verifiedAt || '')));
+  if (!rows.length) return null;
+  const [batchHashValue, batch] = rows[0];
+  return { batchHash: batchHashValue, ...batch };
 }
 
 function normalizeSources(value) {
@@ -648,7 +662,19 @@ async function compactFromGoogle(options = {}) {
     cutoffMs: options.cutoffMs || Date.now() - positiveInt(env.PARQUET_CUTOFF_SECONDS, 600) * 1000,
   });
   if (!selection.records.length) {
-    const report = { format: 'deltaforge-parquet-lake-run-v1', status: 'nothing_to_compact', pending: selection.remaining };
+    // The state checkpoint is written only after remote rclone verification.
+    // A prior process can therefore be safely resumed here if it verified and
+    // checkpointed a batch but died while publishing the liveness receipt.
+    const prior = latestVerifiedBatch(lakeState);
+    if (prior) {
+      writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.remaining), 0o644);
+    }
+    const report = {
+      format: 'deltaforge-parquet-lake-run-v1',
+      status: prior ? 'verified_no_new_batch' : 'nothing_to_compact',
+      latestVerifiedBatch: prior?.batchHash || null,
+      pending: selection.remaining,
+    };
     writeAtomic(path.join(stateRoot, 'last-report.json'), `${JSON.stringify(report, null, 2)}\n`, 0o600);
     return report;
   }
@@ -697,7 +723,7 @@ async function compactFromGoogle(options = {}) {
     };
     lakeState.updatedAt = compactedAt;
     writeAtomic(stateFile, `${JSON.stringify(lakeState, null, 2)}\n`, 0o600);
-    writeAtomic(env.PARQUET_LAKE_RECEIPT || DEFAULT_RECEIPT,
+    writeAtomic(receiptFile(env, stateRoot),
       receiptText(batch, selection.remaining), 0o644);
     const prune = pruneHotParquet(hotRoot, lakeState,
       positiveInt(env.PARQUET_HOT_MAX_BYTES, DEFAULT_HOT_BYTES));
@@ -792,10 +818,12 @@ module.exports = {
   envelopeFor,
   hydrateParquet,
   loadLakeState,
+  latestVerifiedBatch,
   normalizeSources,
   outputRelative,
   parquetCodec,
   pruneHotParquet,
+  receiptFile,
   selectVerifiedRawObjects,
   sourceFromRelative,
   stageRawRecords,
