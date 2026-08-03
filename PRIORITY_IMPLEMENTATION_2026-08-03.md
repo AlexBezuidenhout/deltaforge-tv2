@@ -15,6 +15,11 @@ statement and lock timeouts. They prefer `ANALYTICS_DATABASE_URL`, then
 no research copy is configured. This prevents a report from holding the hot
 ingestion database behind a long analytical scan.
 
+The primary shadow allowlist is now restricted to the unchanged H43 control,
+H43-X and the exact longshot successor. Historical MAIN and discovery variants
+remain immutable and reportable, but no longer generate fresh multiple-testing
+rows in the priority epoch.
+
 ### H43-X resolver-tail successor
 
 `H43X_chainlink_tail_residual_v1` requires:
@@ -74,6 +79,15 @@ executability transitions, 60-second executable heartbeats and five-minute
 diagnostic heartbeats. A 250 ms dwell suppresses opportunities that cannot
 survive the registered execution profile. This removes repetitive derived
 rows without destroying deterministic replay.
+
+### Archive/retention atomicity
+
+Google Drive enumeration tolerates an already-receipted file disappearing
+between directory traversal and metadata capture, treating it as omitted from
+the new traversal rather than as proof. More importantly, the uploader and
+local-retention process now share an exclusive filesystem lock for the entire
+copy/hash/remote-verification interval, so retention cannot unlink a frozen
+source inode while a new receipt is being constructed.
 
 ### Ordered-strike implication trial
 

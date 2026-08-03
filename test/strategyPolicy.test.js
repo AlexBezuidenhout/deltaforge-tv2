@@ -74,7 +74,7 @@ test('runtime policy reads only the latest trial disposition for each strategy',
   ]);
 });
 
-test('VPS allowlist activates the causal H58 successor and omits retired resolver arms', () => {
+test('VPS allowlist is restricted to the frozen priority control and successors', () => {
   const service = fs.readFileSync(
     require.resolve('../ops/vps/borg-collector.service'),
     'utf8',
@@ -85,9 +85,13 @@ test('VPS allowlist activates the causal H58 successor and omits retired resolve
   const allowlist = activeStrategyAllowlist({
     BORG_ACTIVE_STRATEGIES: line.split('=').slice(2).join('='),
   });
-  assert.ok(allowlist.has('H58_source_causal_residual_v2'));
-  assert.ok(allowlist.has('MAIN_VIDEO_PARITY_V1__taker250'));
-  assert.ok(allowlist.has('MAIN_VIDEO_PARITY_V1__postonly'));
+  assert.deepEqual([...allowlist].sort(), [
+    'H43X_chainlink_tail_residual_v1',
+    'H43_resolution_boundary_buffer',
+    'MAIN_LONGSHOT_0_20_V1',
+  ]);
+  assert.equal(allowlist.has('MAIN_VIDEO_PARITY_V1__taker250'), false);
+  assert.equal(allowlist.has('MAIN_VIDEO_PARITY_V1__postonly'), false);
   assert.equal(allowlist.has('H58_resolver_event_stale_quote'), false);
   assert.equal(allowlist.has('H59_resolver_cross_persistence'), false);
   assert.doesNotThrow(() => filterStrategiesByAllowlist(makeStrategies(), allowlist));
