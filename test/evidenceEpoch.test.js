@@ -163,6 +163,13 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
   assert.ok(archiveSeed >= 0, 'raw archive seed is present');
   assert.ok(collectorStart >= 0, 'collector start block is present');
   assert.ok(archiveSeed < collectorStart, 'archive seed precedes the hot writers');
+  assert.match(launcher,
+    /deltaforge-google-drive-archive\.timer deltaforge-google-drive-archive\.service/);
+  assert.match(launcher, /deltaforge-parquet-lake\.timer deltaforge-parquet-lake\.service/);
+  const maintenanceRestart = launcher.indexOf('deltaforge-google-drive-archive.timer \\\n  deltaforge-parquet-lake.timer');
+  const warmupComplete = launcher.lastIndexOf('rm -f "${preflight_report}"');
+  assert.ok(maintenanceRestart > warmupComplete,
+    'off-host and Parquet maintenance restart only after collector warmup');
   assert.match(
     launcher,
     /deployed_release="\$\(basename "\$\(readlink -f \/opt\/deltaforge\/tv2\/current\)"\)"/,

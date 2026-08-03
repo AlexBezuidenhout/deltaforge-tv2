@@ -34,6 +34,8 @@ systemctl stop \
   deltaforge-evidence-health.timer deltaforge-evidence-health.service \
   borg-score.timer borg-score.service \
   deltaforge-raw-archive.timer deltaforge-raw-archive.service \
+  deltaforge-google-drive-archive.timer deltaforge-google-drive-archive.service \
+  deltaforge-parquet-lake.timer deltaforge-parquet-lake.service \
   deltaforge-hot-partitions.timer deltaforge-hot-partitions.service \
   deltaforge-hot-db-prune.timer deltaforge-hot-db-prune.service \
   deltaforge-hot-retention.timer deltaforge-hot-retention.service \
@@ -143,6 +145,13 @@ if [[ "${preflight_ready}" != true ]]; then
   exit 1
 fi
 rm -f "${preflight_report}"
+
+# Off-host upload and Parquet projection are deliberately restarted only after
+# the database archive seed and high-rate collector warmup. They are durable
+# maintenance lanes, not prerequisites that may contend with cohort startup.
+systemctl enable --now \
+  deltaforge-google-drive-archive.timer \
+  deltaforge-parquet-lake.timer
 
 # The persistent generic timer may be overdue after a maintenance drain. Enable
 # it only after same-epoch collectors have passed their warmup, otherwise a
