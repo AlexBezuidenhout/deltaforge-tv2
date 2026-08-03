@@ -309,6 +309,55 @@ items: paper MAIN, paper George and the three frozen shadow strategies.
 Cross-venue V7 still has zero eligible entries and the options lane still has
 zero exact-expiry executable targets; neither is a profit result.
 
+### v31 autopsy, resolver protocol correction and operations UI
+
+v31 did not remain pending. A real VPS network interruption from approximately
+21:24–21:29 UTC made Binance, Coinbase and Hyperliquid stale, closed a primary
+CLOB path and silenced RTDS. Those gaps remain immutable failures. The same
+cohort also exposed two separate Pyth observer defects: it required fresh
+resolver ticks throughout an entire daily contract, even though every frozen
+checkpoint is inside the final 300 seconds, and it restarted the Hermes URL as
+future Gamma feed identities changed. v31 finished with 91 failed samples and
+non-zero Hermes reconfiguration, CLOB coverage and RTDS coverage counters. It
+must never be used as promotion evidence.
+
+`pyth-resolver-boundary-transfer-v4-frozen-observation-window` corrects the
+protocol under a new experiment identity. The initial exact Hermes feed set is
+frozen for the process lifetime; later feed discoveries are disclosed and
+deferred to the next cohort. Signals and fresh-tick requirements apply only
+inside the final 300-second resolver observation window. Raw transport gaps
+remain evidence-breaking at all times. V4 reuses no V3 rows and retains the
+same 300-independent-market, 14-day, doubled-cost, chronological-half,
+clustered-bound and 100/250/500-ms requirements.
+
+The epoch launcher now requires 120 uninterrupted green seconds after the
+existing one-minute process-age gate. One bad preflight resets that clock and
+non-zero process counters cannot recover in place. The cross-venue settlement
+oneshot now treats the launcher's deliberate SIGTERM drain as a clean stop;
+its next poll must still exit zero, so real settlement failures remain visible.
+
+Collector release `4c4202e` started
+`backlog-forward-2026-08-03-v32` at `2026-08-03T22:37:22.217Z`. The controlled
+launch passed its uninterrupted preflight. Its first recorded sample was
+`PENDING_24H` with zero failed samples, zero stale-feed records, zero sequence
+or collector error counters, approximately 33.0 GiB free, 16 verified Parquet
+batches and a fresh verified Google Drive receipt. The Pyth heartbeat reported
+the V4 experiment, a 300-second observation window, a process-lifetime feed
+freeze at `2026-08-03T22:37:28.170Z`, zero reconfiguration gaps and
+`AWAITING_WINDOW` because no certified market was inside its final five
+minutes. MAIN and George were active in paper mode; every live canary flag was
+false. This is launch acceptance only—not a clean 24-hour result or evidence
+of profitability.
+
+The dashboard was rebuilt as a light, high-contrast research operations shell
+with grouped navigation, stable page transitions, keyboard-focus visibility,
+responsive layouts and contextual help. A persistent evidence ribbon keeps
+runtime liveness separate from cohort validity and surfaces storage and archive
+state globally. Dense legacy tables remain horizontally contained. The public
+dashboard-only process runs release `47e03ff`; it reports `Operational`,
+`Collecting`, about 33 GiB free and `Verified` without owning a bot runner.
+The complete repository suite passes 654/654 tests.
+
 ## What remains external or accrual-bound
 
 - H43-X: 300 fresh independent markets and at least 14 days, unchanged.
