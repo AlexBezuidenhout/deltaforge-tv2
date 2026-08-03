@@ -43,6 +43,18 @@ test('sub-250ms executable flicker is suppressed because it cannot survive the e
   assert.equal(sampler.states.get('1:NO').accepted.executable, false);
 });
 
+test('non-executable diagnostic surface flicker must persist for thirty seconds', () => {
+  const sampler = new TransitionMarkSampler({
+    transitionDwellMs: 250,
+    diagnosticTransitionDwellMs: 30000,
+  });
+  sampler.observe('1:NO', mark(), 1000);
+  const incomplete = mark({ executionBarrier: 'INCOMPLETE_BID_ASK_IV_INTERVAL' });
+  assert.equal(sampler.observe('1:NO', incomplete, 2000).persist, false);
+  assert.equal(sampler.observe('1:NO', incomplete, 31999).persist, false);
+  assert.equal(sampler.observe('1:NO', incomplete, 32000).eventKind, 'BARRIER_TRANSITION');
+});
+
 test('sampler prunes expired targets without changing active target state', () => {
   const sampler = new TransitionMarkSampler();
   sampler.observe('1:YES', mark(), 1000);

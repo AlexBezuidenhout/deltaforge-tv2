@@ -4,6 +4,7 @@ const DEFAULTS = Object.freeze({
   diagnosticHeartbeatMs: 5 * 60_000,
   executableHeartbeatMs: 60_000,
   transitionDwellMs: 250,
+  diagnosticTransitionDwellMs: 30_000,
   maximumStates: 20_000,
 });
 
@@ -36,6 +37,9 @@ class TransitionMarkSampler {
       Number(options.executableHeartbeatMs || DEFAULTS.executableHeartbeatMs));
     this.transitionDwellMs = Math.max(0,
       Number(options.transitionDwellMs ?? DEFAULTS.transitionDwellMs));
+    this.diagnosticTransitionDwellMs = Math.max(this.transitionDwellMs,
+      Number(options.diagnosticTransitionDwellMs
+        ?? DEFAULTS.diagnosticTransitionDwellMs));
     this.maximumStates = Math.max(100,
       Number(options.maximumStates || DEFAULTS.maximumStates));
     this.states = new Map();
@@ -88,7 +92,14 @@ class TransitionMarkSampler {
         this.metrics.suppressed += 1;
         return { persist: false, reason: 'TRANSITION_DWELL', mark };
       }
-      if (now - state.pendingSince < this.transitionDwellMs) {
+      // Entry-eligibility transitions retain the 250ms execution dwell. Purely
+      // diagnostic surface/barrier flicker is raw-WAL replayable and must stay
+      // stable much longer before becoming another SQL gold fact. Treating
+      // every subsecond bid/ask-IV mode oscillation as a durable transition
+      // created millions of redundant rows without adding causal evidence.
+      const dwellMs = state.accepted.executable === true || mark.executable === true
+        ? this.transitionDwellMs : this.diagnosticTransitionDwellMs;
+      if (now - state.pendingSince < dwellMs) {
         this.metrics.suppressed += 1;
         return { persist: false, reason: 'TRANSITION_DWELL', mark };
       }

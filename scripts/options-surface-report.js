@@ -106,20 +106,30 @@ function summarize(rows) {
 }
 
 async function buildReport(pool) {
-  const { rows: trialRows } = await pool.query(`
-    SELECT experiment_id,strategy,status,evidence_started_at,
-           min_independent_markets,min_days,manifest_hash
-      FROM borg_trial_ledger
-     WHERE experiment_id=$1
-       AND strategy=$2
-     ORDER BY registered_at DESC LIMIT 1`,
-  [OPTIONS_EXPERIMENT_ID, OPTIONS_STRATEGY]);
+  const [{ rows: trialRows }, { rows: collectionRows }] = await Promise.all([
+    pool.query(`
+      SELECT experiment_id,strategy,status,evidence_started_at,
+             min_independent_markets,min_days,manifest_hash
+        FROM borg_trial_ledger
+       WHERE experiment_id=$1
+         AND strategy=$2
+       ORDER BY registered_at DESC LIMIT 1`,
+    [OPTIONS_EXPERIMENT_ID, OPTIONS_STRATEGY]),
+    pool.query(`
+      SELECT r.epoch_id,e.started_at,e.code_version,e.data_contract_version
+        FROM borg_collector_runs r
+        JOIN borg_collection_epochs e USING(epoch_id)
+       WHERE r.status='RUNNING' ORDER BY r.started_at DESC LIMIT 1`),
+  ]);
   const trial = trialRows[0] || null;
+  const collection = collectionRows[0] || null;
   // Registry time may conservatively lag the manifest freeze during deployment.
-  // Use the later boundary so warm-up observations can never leak into evidence.
+  // The infrastructure epoch is also an evidence boundary: pre-repair rows from
+  // the same strategy identifier may never leak into a post-repair cohort.
   const evidenceStart = new Date(Math.max(
     Date.parse(MANIFEST_EVIDENCE_START),
     trial?.evidence_started_at ? new Date(trial.evidence_started_at).getTime() : 0,
+    collection?.started_at ? new Date(collection.started_at).getTime() : 0,
   )).toISOString();
   const { rows: runtime } = await pool.query(`
     SELECT * FROM borg_options_runtime ORDER BY updated_at DESC LIMIT 1`);
@@ -157,6 +167,7 @@ async function buildReport(pool) {
   return {
     generatedAt: new Date().toISOString(),
     evidenceStartedAt: evidenceStart,
+    collectionEpoch: collection,
     trial,
     policy: 'first executable exact-expiry A-fidelity surface signal per market; no stacking or best-in-hindsight replacement',
     runtime: runtime[0] || null,

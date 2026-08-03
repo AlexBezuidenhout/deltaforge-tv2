@@ -48,6 +48,8 @@ const EXECUTABLE_HEARTBEAT_MS = Math.max(5_000,
   Number(process.env.OPTIONS_EXECUTABLE_HEARTBEAT_MS || 60_000));
 const MARK_TRANSITION_DWELL_MS = Math.max(0,
   Number(process.env.OPTIONS_MARK_TRANSITION_DWELL_MS || 250));
+const DIAGNOSTIC_TRANSITION_DWELL_MS = Math.max(MARK_TRANSITION_DWELL_MS,
+  Number(process.env.OPTIONS_DIAGNOSTIC_TRANSITION_DWELL_MS || 30_000));
 const REQUIRE_EXACT_EXPIRY = String(process.env.OPTIONS_REQUIRE_EXACT_EXPIRY || 'true')
   .toLowerCase() !== 'false';
 const MAX_INSTRUMENTS = Math.max(8, Number(process.env.OPTIONS_MAX_INSTRUMENTS || 160));
@@ -368,6 +370,7 @@ class OptionsObserver {
       diagnosticHeartbeatMs: DIAGNOSTIC_HEARTBEAT_MS,
       executableHeartbeatMs: EXECUTABLE_HEARTBEAT_MS,
       transitionDwellMs: MARK_TRANSITION_DWELL_MS,
+      diagnosticTransitionDwellMs: DIAGNOSTIC_TRANSITION_DWELL_MS,
     });
     this.flushPromise = null;
     this.lastEventAt = 0;
@@ -631,6 +634,7 @@ class OptionsObserver {
           persistencePolicy: {
             mode: 'STATE_TRANSITIONS_AND_BOUNDED_HEARTBEATS',
             transitionDwellMs: MARK_TRANSITION_DWELL_MS,
+            diagnosticTransitionDwellMs: DIAGNOSTIC_TRANSITION_DWELL_MS,
             executableHeartbeatMs: EXECUTABLE_HEARTBEAT_MS,
             diagnosticHeartbeatMs: DIAGNOSTIC_HEARTBEAT_MS,
             rawReplaySource: 'append_before_parse_WAL',
@@ -854,6 +858,7 @@ class OptionsObserver {
       diagnosticHeartbeatMs: DIAGNOSTIC_HEARTBEAT_MS,
       executableHeartbeatMs: EXECUTABLE_HEARTBEAT_MS,
       markTransitionDwellMs: MARK_TRANSITION_DWELL_MS,
+      diagnosticTransitionDwellMs: DIAGNOSTIC_TRANSITION_DWELL_MS,
       markSampler: { ...this.markSampler.metrics, states: this.markSampler.states.size },
       targetBudgetUsd: TARGET_BUDGET_USD,
       archiveAnchors: this.archiveTargets,
@@ -904,6 +909,7 @@ class OptionsObserver {
       flushRetries: this.metrics.flushRetries,
       persistenceErrors: this.metrics.persistenceErrors,
       persistenceQueue: this.touchBuffer.size + this.markBuffer.size,
+      diagnosticTransitionDwellMs: DIAGNOSTIC_TRANSITION_DWELL_MS,
       surfaceFidelity: this.metrics.surfaceFidelity,
       executionBarriers: this.metrics.executionBarriers,
       wal: {
