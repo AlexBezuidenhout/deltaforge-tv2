@@ -114,6 +114,7 @@ async function buildPriorityLaneStatus(pool, options = {}) {
     && finite(pythMeta.hermes?.metrics?.catalogFailures) === 0
     && finite(pythMeta.hermes?.metrics?.connectFailures) === 0
     && finite(pythMeta.hermes?.metrics?.connectionGaps) === 0
+    && finite(pythMeta.hermes?.metrics?.reconfigurationGaps) === 0
     && finite(pythMeta.hermes?.metrics?.parseErrors) === 0;
   const fairCaptureState = collectorState(
     allMarket, now.getTime(), epochId, allMarketMeta.lastEventAt,

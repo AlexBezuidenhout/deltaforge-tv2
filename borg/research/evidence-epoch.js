@@ -69,7 +69,7 @@ function isErrorCounter(key) {
 }
 
 function isGapCounter(key) {
-  return /(?:sequence.?gaps?|discardedsequence|coveragegaps?|connection.?gaps?|bookstategaps?)$/i
+  return /(?:sequence.?gaps?|discardedsequence|coveragegaps?|connection.?gaps?|reconfigurationgaps?|bookstategaps?)$/i
     .test(String(key));
 }
 

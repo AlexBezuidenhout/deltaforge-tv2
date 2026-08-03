@@ -213,8 +213,10 @@ class PythBoundaryObserver {
 
   async refreshUniverse() {
     await this.refreshTerminalOutcomes();
-    const discovered = (await discoverPythUniverse()).sort((left, right) => left.endMs - right.endMs
-      || left.conditionId.localeCompare(right.conditionId)).slice(0, MAX_MARKETS);
+    const certifiedUniverse = (await discoverPythUniverse())
+      .sort((left, right) => left.endMs - right.endMs
+        || left.conditionId.localeCompare(right.conditionId));
+    const discovered = certifiedUniverse.slice(0, MAX_MARKETS);
     await this.persistUniverse(discovered);
     for (const market of discovered) this.markets.set(market.conditionId, market);
     const now = Date.now();
@@ -237,7 +239,11 @@ class PythBoundaryObserver {
         || left.endMs - right.endMs
         || left.symbol.localeCompare(right.symbol);
     });
-    const selectedFeeds = [...new Map(prioritizedFeeds.map((market) => [market.pythFeedSymbol, {
+    // Resolve the complete currently certified rule universe, not merely the
+    // bounded CLOB panel. The panel rotates as markets expire; a stable feed
+    // superset prevents that expected metadata rotation from interrupting an
+    // in-window resolver tape.
+    const selectedFeeds = [...new Map(certifiedUniverse.map((market) => [market.pythFeedSymbol, {
       symbol: market.symbol, feedSymbol: market.pythFeedSymbol,
     }])).values()];
     const hermesSelection = await this.hermes.setFeeds(selectedFeeds);
@@ -245,8 +251,9 @@ class PythBoundaryObserver {
       .filter((market) => isSupportedMarketSymbol(market.symbol))
       .map((market) => market.symbol))]);
     this.clob.subscribe([...this.targetByToken.keys()]);
-    await logEvent('INFO', 'pyth', `certified universe: ${active.length} markets, ${hermesSelection.resolved} exact Hermes feeds`, {
+    await logEvent('INFO', 'pyth', `certified universe: ${active.length} CLOB markets, ${hermesSelection.resolved} exact Hermes feeds`, {
       runId: this.runId, experimentId: EXPERIMENT_ID,
+      certifiedRuleMarkets: certifiedUniverse.length,
       unresolvedExactFeeds: hermesSelection.unresolved,
       diagnosticRtdsSymbols: this.rtds.symbols.size,
     });

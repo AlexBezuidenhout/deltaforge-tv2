@@ -66,10 +66,25 @@ test('closed Flow socket drops a queued frame after WAL shutdown', () => {
   assert.equal(appends, 0);
 });
 
-test('flow market sockets assign every logical shard to two independent paths', () => {
+test('flow market sockets assign every logical shard to the configured independent paths', () => {
   assert.deepEqual(flowRouteIndexes(0, 2, 2), [0, 2]);
   assert.deepEqual(flowRouteIndexes(1, 2, 2), [1, 3]);
   assert.deepEqual(flowRouteIndexes(3, 2, 2), [1, 3]);
+  assert.deepEqual(flowRouteIndexes(0, 2, 3), [0, 2, 4]);
+  assert.deepEqual(flowRouteIndexes(1, 2, 3), [1, 3, 5]);
+});
+
+test('flow socket re-requests only missing active snapshots with a cooldown', () => {
+  const sent = [];
+  const socket = new FlowSocket(0, { append: () => ({}) }, () => {}, () => {});
+  socket.ws = { readyState: WebSocket.OPEN, send: (payload) => sent.push(JSON.parse(payload)) };
+  socket.desired = new Set(['a', 'b']);
+  socket.active = new Set(['a', 'b']);
+  const refreshed = socket.refreshSnapshots(['b', 'not-desired'], 20_000, 5_000);
+  assert.deepEqual(refreshed, ['b']);
+  assert.deepEqual(sent.map((row) => row.operation), ['unsubscribe', 'subscribe']);
+  assert.deepEqual(socket.refreshSnapshots(['b'], 21_000, 5_000), []);
+  assert.equal(socket.active.has('b'), true);
 });
 
 test('flow CLOB health remains covered after one physical route disconnects', () => {

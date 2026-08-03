@@ -51,11 +51,15 @@ const SOCKET_SHARDS = Math.max(1, Math.min(4, Number(process.env.FLOW_CLOB_SHARD
 // drives the derived strategy/SQL state so duplicate frames cannot manufacture
 // signals.
 const SOCKET_PATHS = Math.max(2, Math.min(3,
-  Number(process.env.FLOW_CLOB_PATHS_PER_ASSET || 2)));
+  Number(process.env.FLOW_CLOB_PATHS_PER_ASSET || 3)));
 const SOCKET_CONNECT_STAGGER_MS = Math.max(0,
-  Number(process.env.FLOW_CLOB_CONNECT_STAGGER_MS || 250));
+  Number(process.env.FLOW_CLOB_CONNECT_STAGGER_MS || 5000));
 const SOCKET_COVERAGE_MAX_AGE_MS = Math.max(10_000,
   Number(process.env.FLOW_CLOB_COVERAGE_MAX_AGE_MS || 45_000));
+const SOCKET_REHYDRATE_AFTER_MS = Math.max(1_000,
+  Number(process.env.FLOW_CLOB_REHYDRATE_AFTER_MS || 5_000));
+const SOCKET_REHYDRATE_COOLDOWN_MS = Math.max(SOCKET_REHYDRATE_AFTER_MS,
+  Number(process.env.FLOW_CLOB_REHYDRATE_COOLDOWN_MS || 15_000));
 // Data API trades have second-resolution source timestamps. Polling this
 // discovery-only plane faster than two seconds adds no causal information and
 // previously allowed slow 10,000-row requests to overlap until Cloudflare
@@ -442,6 +446,8 @@ class FlowSocket {
     this.reconnectTimer = null;
     this.pingTimer = null;
     this.lastMessageAt = 0;
+    this.openedAt = 0;
+    this.lastSnapshotRefreshAt = 0;
   }
 
   setAssets(assetIds) {
@@ -468,6 +474,8 @@ class FlowSocket {
       this.eventSequence = 0;
       this.reconnectMs = 2000;
       this.lastMessageAt = Date.now();
+      this.openedAt = this.lastMessageAt;
+      this.lastSnapshotRefreshAt = 0;
       this.active.clear();
       if (this.desired.size) this._sendInitial();
       this.onConnection(this, 'open', { assets: this.desired.size });
@@ -481,6 +489,7 @@ class FlowSocket {
       if (ws !== this.ws) return;
       clearInterval(this.pingTimer);
       this.active.clear();
+      this.openedAt = 0;
       this.onConnection(this, 'close', { code, reason: reason?.toString() || null });
       if (!this.closed) this._scheduleReconnect();
     });
@@ -499,6 +508,21 @@ class FlowSocket {
       if (operation === 'subscribe') this.active.add(id);
       else this.active.delete(id);
     }
+  }
+
+  refreshSnapshots(assetIds, now = Date.now(), cooldownMs = SOCKET_REHYDRATE_COOLDOWN_MS) {
+    if (this.ws?.readyState !== WebSocket.OPEN
+        || now - this.lastSnapshotRefreshAt < cooldownMs) return [];
+    const ids = [...new Set((assetIds || []).map(String))]
+      .filter((id) => this.desired.has(id) && this.active.has(id));
+    if (!ids.length) return [];
+    // WebSocket frames are ordered. Cycling only the missing assets asks the
+    // venue for a fresh book snapshot without disturbing healthy subscriptions
+    // on this route or any independent route.
+    this._sendChange('unsubscribe', ids);
+    this._sendChange('subscribe', ids);
+    this.lastSnapshotRefreshAt = now;
+    return ids;
   }
 
   _message(ws, buffer) {
@@ -603,6 +627,7 @@ class FlowCollector {
       globalBootstrapTruncations: 0, globalRescueSnapshots: 0,
       realtimeTransportReconnects: 0, realtimeCoverageGaps: 0,
       lastRealtimeCoverageGapAt: null,
+      realtimeSnapshotRefreshes: 0, realtimeSnapshotRefreshAssets: 0,
       globalDbPersisted: 0, globalDbQueueHighWater: 0,
       restRetries: 0, lastRestRetryAt: null,
       boundarySourceArmed: 0, boundaryReady: 0, boundaryRejected: 0,
@@ -885,6 +910,7 @@ class FlowCollector {
       activeSockets: this.sockets.filter((socket) => socket.ws?.readyState === WebSocket.OPEN).length,
       expectedAssets: assets.length,
       coveredAssets: Object.values(assetCoverage).filter((row) => row.freshRoutes > 0).length,
+      pathsPerAsset: SOCKET_PATHS,
       transportReconnects: this.counters.realtimeTransportReconnects,
       coverageGaps: this.counters.realtimeCoverageGaps,
       lastCoverageGapAt: this.counters.lastRealtimeCoverageGapAt,
@@ -915,6 +941,28 @@ class FlowCollector {
           event: 'close', assetId, aggregateCoverageGap: true,
         });
       }
+    }
+  }
+
+  _rehydrateMissingRouteBooks(now = Date.now()) {
+    for (const socket of this.sockets) {
+      if (socket.ws?.readyState !== WebSocket.OPEN || !socket.openedAt
+          || now - socket.openedAt < SOCKET_REHYDRATE_AFTER_MS) continue;
+      const routeBooks = this.routeBooks.get(socket.shard);
+      const missing = [...socket.desired].filter((assetId) => {
+        const book = routeBooks?.get(assetId);
+        return !book || book.connectionEpoch !== socket.connectionEpoch;
+      });
+      const refreshed = socket.refreshSnapshots(
+        missing, now, SOCKET_REHYDRATE_COOLDOWN_MS,
+      );
+      if (!refreshed.length) continue;
+      this.counters.realtimeSnapshotRefreshes += 1;
+      this.counters.realtimeSnapshotRefreshAssets += refreshed.length;
+      logEvent('WARN', 'flow', `CLOB route ${socket.shard} requested missing snapshots`, {
+        route: socket.shard, connectionEpoch: socket.connectionEpoch,
+        assets: refreshed, aggregateCoverageGap: false,
+      });
     }
   }
 
@@ -1578,6 +1626,7 @@ class FlowCollector {
 
   health() {
     for (const socket of this.sockets) socket.checkStale();
+    this._rehydrateMissingRouteBooks();
   }
 
   async heartbeat() {

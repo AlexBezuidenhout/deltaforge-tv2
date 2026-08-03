@@ -42,6 +42,7 @@ test('feed-specific coverage and sequence gaps fail closed', () => {
   assert.equal(isGapCounter('realtimeTransportReconnects'), false);
   assert.equal(isGapCounter('bookStateGaps'), true);
   assert.equal(isGapCounter('connectionGaps'), true);
+  assert.equal(isGapCounter('reconfigurationGaps'), true);
   assert.equal(isGapCounter('globalBootstrapTruncations'), false);
 });
 
