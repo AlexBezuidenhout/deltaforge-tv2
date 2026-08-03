@@ -39,4 +39,5 @@ test('dashboard shell is responsive, keyboard visible and motion aware', () => {
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /\.nav-scrim/);
   assert.match(shell, /event\.key === 'Escape'/);
+  assert.match(shell, /tooltip\?\.classList\.remove\('visible'\)/);
 });

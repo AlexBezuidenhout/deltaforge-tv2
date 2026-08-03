@@ -170,6 +170,7 @@
 
   function closeNav() {
     document.body.classList.remove('nav-open');
+    tooltip?.classList.remove('visible');
     const toggle = document.getElementById('mobileNavToggle');
     if (toggle) toggle.setAttribute('aria-expanded', 'false');
   }
