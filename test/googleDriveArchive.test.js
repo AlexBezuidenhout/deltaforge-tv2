@@ -16,6 +16,7 @@ const {
   selectBatch,
   stateMatches,
   validateRcloneConfig,
+  writeArchiveFailureReport,
 } = require('../scripts/google-drive-archive');
 
 test('Google Drive archive accepts only a least-privilege drive.file remote', (t) => {
@@ -72,6 +73,22 @@ test('combined rclone verification must account for every frozen source file', (
   assert.equal(parseCombinedReport('= one.gz\n= two.gz\n', 2), 2);
   assert.throws(() => parseCombinedReport('= one.gz\n+ two.gz\n', 2), /mismatch/);
   assert.throws(() => parseCombinedReport('= one.gz\n', 2), /1\/2/);
+});
+
+test('Google Drive failures atomically replace a stale successful run report', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'df-gdrive-failure-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const reportFile = path.join(root, 'last-report.json');
+  fs.writeFileSync(reportFile, JSON.stringify({
+    format: 'deltaforge-google-drive-archive-v1', status: 'verified',
+  }));
+  writeArchiveFailureReport(Object.assign(new Error('rateLimitExceeded'), {
+    code: 8,
+  }), { GDRIVE_ARCHIVE_STATE_ROOT: root });
+  const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+  assert.equal(report.status, 'failed');
+  assert.equal(report.errorCode, 8);
+  assert.match(report.error, /rateLimitExceeded/);
 });
 
 test('manifests and receipts carry SHA-256 evidence and destination identity', () => {

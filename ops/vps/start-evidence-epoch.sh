@@ -20,6 +20,36 @@ deployed_release="$(basename "$(readlink -f /opt/deltaforge/tv2/current)")"
 # evidence epoch with an obsolete hard-coded code version.
 code_version="${BORG_EPOCH_CODE_VERSION:-${deployed_release}}"
 epoch_reason="${BORG_EPOCH_REASON:-exact-rule-structural-options-forward-after-runtime-repair}"
+
+# An immutable code release is not runnable evidence unless its lockfile-
+# matched native dependency set is installed. In particular, a missing DuckDB
+# binding previously left the Parquet timer failed while an old receipt still
+# looked fresh. Refuse the epoch before any collector is stopped or relabelled.
+if ! runuser -u deltaforge -- bash -lc \
+    "cd '/var/lib/deltaforge/research-tools/current' && /usr/local/bin/node -e \"require.resolve('@duckdb/node-api')\""; then
+  echo "refusing to start evidence epoch: release dependencies are incomplete" >&2
+  exit 1
+fi
+
+for maintenance_unit in \
+    deltaforge-google-drive-archive.service \
+    deltaforge-parquet-lake.service; do
+  if systemctl is-failed --quiet "${maintenance_unit}"; then
+    echo "refusing to start evidence epoch: ${maintenance_unit} is failed" >&2
+    exit 1
+  fi
+done
+
+for failure_report in \
+    /var/lib/deltaforge/google-drive-archive/last-report.json \
+    /var/lib/deltaforge/parquet-lake/last-report.json; do
+  if [[ -f "${failure_report}" ]] \
+      && grep -Eq '"status"[[:space:]]*:[[:space:]]*"failed"' "${failure_report}"; then
+    echo "refusing to start evidence epoch: failed maintenance report ${failure_report}" >&2
+    exit 1
+  fi
+done
+
 available_kib="$(df --output=avail /var/lib/postgresql | tail -1 | tr -d ' ')"
 required_kib="$((minimum_free_gib * 1024 * 1024))"
 if (( available_kib < required_kib )); then

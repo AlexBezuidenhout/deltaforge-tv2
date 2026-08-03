@@ -213,7 +213,29 @@ function rcloneCommon(env, configFile) {
     '--timeout', env.GDRIVE_IO_TIMEOUT || '5m',
     '--retries', String(positiveInt(env.GDRIVE_RETRIES, 3)),
     '--low-level-retries', String(positiveInt(env.GDRIVE_LOW_LEVEL_RETRIES, 10)),
+    '--retries-sleep', env.GDRIVE_RETRIES_SLEEP || '30s',
   ];
+}
+
+function archiveReportFile(env = process.env) {
+  const stateRoot = env.GDRIVE_ARCHIVE_STATE_ROOT || DEFAULT_STATE_ROOT;
+  return path.join(stateRoot, 'last-report.json');
+}
+
+function writeArchiveFailureReport(error, env = process.env) {
+  const report = {
+    format: 'deltaforge-google-drive-archive-v1',
+    status: 'failed',
+    failedAt: new Date().toISOString(),
+    errorCode: error?.code || null,
+    error: String(error?.message || error || 'unknown Google Drive archive failure').slice(0, 500),
+  };
+  try {
+    writeAtomic(archiveReportFile(env), `${JSON.stringify(report, null, 2)}\n`);
+  } catch (writeError) {
+    console.error(`unable to persist Google Drive failure report: ${writeError.message}`);
+  }
+  return report;
 }
 
 async function ensureRemoteDirectory({
@@ -435,6 +457,7 @@ async function main(options = {}) {
     runCommand(rcloneBinary, args, { env }));
   const report = {
     format: 'deltaforge-google-drive-archive-v1',
+    status: 'verified',
     checkedAt: new Date().toISOString(),
     cutoffAt: new Date(cutoffMs).toISOString(),
     destination,
@@ -555,12 +578,14 @@ async function main(options = {}) {
 
 if (require.main === module) {
   main().catch((error) => {
+    writeArchiveFailureReport(error, process.env);
     console.error(error.stack || error.message);
     process.exit(1);
   });
 }
 
 module.exports = {
+  archiveReportFile,
   loadState,
   main,
   manifestDocument,
@@ -575,5 +600,6 @@ module.exports = {
   selectBatch,
   stateMatches,
   validateRcloneConfig,
+  writeArchiveFailureReport,
   writeFileList,
 };
