@@ -1507,6 +1507,25 @@ const PROMISING_FORWARD_COHORT = Object.freeze([
   { source: 'H1_pair_arb_2x', name: 'FWD_H1_pair_arb_2x_v1', tier: 'C' },
 ]);
 
+// Two mechanism-valid five-minute rules survived the latest evidence review
+// as unresolved (not promoted) leads.  They are cloned under fresh identities
+// so the July rows can never be pooled into this post-selection continuation.
+// The source objects, including every threshold and sizing rule, are otherwise
+// untouched.  Both use the already-required five-minute feed, so activating
+// them adds no CLOB subscriptions to the primary evidence collector.
+const WORTHY_FORWARD_COHORT = Object.freeze([
+  {
+    source: 'H54_dynamic_ofi_resolver_confirm',
+    name: 'NEXT_H54_dynamic_ofi_resolver_confirm_v1',
+    tier: 'PRIORITY',
+  },
+  {
+    source: 'H7_btc_oracle_confirm',
+    name: 'NEXT_H7_btc_oracle_confirm_v1',
+    tier: 'CONTROL',
+  },
+]);
+
 function makeBaseStrategies() {
   return [
   new LateWindowArb(), new EthLateTaker(), new EthLateMaker(), new EthGLateExactForward(),
@@ -1562,11 +1581,36 @@ function makePromisingForwardStrategies() {
   });
 }
 
+function makeWorthyForwardStrategies() {
+  const sources = new Map(makeBaseStrategies().map((strategy) => [strategy.name, strategy]));
+  return WORTHY_FORWARD_COHORT.map((spec) => {
+    const strategy = sources.get(spec.source);
+    if (!strategy) throw new Error(`Missing worthy-forward source strategy: ${spec.source}`);
+    strategy.sourceStrategy = spec.source;
+    strategy.forwardCohort = 'worthy-paper-forward-2026-08-03-v1';
+    strategy.forwardTier = spec.tier;
+    strategy.name = spec.name;
+    const sourceDiagnostics = typeof strategy.diagnostics === 'function'
+      ? strategy.diagnostics.bind(strategy)
+      : null;
+    strategy.diagnostics = () => ({
+      ...(sourceDiagnostics ? sourceDiagnostics() : {}),
+      sourceStrategy: spec.source,
+      forwardCohort: strategy.forwardCohort,
+      forwardTier: spec.tier,
+      identityOnlyClone: true,
+      historicalEvidenceExcluded: true,
+    });
+    return strategy;
+  });
+}
+
 // Vasili remains above as an audit artifact but is no longer registered:
 // n=983 core fills, -$393.77, and its losing CI excludes zero.
 module.exports = () => [
   ...makeBaseStrategies(),
   ...makePromisingForwardStrategies(),
+  ...makeWorthyForwardStrategies(),
   ...makeMetaChampionStreakStrategies(),
   ...makePrioritySuccessors(),
 ];
@@ -1598,6 +1642,8 @@ module.exports._test = {
 };
 module.exports._forward = {
   PROMISING_FORWARD_COHORT,
+  WORTHY_FORWARD_COHORT,
   makeBaseStrategies,
   makePromisingForwardStrategies,
+  makeWorthyForwardStrategies,
 };

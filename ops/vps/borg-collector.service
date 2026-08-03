@@ -17,13 +17,14 @@ Environment=BORG_ARCHIVE_DIR=/var/lib/deltaforge/archive/borg-raw
 Environment=BORG_WAL_MIN_FREE_GB=20
 Environment=BORG_ARCHIVE_MIN_FREE_GB=20
 Environment=BORG_CODE_VERSION=priority-research-v14
-# Paper/shadow only. Restrict the active decision fleet to the unchanged H43
-# control and the two fresh, pre-registered successor hypotheses. Historical
-# discovery arms remain immutable and queryable, but no longer consume compute
-# or manufacture fresh multiple-testing rows in the priority epoch.
-Environment=BORG_ACTIVE_STRATEGIES=H43_resolution_boundary_buffer,H43X_chainlink_tail_residual_v1,MAIN_LONGSHOT_0_20_V1
+# Paper/shadow only. The two post-audit continuations are identity-only copies
+# of unchanged H54/H7 rules and start from zero under a new frozen manifest.
+# They consume the same five-minute books as the priority set, so this does not
+# widen the continuity-critical CLOB subscription universe. Historical arms
+# remain immutable and queryable but do not generate fresh rows.
+Environment=BORG_ACTIVE_STRATEGIES=H43_resolution_boundary_buffer,H43X_chainlink_tail_residual_v1,MAIN_LONGSHOT_0_20_V1,NEXT_H54_dynamic_ofi_resolver_confirm_v1,NEXT_H7_btc_oracle_confirm_v1
 Environment=BORG_CAPTURE_ASSETS=btc,eth,sol,xrp
-# All three active hypotheses consume five-minute books. Hourly, threshold and
+# All five active hypotheses consume five-minute books. Hourly, threshold and
 # range authority is collected by the dedicated all-market/options/structural
 # lanes; duplicating it here overloaded the primary socket and created real
 # connection gaps without adding evidence for the frozen active strategy set.

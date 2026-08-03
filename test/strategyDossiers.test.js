@@ -79,9 +79,24 @@ test('forward successor dossier discloses identity-only redesign and source', ()
   });
   assert.equal(dossier.lifecycle, 'TESTING');
   assert.equal(dossier.sourceStrategy, 'H24_hourly_flow_breakout');
-  assert.equal(dossier.recommended, true);
+  assert.equal(dossier.recommended, false);
   assert.match(dossier.design, /thresholds.*unchanged/i);
   assert.match(dossier.priorOutcome, /original broad H24 cohort was negative/i);
+});
+
+test('post-audit worthy successors disclose their source and start-from-zero caveat', () => {
+  const dossier = dossierFor('NEXT_H54_dynamic_ofi_resolver_confirm_v1', {
+    trialStatus: 'COLLECTING',
+    runtimePresent: true,
+    runtimeUpdatedAt: new Date(NOW - 10_000).toISOString(),
+    nowMs: NOW,
+  });
+  assert.equal(dossier.lifecycle, 'TESTING');
+  assert.equal(dossier.sourceStrategy, 'H54_dynamic_ofi_resolver_confirm');
+  assert.equal(dossier.priorityTier, 'PRIORITY');
+  assert.equal(dossier.recommended, true);
+  assert.match(dossier.design, /discovery rows are excluded/i);
+  assert.match(dossier.priorOutcome, /13 A\/B markets/i);
 });
 
 test('every unknown strategy receives an honest fallback premise', () => {

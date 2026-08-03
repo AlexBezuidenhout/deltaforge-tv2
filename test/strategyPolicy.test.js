@@ -74,7 +74,7 @@ test('runtime policy reads only the latest trial disposition for each strategy',
   ]);
 });
 
-test('VPS allowlist is restricted to the frozen priority control and successors', () => {
+test('VPS allowlist is restricted to the frozen priority and fresh worthy successors', () => {
   const service = fs.readFileSync(
     require.resolve('../ops/vps/borg-collector.service'),
     'utf8',
@@ -89,6 +89,8 @@ test('VPS allowlist is restricted to the frozen priority control and successors'
     'H43X_chainlink_tail_residual_v1',
     'H43_resolution_boundary_buffer',
     'MAIN_LONGSHOT_0_20_V1',
+    'NEXT_H54_dynamic_ofi_resolver_confirm_v1',
+    'NEXT_H7_btc_oracle_confirm_v1',
   ]);
   assert.equal(allowlist.has('MAIN_VIDEO_PARITY_V1__taker250'), false);
   assert.equal(allowlist.has('MAIN_VIDEO_PARITY_V1__postonly'), false);

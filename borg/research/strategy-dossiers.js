@@ -8,18 +8,11 @@ const RUNTIME_STALE_AFTER_SEC = 130;
 // recommendations. They make the operator's current, pre-registered work queue
 // explicit without changing any strategy rule.
 const PRIORITY_RESEARCH = Object.freeze({
-  META_CHAMPION_STREAK_V1: { rank: 3, tier: 'EXPLORATORY' },
-  H58_source_causal_residual_v2: { rank: 1, tier: 'PRIORITY' },
-  MAIN_VIDEO_PARITY_V1__taker250: { rank: 2, tier: 'FALSIFICATION' },
-  MAIN_VIDEO_PARITY_V1__postonly: { rank: 2, tier: 'FALSIFICATION' },
-  FWD_H24_hourly_flow_breakout_v1: { rank: 3, tier: 'PRIORITY' },
-  FWD_H40_directional_entropy_breakout_v1: { rank: 4, tier: 'PRIORITY' },
-  H43_resolution_boundary_buffer: { rank: 5, tier: 'PRIORITY' },
-  FWD_H44_hourly_midwindow_reversal_v1: { rank: 6, tier: 'PRIORITY' },
-  FWD_H38_passive_flow_divergence_v1: { rank: 7, tier: 'PRIORITY' },
-  H54_dynamic_ofi_resolver_confirm: { rank: 8, tier: 'WATCH' },
-  H60_bipower_jump_envelope: { rank: 9, tier: 'WATCH' },
-  H75_4h_dynamic_liquidity_leadlag: { rank: 10, tier: 'WATCH' },
+  H43X_chainlink_tail_residual_v1: { rank: 1, tier: 'PRIORITY' },
+  H43_resolution_boundary_buffer: { rank: 2, tier: 'CONTROL' },
+  NEXT_H54_dynamic_ofi_resolver_confirm_v1: { rank: 3, tier: 'PRIORITY' },
+  NEXT_H7_btc_oracle_confirm_v1: { rank: 4, tier: 'CONTROL' },
+  MAIN_LONGSHOT_0_20_V1: { rank: 5, tier: 'FALSIFICATION' },
 });
 
 const PREMISES = Object.freeze({
@@ -82,6 +75,7 @@ const PREMISES = Object.freeze({
   H41_crossasset_dispersion_reversion: 'Trade five-minute cross-sectional dispersion when asset moves begin converging.',
   H42_book_trade_disagreement: 'Trade the replenished book when recent prints point the other way but terminal fair value agrees with the book.',
   H43_resolution_boundary_buffer: 'Enter near expiry only when a conservative fair-value lower bound clears the executable ask, volatility, resolver uncertainty, slippage and doubled fees.',
+  H43X_chainlink_tail_residual_v1: 'Condition the executable market prior on fresh, rule-certified Chainlink displacement and a frozen pre-cutoff terminal-move envelope near expiry.',
   H44_hourly_midwindow_reversal: 'Fade an hourly mid-window displacement only when aggressor flow confirms exhaustion and reversal.',
   H45_threshold_distance_velocity: 'Trade a daily threshold probability that lags a sustained change in strike distance.',
   H46_range_boundary_migration: 'Trade a daily range bucket after a confirmed resolver-source boundary crossing has not been fully repriced.',
@@ -116,6 +110,7 @@ const PREMISES = Object.freeze({
   H73_market_prior_calibration_residual: 'Apply a pre-cutoff Wilson-bounded calibration map at T-120 and trade only deviations that survive executable asks and doubled fees.',
   H74_markov_regime_residual: 'Trade only when a four-hour three-state Markov model has an identifiable transition row and creates incremental executable edge beyond the unshifted market-aware fair value.',
   H75_4h_dynamic_liquidity_leadlag: 'Select the current cross-asset price-discovery leader from two stable two-hour halves, then trade a liquidity-confirmed one-minute target underresponse only when it creates incremental edge.',
+  MAIN_LONGSHOT_0_20_V1: 'Preserve the purchased MAIN rule exactly, but retain only its first executable 1–20 cent intent per market under a fresh evidence identity.',
   ETH_G_late_exact_forward_v1: 'Re-run the exact ETH late-window rule under a fresh evidence clock, with realistic executable arrival and fee stress.',
   ETH_late_taker: 'Take late-window ETH quotes when CEX movement appears to clear the terminal payoff hurdle.',
   ETH_late_maker: 'Quote the same ETH late-window view passively with back-of-queue fill accounting.',
@@ -132,6 +127,8 @@ const FORWARD_SOURCE = Object.freeze({
   FWD_H20_cross_venue_basis_reversion_v1: 'H20_cross_venue_basis_reversion',
   FWD_H7_btc_oracle_confirm_v1: 'H7_btc_oracle_confirm',
   FWD_H1_pair_arb_2x_v1: 'H1_pair_arb_2x',
+  NEXT_H54_dynamic_ofi_resolver_confirm_v1: 'H54_dynamic_ofi_resolver_confirm',
+  NEXT_H7_btc_oracle_confirm_v1: 'H7_btc_oracle_confirm',
 });
 
 const PRIOR_OUTCOMES = Object.freeze({
@@ -161,6 +158,8 @@ const PRIOR_OUTCOMES = Object.freeze({
   META_CHAMPION_STREAK_V1: 'This selector starts at zero. Winning-streak routing is especially exposed to winner’s curse and multiple testing, so source PnL is only an input feature; only the meta-strategy’s fresh forward PnL can validate it.',
   H74_markov_regime_residual: 'The 30-day development prior was negative across BTC, ETH, SOL and XRP. H74 is retained as a strict forward falsification arm, not a promising backtest.',
   H75_4h_dynamic_liquidity_leadlag: 'The only encouraging development cell was ETH over three minutes (23 episodes, +2.645 bps), but its Wilson interval included chance and no Polymarket execution costs were available. All four asset arms remain in the fresh test.',
+  NEXT_H54_dynamic_ofi_resolver_confirm_v1: 'The prior frozen rule produced +$34.68 at doubled costs over 13 A/B markets and six days, but one market/day and BTC concentration made the line non-promotable. This new identity starts at zero.',
+  NEXT_H7_btc_oracle_confirm_v1: 'The prior forward clone produced +$6.98 at doubled costs over 12 A/B markets and six days. It remained one-asset, statistically unresolved and used an oracle control rather than the exact resolver stream; this new identity starts at zero.',
 });
 
 function humanizeStrategyName(strategy) {

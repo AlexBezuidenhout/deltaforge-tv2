@@ -1,0 +1,87 @@
+{
+  "experiment_id": "worthy-paper-forward-2026-08-03-v1",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-08-03T22:54:45.000Z",
+  "evidence_started_at": "2026-08-03T22:54:45.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "post_audit_five_minute_continuations",
+  "strategy_version": "worthy-paper-forward-2026-08-03-v1",
+  "starting_bankroll_usd": 500,
+  "capital_policy": "500usd-v1",
+  "max_stake_usd": 10,
+  "max_touch_participation": 0.2,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "selection_disclosure": {
+    "selected_after_reviewing_prior_results": true,
+    "prior_rows_are_hypothesis_generation_only": true,
+    "prior_rows_count_toward_promotion": false,
+    "family_wise_test_includes_every_registered_borg_arm": true,
+    "reason": "R07 and N09 completed their bounded falsification/discovery work without an executable opportunity. These two unchanged five-minute mechanisms are the strongest unresolved statistical continuations that require no additional market-data sockets.",
+    "h54_prior_diagnostic": "13 A/B markets over 6 UTC days, +$34.68 at doubled costs; one market/day and BTC concentration make the result non-promotable.",
+    "h7_prior_diagnostic": "12 A/B markets over 6 UTC days, +$6.98 at doubled costs with both chronological halves positive; sample size, one-asset concentration and use of the non-resolver oracle control make the result non-promotable."
+  },
+  "identity_only_contract": {
+    "source_code_changed": false,
+    "thresholds_changed": false,
+    "assets_changed": false,
+    "market_type_changed": false,
+    "sizing_changed": false,
+    "execution_model_changed": false,
+    "new_strategy_identity": true,
+    "fresh_evidence_only": true,
+    "capture_market_types": [
+      "direction_5m"
+    ]
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "NEXT_H54_dynamic_ofi_resolver_confirm_v1",
+      "family": "dynamic_depth_normalized_ofi_resolver_continuation",
+      "arm": "unchanged_rule_fresh_identity",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    },
+    {
+      "strategy": "NEXT_H7_btc_oracle_confirm_v1",
+      "family": "oracle_confirmation_control_continuation",
+      "arm": "unchanged_rule_fresh_identity",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "promotion_contract": {
+    "minimum_fresh_independent_markets_per_strategy": 300,
+    "minimum_calendar_days": 14,
+    "positive_doubled_cost_pnl_in_both_chronological_halves": true,
+    "market_and_day_clustered_lower_bounds_above_zero": true,
+    "family_wise_multiple_testing_correction": true,
+    "positive_latency_profiles_ms": [
+      100,
+      250,
+      500
+    ],
+    "realistic_nonfills_partial_fills_and_depth": true,
+    "shared_bankrolls_usd": [
+      500,
+      1000
+    ],
+    "no_dominant_market_asset_or_day": true,
+    "no_optional_stopping": true,
+    "authenticated_pilot": "Not authorized by this manifest. A separate review is required after every paper gate passes."
+  },
+  "explicit_exclusions": {
+    "H1_pair_arb_2x": "Not continued: the positive A/B line was produced by one-sided orphan fills, not a simultaneous guaranteed-payoff bundle.",
+    "H24_H40_H44_H38_H15_H20": "Not continued: their execution-honest forward cohorts are negative, several in both chronological halves.",
+    "H45_H46": "Not launched in the primary process: they require daily threshold/range books that are deliberately excluded from the continuity-critical five-minute socket set. They remain replay/scanner candidates on the dedicated research data.",
+    "H74_H75": "Not launched: the Markov development prior was negative and the lead-lag prior was sparse and economically tiny; both also require fifteen-minute books outside the primary capture contract.",
+    "META_CHAMPION_STREAK_V1": "Not continued: a selector cannot create alpha from inactive or falsified source strategies and its original source universe is no longer the active fleet."
+  }
+}
