@@ -4,7 +4,6 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const readline = require('node:readline');
 const zlib = require('node:zlib');
 const { spawn } = require('node:child_process');
 const { DuckDBInstance } = require('@duckdb/node-api');
@@ -32,6 +31,7 @@ const DEFAULT_MAX_BYTES = 2 * 1024 ** 3;
 const DEFAULT_HOT_BYTES = 10 * 1024 ** 3;
 const DEFAULT_MIN_FREE_BYTES = 15 * 1024 ** 3;
 const DEFAULT_EXPANSION_RESERVE_MULTIPLIER = 24;
+const INVALID_WAL_SEGMENT = 'INVALID_WAL_SEGMENT';
 
 const SOURCE_TIME_FIELDS = Object.freeze([
   'source_timestamp_ms', 'source_timestamp', 'source_ts', 'exchange_timestamp',
@@ -166,7 +166,7 @@ function envelopeFor(row, header, record, rowIndex) {
 }
 
 function emptyLakeState() {
-  return { format: STATE_FORMAT, sources: {}, batches: {} };
+  return { format: STATE_FORMAT, sources: {}, rejectedSources: {}, batches: {} };
 }
 
 function loadJson(file, fallback) {
@@ -180,6 +180,7 @@ function loadLakeState(file) {
   const state = loadJson(file, emptyLakeState());
   if (state?.format !== STATE_FORMAT) throw new Error(`unsupported Parquet lake state: ${state?.format}`);
   state.sources ||= {};
+  state.rejectedSources ||= {};
   state.batches ||= {};
   return state;
 }
@@ -222,6 +223,10 @@ function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
     if (!String(entry.relative || '').endsWith('.ndjson.gz')) continue;
     if (!/^[a-f0-9]{64}$/.test(String(entry.sha256 || ''))) continue;
     if (lakeState.sources[id]) continue;
+    const rejected = lakeState.rejectedSources?.[id];
+    // Rejections are content-addressed. A changed upstream object must be
+    // reconsidered rather than inheriting an old verdict for the same key.
+    if (rejected?.sha256 === entry.sha256) continue;
     const parsed = sourceFromRelative(entry.relative);
     if (sources && !sources.has(parsed.source)) continue;
     if (Number(entry.mtimeMs) > cutoffMs) continue;
@@ -263,29 +268,103 @@ async function verifyStagedRecord(record) {
   return true;
 }
 
+function invalidWalSegmentError(record, reason, details = {}) {
+  const safeReason = String(reason || 'invalid WAL segment')
+    .replace(/[\r\n]+/g, ' ')
+    .slice(0, 500);
+  const error = new Error(`${record.relative}: ${safeReason}`);
+  error.code = INVALID_WAL_SEGMENT;
+  error.recordId = record.id;
+  error.relative = record.relative;
+  error.sourceSha256 = record.sha256;
+  for (const [key, value] of Object.entries(details)) error[key] = value;
+  return error;
+}
+
+/**
+ * WAL is NDJSON, so only the LF byte terminates a record. Node's readline
+ * also treats Unicode U+2028/U+2029 as line separators; those code points are
+ * legal inside JSON strings and previously split valid structural-rule rows.
+ */
+async function* lfDelimitedLines(readable) {
+  let pending = Buffer.alloc(0);
+  for await (const rawChunk of readable) {
+    const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk);
+    let start = 0;
+    let end = chunk.indexOf(0x0a, start);
+    while (end !== -1) {
+      let line = pending.length
+        ? Buffer.concat([pending, chunk.subarray(start, end)])
+        : chunk.subarray(start, end);
+      if (line.length && line[line.length - 1] === 0x0d) line = line.subarray(0, -1);
+      yield line.toString('utf8');
+      pending = Buffer.alloc(0);
+      start = end + 1;
+      end = chunk.indexOf(0x0a, start);
+    }
+    if (start < chunk.length) {
+      const tail = chunk.subarray(start);
+      pending = pending.length ? Buffer.concat([pending, tail]) : Buffer.from(tail);
+    }
+  }
+  if (pending.length) yield pending.toString('utf8');
+}
+
 async function streamSegment(record, onRow) {
   const input = fs.createReadStream(record.file).pipe(zlib.createGunzip());
-  const lines = readline.createInterface({ input, crlfDelay: Infinity });
   let header = null;
   let rowIndex = 0;
-  for await (const line of lines) {
-    if (!line.trim()) continue;
-    let parsed;
-    try { parsed = JSON.parse(line); } catch (error) {
-      throw new Error(`${record.relative}: invalid NDJSON line ${rowIndex + 1}: ${error.message}`);
-    }
-    if (!header) {
-      if (!parsed._borg_wal && !parsed._borg_archive) {
-        throw new Error(`${record.relative}: missing BORG WAL/archive header`);
+  let physicalLine = 0;
+  try {
+    for await (const line of lfDelimitedLines(input)) {
+      physicalLine += 1;
+      if (!line.trim()) continue;
+      let parsed;
+      try { parsed = JSON.parse(line); } catch (error) {
+        throw invalidWalSegmentError(
+          record,
+          `invalid NDJSON physical line ${physicalLine}: ${error.message}`,
+          { physicalLine },
+        );
       }
-      header = parsed;
-      continue;
+      if (!header) {
+        if (!parsed._borg_wal && !parsed._borg_archive) {
+          throw invalidWalSegmentError(record, 'missing BORG WAL/archive header', { physicalLine });
+        }
+        header = parsed;
+        continue;
+      }
+      rowIndex += 1;
+      await onRow(envelopeFor(parsed, header, record, rowIndex));
     }
-    rowIndex += 1;
-    await onRow(envelopeFor(parsed, header, record, rowIndex));
+  } catch (error) {
+    if (error?.code === INVALID_WAL_SEGMENT) throw error;
+    if (error?.code === 'Z_DATA_ERROR' || error?.code === 'Z_BUF_ERROR') {
+      throw invalidWalSegmentError(record, `invalid gzip stream: ${error.message}`);
+    }
+    throw error;
   }
-  if (!header) throw new Error(`${record.relative}: empty segment`);
+  if (!header) throw invalidWalSegmentError(record, 'empty segment');
   return { header, rows: rowIndex };
+}
+
+function quarantineRawSource(lakeState, record, error, rejectedAt = new Date().toISOString()) {
+  if (error?.code !== INVALID_WAL_SEGMENT || error.recordId !== record.id) {
+    throw new Error('only an identified INVALID_WAL_SEGMENT may be quarantined');
+  }
+  lakeState.rejectedSources ||= {};
+  const rejection = {
+    relative: record.relative,
+    sha256: record.sha256,
+    bytes: record.size,
+    rejectedAt,
+    code: error.code,
+    reason: String(error.message).slice(0, 600),
+    physicalLine: Number.isInteger(error.physicalLine) ? error.physicalLine : null,
+  };
+  lakeState.rejectedSources[record.id] = rejection;
+  lakeState.updatedAt = rejectedAt;
+  return { id: record.id, ...rejection };
 }
 
 function appendNullable(appender, method, value) {
@@ -579,7 +658,7 @@ async function uploadBatch(batch, options) {
   return { destination: 'Google Drive/VPS Data/parquet', verified: relatives.length };
 }
 
-function receiptText(batch, pending) {
+function receiptText(batch, pending, options = {}) {
   const parquetFiles = (batch.outputs || [])
     .filter((output) => String(output.relative || '').endsWith('.parquet')).length;
   return [
@@ -591,6 +670,7 @@ function receiptText(batch, pending) {
     `source_rows=${batch.sourceRows}`,
     `parquet_files=${parquetFiles}`,
     `pending_source_files=${pending}`,
+    `rejected_source_files_total=${Number(options.rejectedSourceFilesTotal) || 0}`,
     'compression=ZSTD',
     'destination=Google Drive/VPS Data/parquet',
     'remote_verification=google-drive-md5-via-rclone-check',
@@ -669,13 +749,16 @@ async function compactFromGoogle(options = {}) {
     // checkpointed a batch but died while publishing the liveness receipt.
     const prior = latestVerifiedBatch(lakeState);
     if (prior) {
-      writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.remaining), 0o644);
+      writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.remaining, {
+        rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
+      }), 0o644);
     }
     const report = {
       format: 'deltaforge-parquet-lake-run-v1',
       status: prior ? 'verified_no_new_batch' : 'nothing_to_compact',
       latestVerifiedBatch: prior?.batchHash || null,
       pending: selection.remaining,
+      rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
     };
     writeAtomic(path.join(stateRoot, 'last-report.json'), `${JSON.stringify(report, null, 2)}\n`, 0o600);
     return report;
@@ -690,23 +773,62 @@ async function compactFromGoogle(options = {}) {
   if (freeBefore - projectedWorkingBytes < minFreeBytes) {
     throw new Error(`Parquet batch preflight: ${selection.bytes} compressed bytes require a ${projectedWorkingBytes} byte expansion reserve, leaving less than ${minFreeBytes} bytes free`);
   }
-  const hash = batchHash(selection.records);
-  const workRoot = fs.mkdtempSync(path.join(stageBase, `${hash}-`));
+  const selectionHash = batchHash(selection.records);
+  const workRoot = fs.mkdtempSync(path.join(stageBase, `${selectionHash}-`));
   const runRclone = options.rclone || ((args) => runCommand(rcloneBinary, args, { env }));
   try {
     const staged = await stageRawRecords(selection.records, {
       remote, prefix, configFile, rclone: runRclone, stageRoot: workRoot, env,
     });
-    const batch = await compactStagedBatch(staged, {
-      hotRoot, stageRoot: workRoot, batchHash: hash,
-      threads: env.PARQUET_DUCKDB_THREADS || 1,
-      minFreeBytes,
-    });
+    let compactable = staged;
+    const rejected = [];
+    let batch = null;
+    while (compactable.length) {
+      const candidateHash = batchHash(compactable);
+      try {
+        batch = await compactStagedBatch(compactable, {
+          hotRoot, stageRoot: workRoot, batchHash: candidateHash,
+          threads: env.PARQUET_DUCKDB_THREADS || 1,
+          minFreeBytes,
+        });
+        break;
+      } catch (error) {
+        if (error?.code !== INVALID_WAL_SEGMENT) throw error;
+        const invalid = compactable.find((record) => record.id === error.recordId);
+        if (!invalid) throw error;
+        rejected.push(quarantineRawSource(lakeState, invalid, error));
+        // Persist the evidence exclusion immediately. A crash must not erase
+        // the explicit rejection and retry the same deterministic bad bytes.
+        writeAtomic(stateFile, `${JSON.stringify(lakeState, null, 2)}\n`, 0o600);
+        compactable = compactable.filter((record) => record.id !== invalid.id);
+      }
+    }
+    if (!batch) {
+      const prior = latestVerifiedBatch(lakeState);
+      if (prior) {
+        writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.remaining, {
+          rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
+        }), 0o644);
+      }
+      const report = {
+        format: 'deltaforge-parquet-lake-run-v1',
+        status: 'source_rejections_only',
+        latestVerifiedBatch: prior?.batchHash || null,
+        selectedSourceFiles: selection.records.length,
+        rejectedSourceFiles: rejected.length,
+        rejected,
+        rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
+        pendingSourceFiles: selection.remaining,
+      };
+      writeAtomic(path.join(stateRoot, 'last-report.json'), `${JSON.stringify(report, null, 2)}\n`, 0o600);
+      return report;
+    }
+    const hash = batch.batchHash;
     const remoteResult = await uploadBatch(batch, {
       hotRoot, remote, prefix, configFile, rclone: runRclone, env, workRoot,
     });
     const compactedAt = new Date().toISOString();
-    for (const record of selection.records) {
+    for (const record of compactable) {
       lakeState.sources[record.id] = {
         batchHash: hash,
         relative: record.relative,
@@ -726,7 +848,9 @@ async function compactFromGoogle(options = {}) {
     lakeState.updatedAt = compactedAt;
     writeAtomic(stateFile, `${JSON.stringify(lakeState, null, 2)}\n`, 0o600);
     writeAtomic(receiptFile(env, stateRoot),
-      receiptText(batch, selection.remaining), 0o644);
+      receiptText(batch, selection.remaining, {
+        rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
+      }), 0o644);
     const prune = pruneHotParquet(hotRoot, lakeState,
       positiveInt(env.PARQUET_HOT_MAX_BYTES, DEFAULT_HOT_BYTES));
     const report = {
@@ -735,6 +859,11 @@ async function compactFromGoogle(options = {}) {
       batchHash: hash,
       selectedSourceFiles: selection.records.length,
       selectedCompressedBytes: selection.bytes,
+      compactedSourceFiles: compactable.length,
+      compactedCompressedBytes: compactable.reduce((sum, row) => sum + row.size, 0),
+      rejectedSourceFiles: rejected.length,
+      rejected,
+      rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
       sourceRows: batch.sourceRows,
       parquetFiles: batch.outputs.length,
       parquetBytes: batch.outputs.reduce((sum, row) => sum + row.bytes, 0),
@@ -810,6 +939,7 @@ module.exports = {
   DEFAULT_EXPANSION_RESERVE_MULTIPLIER,
   DEFAULT_HOT_ROOT,
   DEFAULT_MIN_FREE_BYTES,
+  INVALID_WAL_SEGMENT,
   STATE_FORMAT,
   assertDiskReserve,
   batchHash,
@@ -819,12 +949,14 @@ module.exports = {
   diskFreeBytes,
   envelopeFor,
   hydrateParquet,
+  lfDelimitedLines,
   loadLakeState,
   latestVerifiedBatch,
   normalizeSources,
   outputRelative,
   parquetCodec,
   pruneHotParquet,
+  quarantineRawSource,
   receiptFile,
   receiptText,
   selectVerifiedRawObjects,

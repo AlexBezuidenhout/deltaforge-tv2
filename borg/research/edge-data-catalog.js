@@ -662,11 +662,13 @@ function readOffhostState(file) {
 
 function aggregateParquetLakeState(state) {
   const groups = new Map();
+  const rejectionGroups = new Map();
   let files = 0;
   let bytes = 0;
   let rows = 0;
   let invalidOutputs = 0;
   let verifiedBatches = 0;
+  let rejectedSourceBytes = 0;
   for (const batch of Object.values(state?.batches || {})) {
     if (batch.verified !== true) continue;
     verifiedBatches += 1;
@@ -697,6 +699,19 @@ function aggregateParquetLakeState(state) {
       groups.set(source, current);
     }
   }
+  for (const rejection of Object.values(state?.rejectedSources || {})) {
+    const source = String(rejection.relative || '').split('/')[0] || 'unknown';
+    const bytes = finite(rejection.bytes, 0);
+    const current = rejectionGroups.get(source) || {
+      source, rejectedSourceFiles: 0, bytes: 0, codes: {},
+    };
+    const code = String(rejection.code || 'UNKNOWN');
+    current.rejectedSourceFiles += 1;
+    current.bytes += bytes;
+    current.codes[code] = (current.codes[code] || 0) + 1;
+    rejectedSourceBytes += bytes;
+    rejectionGroups.set(source, current);
+  }
   return {
     format: state?.format || null,
     updatedAt: safeIso(state?.updatedAt),
@@ -709,6 +724,9 @@ function aggregateParquetLakeState(state) {
     bytes,
     rows,
     invalidOutputs,
+    rejectedSourceFiles: Object.keys(state?.rejectedSources || {}).length,
+    rejectedSourceBytes,
+    rejectionGroups: [...rejectionGroups.values()].sort((left, right) => right.bytes - left.bytes),
     compression: 'ZSTD',
     groups: [...groups.values()].sort((left, right) => right.bytes - left.bytes),
   };
@@ -833,6 +851,9 @@ function catalogWarnings(catalog) {
   if (catalog.storage?.parquetLake?.invalidOutputs > 0) {
     warnings.push(`${catalog.storage.parquetLake.invalidOutputs} Parquet output(s) lack verified SHA-256/ZSTD metadata.`);
   }
+  if (catalog.storage?.parquetLake?.rejectedSourceFiles > 0) {
+    warnings.push(`${catalog.storage.parquetLake.rejectedSourceFiles} checksum-attested raw WAL source object(s) failed content validation and are quarantined from every replay projection.`);
+  }
   if (catalog.storage?.offhost?.invalidChecksums > 0) {
     warnings.push(`${catalog.storage.offhost.invalidChecksums} off-host object(s) lack valid verification metadata.`);
   }
@@ -932,6 +953,7 @@ function markdownCatalog(catalog) {
     `- Local WAL: ${(catalog.storage?.wal?.files || 0).toLocaleString('en-US')} files, ${byteText(catalog.storage?.wal?.bytes || 0)}.`,
     `- Verified off-host index: ${(catalog.storage?.offhost?.verified || 0).toLocaleString('en-US')} / ${(catalog.storage?.offhost?.files || 0).toLocaleString('en-US')} objects, ${byteText(catalog.storage?.offhost?.bytes || 0)}.`,
     `- Verified Parquet lake: ${(catalog.storage?.parquetLake?.files || 0).toLocaleString('en-US')} ZSTD files / ${(catalog.storage?.parquetLake?.rows || 0).toLocaleString('en-US')} events from ${(catalog.storage?.parquetLake?.sourceFiles || 0).toLocaleString('en-US')} raw segments; ${byteText(catalog.storage?.parquetLake?.bytes || 0)} off-host.`,
+    `- Quarantined raw inputs: ${(catalog.storage?.parquetLake?.rejectedSourceFiles || 0).toLocaleString('en-US')} checksum-attested object(s), ${byteText(catalog.storage?.parquetLake?.rejectedSourceBytes || 0)}; excluded rather than silently repaired.`,
     `- VPS hot Parquet cache: ${(catalog.storage?.parquet?.parquetFiles || catalog.storage?.parquet?.groups?.reduce((sum, row) => sum + row.parquetFiles, 0) || 0).toLocaleString('en-US')} files.`,
     '',
     '## Binding warnings',

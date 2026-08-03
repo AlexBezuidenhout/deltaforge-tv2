@@ -8,17 +8,20 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const zlib = require('node:zlib');
 const {
+  INVALID_WAL_SEGMENT,
   assertDiskReserve,
   batchHash,
   compactStagedBatch,
   diskFreeBytes,
   envelopeFor,
   latestVerifiedBatch,
+  quarantineRawSource,
   receiptFile,
   receiptText,
   selectVerifiedRawObjects,
   sourceFromRelative,
   stageRawRecords,
+  streamSegment,
 } = require('../borg/research/parquet-lake');
 const { runParquetQuery } = require('../borg/research/parquet-query');
 
@@ -62,6 +65,27 @@ test('verified raw selection excludes unverified and already compacted objects',
   assert.deepEqual(selected.records.map((row) => row.id), ['good']);
 });
 
+test('raw rejection is content-addressed and a changed object is reconsidered', () => {
+  const entry = {
+    namespace: 'wal', verified: true,
+    relative: 'structural-scanner/2026-08-03/a.ndjson.gz',
+    size: 100, mtimeMs: 1000, sha256: 'a'.repeat(64),
+  };
+  const raw = {
+    format: 'deltaforge-google-drive-state-v1',
+    objects: { candidate: entry },
+  };
+  const lake = { sources: {}, rejectedSources: {
+    candidate: { relative: entry.relative, sha256: entry.sha256, code: INVALID_WAL_SEGMENT },
+  } };
+  assert.equal(selectVerifiedRawObjects(raw, lake, { maxFiles: 10, maxBytes: 1000 }).records.length, 0);
+  raw.objects.candidate = { ...entry, sha256: 'b'.repeat(64) };
+  assert.deepEqual(
+    selectVerifiedRawObjects(raw, lake, { maxFiles: 10, maxBytes: 1000 }).records.map((row) => row.id),
+    ['candidate'],
+  );
+});
+
 test('envelope preserves clocks, provenance and token/native values only inside raw JSON', () => {
   const record = {
     relative: 'binance/2026-08-03/a.ndjson.gz', sha256: 'a'.repeat(64), mtimeMs: 0,
@@ -79,6 +103,53 @@ test('envelope preserves clocks, provenance and token/native values only inside 
   assert.equal(envelope.sequenceId, '42');
   assert.equal(envelope.collectionEpochId, 'epoch');
   assert.equal(JSON.parse(envelope.eventJson).token_price, '0.42');
+});
+
+test('strict LF parser preserves legal Unicode line separators inside JSON strings', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'df-parquet-unicode-test-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const record = segment(root, 'structural-scanner', '2026-08-03', 'unicode', [{
+    source_timestamp_ms: 1785751200000,
+    rule: 'UK ISO-GB\u2028 winner determined by official source\u2029 end',
+  }]);
+  const rows = [];
+  const result = await streamSegment(record, async (row) => rows.push(JSON.parse(row.eventJson)));
+  assert.equal(result.rows, 1);
+  assert.equal(rows[0].rule, 'UK ISO-GB\u2028 winner determined by official source\u2029 end');
+});
+
+test('genuinely malformed source is identified and can be quarantined without payload leakage', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'df-parquet-invalid-test-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const relative = 'structural-scanner/2026-08-03/invalid.ndjson.gz';
+  const file = path.join(root, ...relative.split('/'));
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const packed = zlib.gzipSync([
+    JSON.stringify({ _borg_wal: { format: 'borg-event-wal-v2', opened_at: '2026-08-03T10:00:00Z' } }),
+    '{"raw":"do-not-leak"',
+    '',
+  ].join('\n'));
+  fs.writeFileSync(file, packed);
+  const record = {
+    id: `wal:${relative}`, namespace: 'wal', relative, source: 'structural-scanner',
+    file, size: packed.length, sha256: digest(packed), mtimeMs: 1,
+  };
+  let invalid;
+  await assert.rejects(
+    () => streamSegment(record, async () => {}),
+    (error) => {
+      invalid = error;
+      assert.equal(error.code, INVALID_WAL_SEGMENT);
+      assert.equal(error.recordId, record.id);
+      assert.equal(error.physicalLine, 2);
+      assert.doesNotMatch(error.message, /do-not-leak/);
+      return true;
+    },
+  );
+  const state = { sources: {}, rejectedSources: {}, batches: {} };
+  const rejection = quarantineRawSource(state, record, invalid, '2026-08-03T12:00:00.000Z');
+  assert.equal(rejection.sha256, record.sha256);
+  assert.equal(state.rejectedSources[record.id].physicalLine, 2);
 });
 
 test('unsafe segment paths are rejected', () => {

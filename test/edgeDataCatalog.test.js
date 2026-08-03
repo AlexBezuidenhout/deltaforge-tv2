@@ -69,6 +69,12 @@ test('Parquet lake aggregation counts only verified ZSTD batch outputs as valid'
     format: 'deltaforge-parquet-lake-state-v1',
     updatedAt: '2026-08-03T14:00:00Z',
     sources: { one: {}, two: {} },
+    rejectedSources: {
+      rejected: {
+        relative: 'structural-scanner/2026-08-03/bad.ndjson.gz',
+        bytes: 75, code: 'INVALID_WAL_SEGMENT',
+      },
+    },
     batches: {
       good: {
         verified: true,
@@ -92,6 +98,9 @@ test('Parquet lake aggregation counts only verified ZSTD batch outputs as valid'
   assert.equal(summary.files, 2);
   assert.equal(summary.rows, 150);
   assert.equal(summary.invalidOutputs, 1);
+  assert.equal(summary.rejectedSourceFiles, 1);
+  assert.equal(summary.rejectedSourceBytes, 75);
+  assert.equal(summary.rejectionGroups[0].source, 'structural-scanner');
   assert.equal(summary.groups[0].firstDate, '2026-08-03');
   assert.equal(summary.groups[0].lastDate, '2026-08-04');
 });
@@ -112,4 +121,18 @@ test('catalog warning routes analytics away from hot ingestion once Parquet exis
   });
   assert.match(warnings[0], /verified Parquet lake/);
   assert.doesNotMatch(warnings[0], /until Parquet/);
+});
+
+test('catalog makes quarantined raw evidence a binding warning', () => {
+  const warnings = catalogWarnings({
+    database: { bytes: 0 },
+    storage: {
+      parquetLake: { files: 10, invalidOutputs: 0, rejectedSourceFiles: 2 },
+      offhost: { invalidChecksums: 0 },
+      disk: { freeBytes: 40 * 1024 ** 3 },
+    },
+  });
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /2 checksum-attested raw WAL source object/);
+  assert.match(warnings[0], /quarantined/);
 });
