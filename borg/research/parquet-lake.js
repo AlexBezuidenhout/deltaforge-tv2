@@ -243,6 +243,7 @@ function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
   const cutoffMs = Number.isFinite(Number(options.cutoffMs)) ? Number(options.cutoffMs) : Infinity;
   const window = normalizeSelectionWindow(options);
   const candidates = [];
+  let globallyEligible = 0;
   for (const [id, entry] of Object.entries(rawState.objects || {})) {
     if (entry.namespace !== 'wal' || entry.verified !== true) continue;
     if (!String(entry.relative || '').endsWith('.ndjson.gz')) continue;
@@ -253,10 +254,11 @@ function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
     // reconsidered rather than inheriting an old verdict for the same key.
     if (rejected?.sha256 === entry.sha256) continue;
     const parsed = sourceFromRelative(entry.relative);
+    if (Number(entry.mtimeMs) > cutoffMs) continue;
+    globallyEligible += 1;
     if (sources && !sources.has(parsed.source)) continue;
     if (window.from && parsed.pathDate < window.from) continue;
     if (window.to && parsed.pathDate > window.to) continue;
-    if (Number(entry.mtimeMs) > cutoffMs) continue;
     candidates.push({
       id,
       namespace: 'wal',
@@ -282,6 +284,7 @@ function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
     records: selected,
     bytes,
     remaining: Math.max(0, candidates.length - selected.length),
+    globalRemaining: Math.max(0, globallyEligible - selected.length),
     eligible: candidates.length,
     scope: {
       sources: sources ? [...sources].sort() : null,
@@ -681,6 +684,10 @@ function receiptText(batch, pending, options = {}) {
     `source_rows=${batch.sourceRows}`,
     `parquet_files=${parquetFiles}`,
     `pending_source_files=${pending}`,
+    `pending_scope_source_files=${Number(options.pendingScopeSourceFiles ?? pending)}`,
+    `selection_scope=${JSON.stringify(options.selectionScope || {
+      sources: null, from: null, to: null, order: 'newest',
+    })}`,
     `rejected_source_files_total=${Number(options.rejectedSourceFilesTotal) || 0}`,
     'compression=ZSTD',
     'destination=Google Drive/VPS Data/parquet',
@@ -763,7 +770,9 @@ async function compactFromGoogle(options = {}) {
     // checkpointed a batch but died while publishing the liveness receipt.
     const prior = latestVerifiedBatch(lakeState);
     if (prior) {
-      writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.remaining, {
+      writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.globalRemaining, {
+        pendingScopeSourceFiles: selection.remaining,
+        selectionScope: selection.scope,
         rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
       }), 0o644);
     }
@@ -771,7 +780,8 @@ async function compactFromGoogle(options = {}) {
       format: 'deltaforge-parquet-lake-run-v1',
       status: prior ? 'verified_no_new_batch' : 'nothing_to_compact',
       latestVerifiedBatch: prior?.batchHash || null,
-      pending: selection.remaining,
+      pending: selection.globalRemaining,
+      pendingScopeSourceFiles: selection.remaining,
       selection: selection.scope,
       rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
     };
@@ -821,7 +831,9 @@ async function compactFromGoogle(options = {}) {
     if (!batch) {
       const prior = latestVerifiedBatch(lakeState);
       if (prior) {
-        writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.remaining, {
+        writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.globalRemaining, {
+          pendingScopeSourceFiles: selection.remaining,
+          selectionScope: selection.scope,
           rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
         }), 0o644);
       }
@@ -833,7 +845,8 @@ async function compactFromGoogle(options = {}) {
         rejectedSourceFiles: rejected.length,
         rejected,
         rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
-        pendingSourceFiles: selection.remaining,
+        pendingSourceFiles: selection.globalRemaining,
+        pendingScopeSourceFiles: selection.remaining,
         selection: selection.scope,
       };
       writeAtomic(path.join(stateRoot, 'last-report.json'), `${JSON.stringify(report, null, 2)}\n`, 0o600);
@@ -864,7 +877,9 @@ async function compactFromGoogle(options = {}) {
     lakeState.updatedAt = compactedAt;
     writeAtomic(stateFile, `${JSON.stringify(lakeState, null, 2)}\n`, 0o600);
     writeAtomic(receiptFile(env, stateRoot),
-      receiptText(batch, selection.remaining, {
+      receiptText(batch, selection.globalRemaining, {
+        pendingScopeSourceFiles: selection.remaining,
+        selectionScope: selection.scope,
         rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
       }), 0o644);
     const prune = pruneHotParquet(hotRoot, lakeState,
@@ -883,7 +898,8 @@ async function compactFromGoogle(options = {}) {
       sourceRows: batch.sourceRows,
       parquetFiles: batch.outputs.length,
       parquetBytes: batch.outputs.reduce((sum, row) => sum + row.bytes, 0),
-      pendingSourceFiles: selection.remaining,
+      pendingSourceFiles: selection.globalRemaining,
+      pendingScopeSourceFiles: selection.remaining,
       selection: selection.scope,
       remote: remoteResult,
       hotPrune: prune,
@@ -907,7 +923,9 @@ async function materializeFromGoogle(options = {}) {
     if (index > 0 && Date.now() >= deadlineMs) break;
     const report = await compactFromGoogle(runOptions);
     batches.push(report);
-    const pending = Number(report.pendingSourceFiles ?? report.pending ?? 0);
+    const pending = Number(
+      report.pendingScopeSourceFiles ?? report.pendingSourceFiles ?? report.pending ?? 0,
+    );
     if (pending <= 0 || ['nothing_to_compact', 'verified_no_new_batch'].includes(report.status)) {
       complete = true;
       break;
@@ -935,7 +953,10 @@ async function materializeFromGoogle(options = {}) {
     sourceRows: batches.reduce((sum, row) => sum + Number(row.sourceRows || 0), 0),
     parquetFiles: batches.reduce((sum, row) => sum + Number(row.parquetFiles || 0), 0),
     finalPendingSourceFiles: Number(
-      finalReport?.pendingSourceFiles ?? finalReport?.pending ?? 0,
+      finalReport?.pendingScopeSourceFiles
+        ?? finalReport?.pendingSourceFiles
+        ?? finalReport?.pending
+        ?? 0,
     ),
     batches,
   };

@@ -86,6 +86,8 @@ test('raw selection can materialize an audited source/date window oldest first',
     order: 'oldest', maxFiles: 10, maxBytes: 1000,
   });
   assert.deepEqual(selected.records.map((row) => row.id), ['oldest', 'newest']);
+  assert.equal(selected.remaining, 0);
+  assert.equal(selected.globalRemaining, 2);
   assert.deepEqual(selected.scope, {
     sources: ['binance'], from: '2026-08-02', to: '2026-08-02', order: 'oldest',
   });
@@ -215,6 +217,8 @@ test('receipt stays inside the service-owned state directory and can recover the
   }, 4);
   assert.match(receipt, /parquet_files=1/);
   assert.match(receipt, /pending_source_files=4/);
+  assert.match(receipt, /pending_scope_source_files=4/);
+  assert.match(receipt, /selection_scope=\{"sources":null/);
 });
 
 test('staging uses one bounded files-from transfer before per-file SHA verification', async (t) => {
