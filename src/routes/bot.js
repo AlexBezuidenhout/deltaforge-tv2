@@ -2,7 +2,16 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../models/db');
 const { authMiddleware } = require('../middleware/auth');
-const { FAST_MAX_AGE_SEC, heartbeatRowFresh } = require('../monitoring/heartbeatPolicy');
+const {
+  FAST_MAX_AGE_SEC,
+  heartbeatRowFresh,
+  parsedMeta,
+} = require('../monitoring/heartbeatPolicy');
+
+function heartbeatBelongsToUser(row, userId) {
+  const heartbeatUserId = parsedMeta(row?.meta).userId;
+  return heartbeatUserId != null && String(heartbeatUserId) === String(userId);
+}
 
 // --- Start Signal Bot ---
 router.post('/start', authMiddleware, async (req, res) => {
@@ -107,19 +116,19 @@ router.get('/george/status', authMiddleware, async (req, res) => {
     const resWins = parseInt(rs.wins) || 0;
     const [resCiLo, resCiHi] = wilson95(resWins, resClosed);
 
-    const [settingsRow, fleetHeartbeat] = await Promise.all([
-      pool.query(
-        'SELECT george_is_active, george_own_signal_enabled, george_resurrection_enabled FROM bot_settings WHERE user_id = $1',
-        [req.userId],
-      ),
-      pool.query(`
-        SELECT EXTRACT(EPOCH FROM now() - beat_at)::int AS age_sec, meta
-          FROM system_heartbeats WHERE component='george_bot'
-      `),
-    ]);
+    const settingsRow = await pool.query(`
+      SELECT bs.george_is_active, bs.george_own_signal_enabled,
+             bs.george_resurrection_enabled,
+             EXTRACT(EPOCH FROM now() - hb.beat_at)::int AS age_sec,
+             hb.meta
+        FROM bot_settings bs
+        LEFT JOIN system_heartbeats hb ON hb.component='george_bot'
+       WHERE bs.user_id=$1
+    `, [req.userId]);
     const sr = settingsRow.rows[0] || {};
     const fleetRunning = sr.george_is_active === true
-      && heartbeatRowFresh(fleetHeartbeat.rows[0], FAST_MAX_AGE_SEC);
+      && heartbeatBelongsToUser(sr, req.userId)
+      && heartbeatRowFresh(sr, FAST_MAX_AGE_SEC);
 
     res.json({
       running: !!status?.isRunning || fleetRunning,
@@ -210,13 +219,17 @@ router.get('/status', authMiddleware, async (req, res) => {
     const status = botManager.getBotStatus(req.userId);
 
     const fleetHeartbeatResult = await pool.query(`
-      SELECT EXTRACT(EPOCH FROM now() - beat_at)::int AS age_sec, meta
-        FROM system_heartbeats WHERE component='main_bot'
-    `);
-    const fleetBotRunning = heartbeatRowFresh(
-      fleetHeartbeatResult.rows[0],
-      FAST_MAX_AGE_SEC,
-    );
+      SELECT bs.is_active, bs.paper_trading,
+             EXTRACT(EPOCH FROM now() - hb.beat_at)::int AS age_sec,
+             hb.meta
+        FROM bot_settings bs
+        LEFT JOIN system_heartbeats hb ON hb.component='main_bot'
+       WHERE bs.user_id=$1
+    `, [req.userId]);
+    const fleetStatus = fleetHeartbeatResult.rows[0] || {};
+    const fleetBotRunning = fleetStatus.is_active === true
+      && heartbeatBelongsToUser(fleetStatus, req.userId)
+      && heartbeatRowFresh(fleetStatus, FAST_MAX_AGE_SEC);
 
     // Resolve active session for this user (most recent, not yet ended)
     const sessionRow = await pool.query(
@@ -245,7 +258,7 @@ router.get('/status', authMiddleware, async (req, res) => {
       botRunning: !!status?.isRunning || fleetBotRunning,
       statusSource: status ? 'local-runner' : (fleetBotRunning ? 'fleet-heartbeat' : 'none'),
       controlsAvailable: botManager.runnerEnabled !== false,
-      paperTrading: status?.paperTrading ?? true,
+      paperTrading: status?.paperTrading ?? fleetStatus.paper_trading ?? true,
       paperBalance: status?.paperBalance || null,
       dryPaperBalance: status?.dryPaperBalance ?? status?.paperBalance ?? null,
       virtualPaperBalance: status?.virtualPaperBalance ?? null,

@@ -14,7 +14,11 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../models/db');
 const { authMiddleware } = require('../middleware/auth');
-const { FAST_MAX_AGE_SEC, heartbeatRowFresh } = require('../monitoring/heartbeatPolicy');
+const {
+  FAST_MAX_AGE_SEC,
+  heartbeatRowFresh,
+  parsedMeta,
+} = require('../monitoring/heartbeatPolicy');
 const { buildPortfolioPolicy } = require('../bot/PortfolioRiskPolicy');
 const {
   RESEARCH_CAPITAL_VERSION,
@@ -174,7 +178,8 @@ router.get('/', authMiddleware, async (req, res) => {
       settings, mainStrict, georgeRes, shadowStrategies, strategyRuntime, glaHeartbeat, glaLiveToday,
       collectorHeartbeat, runtimeHeartbeats, currentTrials,
     ] = await Promise.all([
-      q(`SELECT paper_trading, paper_balance, george_paper_balance, exits_hold_only_mode,
+      q(`SELECT is_active, george_is_active, paper_trading, paper_balance,
+                george_paper_balance, exits_hold_only_mode,
                 george_own_signal_enabled, george_resurrection_enabled, live_gla_enabled, live_gla_baseline_usdc,
                 candidate_portfolio_enabled, portfolio_bankroll_usdc, main_exec_honest_anchor,
                 main_legacy_execution_enabled, paper_risk_epoch_anchor, paper_risk_limits_enabled
@@ -383,6 +388,13 @@ router.get('/', authMiddleware, async (req, res) => {
     const runtimeBeat = Object.fromEntries(runtimeHeartbeats.map((row) => [row.component, row]));
     const shadowRuntime = Object.fromEntries(strategyRuntime.map((row) => [row.strategy, row]));
     const currentTrial = Object.fromEntries(currentTrials.map((row) => [row.strategy, row]));
+    const ownedFreshHeartbeat = (component) => {
+      const heartbeat = runtimeBeat[component];
+      const heartbeatUserId = parsedMeta(heartbeat?.meta).userId;
+      return heartbeatUserId != null
+        && String(heartbeatUserId) === String(req.userId)
+        && heartbeatRowFresh(heartbeat, FAST_MAX_AGE_SEC);
+    };
 
     const bots = [];
 
@@ -398,7 +410,7 @@ router.get('/', authMiddleware, async (req, res) => {
         : 'quote-relative heuristic retired from paper execution · telemetry control for MAIN V2',
       running: !!mainStatus?.botRunning || !!mainStatus?.isRunning
         || (st.is_active === true
-          && heartbeatRowFresh(runtimeBeat.main_bot, FAST_MAX_AGE_SEC)),
+          && ownedFreshHeartbeat('main_bot')),
       activity: {
         label: 'signal evaluator',
         lastAt: runtimeBeat.main_bot?.beat_at || null,
@@ -443,7 +455,7 @@ router.get('/', authMiddleware, async (req, res) => {
       subtitle: 'legacy source retired · RTDS successors H48/H49',
       running: !!georgeStatus?.isRunning
         || (st.george_is_active === true
-          && heartbeatRowFresh(runtimeBeat.george_bot, FAST_MAX_AGE_SEC)),
+          && ownedFreshHeartbeat('george_bot')),
       activity: {
         label: 'Chainlink evaluator',
         lastAt: runtimeBeat.george_bot?.beat_at || null,
