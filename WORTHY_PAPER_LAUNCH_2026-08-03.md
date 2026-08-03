@@ -85,3 +85,30 @@ market, asset or day. No threshold changes are allowed during accrual.
 
 The realistic objective of this launch is to discover whether either lead
 survives. Zero or negative edge is an admissible and useful outcome.
+
+## Deployment verification
+
+Release `7af8505` was deployed to the Dublin VPS and passed the complete
+657-test suite locally and on the VPS. Evidence epoch
+`worthy-forward-2026-08-03-v33` began at `2026-08-03T23:02:04.261Z` after the
+launcher held every required collector green for 120 uninterrupted seconds.
+The epoch is `PENDING_24H`; it is not clean evidence until the full continuity
+and Parquet clocks complete.
+
+The immutable collector run contract contains exactly:
+
+- `H43_resolution_boundary_buffer`
+- `H43X_chainlink_tail_residual_v1`
+- `MAIN_LONGSHOT_0_20_V1`
+- `NEXT_H54_dynamic_ofi_resolver_confirm_v1`
+- `NEXT_H7_btc_oracle_confirm_v1`
+
+All five evaluators registered current heartbeats with zero errors. At the
+first verification read, the all-market capture had 20 frozen markets with
+strategy signals disabled, cross-venue monitored six pairs with zero exact
+eligible leads, options had 66 targets and zero executable exact-expiry marks,
+the structural scanner had 48 candidates with zero persistence errors, and
+Pyth was correctly waiting for an exact-feed market to enter its final
+300-second observation window. Platform acceptance and runtime audit both
+passed; all authenticated live switches were false and paper risk limits
+remained disabled only for imaginary capital.
