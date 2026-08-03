@@ -23,7 +23,11 @@ Environment=PARQUET_MAX_BYTES=2147483648
 Environment=PARQUET_HOT_MAX_BYTES=10737418240
 Environment=PARQUET_CUTOFF_SECONDS=900
 Environment=PARQUET_DUCKDB_THREADS=1
-ExecStart=/usr/bin/flock --exclusive --wait 7200 /var/lib/deltaforge/parquet-lake.lock /usr/local/bin/node scripts/parquet-lake.js compact
+RuntimeDirectory=deltaforge-parquet-lake
+RuntimeDirectoryMode=0700
+StateDirectory=deltaforge/parquet-lake deltaforge/parquet-hot deltaforge/parquet-stage
+StateDirectoryMode=0700
+ExecStart=/usr/bin/flock --exclusive --wait 7200 /run/deltaforge-parquet-lake/run.lock /usr/local/bin/node scripts/parquet-lake.js compact
 TimeoutStartSec=2h
 Nice=15
 IOSchedulingClass=idle
