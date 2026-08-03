@@ -39,6 +39,8 @@
     "research:funding": "node scripts/funding-carry-backtest.js",
     "research:dvol-threshold": "node scripts/dvol-threshold-backtest.js",
     "research:options-surface": "node scripts/options-surface-report.js",
+    "research:h43x-train": "node scripts/train-h43x-tail-model.js",
+    "research:ordered-strike": "node scripts/ordered-strike-report.js",
     "research:cross-funding": "node scripts/cross-venue-funding-backtest.js",
     "research:resolver-boundary": "node scripts/resolver-boundary-portfolio.js",
     "research:neglected-edge": "node scripts/neglected-edge-report.js",

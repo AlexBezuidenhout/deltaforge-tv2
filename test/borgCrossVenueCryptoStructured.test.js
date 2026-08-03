@@ -142,7 +142,7 @@ test('frozen exact-rule protocol needs no unrelated title-score threshold', () =
   });
   assert.equal(approved.paperEvalApproved, true);
   assert.equal(approved.paperEvalStatus, 'EXACT_RULE_KEY_APPROVED_PAPER_ONLY');
-  assert.equal(approved.paperEvalSource, 'frozen_exact_rule_key_v1');
+  assert.equal(approved.paperEvalSource, 'frozen_exact_rule_key_v2');
   assert.equal(approved.paperEvalThreshold, null);
 });
 
