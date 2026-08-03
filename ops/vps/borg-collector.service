@@ -23,10 +23,15 @@ Environment=BORG_CODE_VERSION=priority-research-v14
 # or manufacture fresh multiple-testing rows in the priority epoch.
 Environment=BORG_ACTIVE_STRATEGIES=H43_resolution_boundary_buffer,H43X_chainlink_tail_residual_v1,MAIN_LONGSHOT_0_20_V1
 Environment=BORG_CAPTURE_ASSETS=btc,eth,sol,xrp
-# H24/H44 require hourly books and H45/H46 require the nearest deterministic
-# daily threshold/range panel. Six-hour activation would be false telemetry if
-# the collector continued filtering those market families out.
-Environment=BORG_CAPTURE_MARKET_TYPES=direction_5m,direction_15m,direction_1h,threshold_daily,range_daily
+# All three active hypotheses consume five-minute books. Hourly, threshold and
+# range authority is collected by the dedicated all-market/options/structural
+# lanes; duplicating it here overloaded the primary socket and created real
+# connection gaps without adding evidence for the frozen active strategy set.
+Environment=BORG_CAPTURE_MARKET_TYPES=direction_5m
+# Three shards keep the high-rate BTC pair from sharing one connection with
+# half of the wider panel. This is a feed-integrity mechanism change, not a
+# trading threshold or PnL-derived parameter change.
+Environment=BORG_CLOB_SHARDS=3
 # Full event fidelity remains in compressed WAL. PostgreSQL stores at most one
 # derived touch per token/250 ms, plus the trailing state, for fast queries.
 Environment=BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS=250

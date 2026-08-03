@@ -84,6 +84,10 @@ class ClobRecon {
     this._initialSubscriptionSent = false;
     this.connectionEpoch = 0;
     this.connectionShard = Number.isInteger(options.connectionShard) ? options.connectionShard : 0;
+    this.connectionGaps = 0;
+    this.bookStateGaps = 0;
+    this.lastConnectionGapAt = null;
+    this.lastBookStateGapAt = null;
     this.frameSequence = 0;
     this.lastPingAt = 0;
     this.lastPongAt = 0;
@@ -150,12 +154,44 @@ class ClobRecon {
           connectionShard: this.connectionShard,
         };
         logEvent('WARN', 'clob', `ws closed (${code}${close.reason ? `: ${close.reason}` : ''}) — reconnecting`, close);
-        this._bufferEvent(null, 'connection_gap', null, null, null, { reason: 'ws_close', ...close });
+        this._recordConnectionGap({ reason: 'ws_close', ...close });
         this.activeSubscriptions.clear();
         this._scheduleReconnect();
       });
       ws.on('error', () => { /* close follows */ });
     });
+  }
+
+  _recordConnectionGap(detail = {}) {
+    // A socket that never reached OPEN is startup unavailability, not a lost
+    // interval. Once an epoch has received frames, every disconnect creates an
+    // unobservable interval and must remain a non-zero evidence counter.
+    if (this.connectionEpoch <= 0) return false;
+    this.connectionGaps += 1;
+    this.lastConnectionGapAt = new Date().toISOString();
+    this._bufferEvent(null, 'connection_gap', null, null, null, detail);
+
+    // Never let evaluators consume a pre-disconnect book during reconnect.
+    // Fresh WS snapshots or explicit REST recovery must repopulate state.
+    this.books.clear();
+    this._lastTouch?.clear();
+    this._pendingSqlTouch.clear();
+    return true;
+  }
+
+  health(now = Date.now()) {
+    return {
+      connectionShard: this.connectionShard,
+      connected: this.ws?.readyState === WebSocket.OPEN,
+      connectionEpoch: this.connectionEpoch,
+      connectionGaps: this.connectionGaps,
+      bookStateGaps: this.bookStateGaps,
+      lastConnectionGapAt: this.lastConnectionGapAt,
+      lastBookStateGapAt: this.lastBookStateGapAt,
+      desiredAssets: this.subscribed.size,
+      activeSubscriptions: this.activeSubscriptions.size,
+      lastWsMessageAgeMs: this.lastWsMsgAt > 0 ? Math.max(0, now - this.lastWsMsgAt) : null,
+    };
   }
 
   _scheduleReconnect() {
@@ -515,6 +551,8 @@ class ClobRecon {
           connectionShard: this.connectionShard,
         });
         if (hashMismatch) {
+          this.bookStateGaps += 1;
+          this.lastBookStateGapAt = new Date().toISOString();
           await logEvent('WARN', 'clob', 'book hash mismatch repaired from REST', {
             assetId, wsHash: requestHash, restHash: b.hash,
           });

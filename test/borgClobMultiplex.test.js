@@ -25,3 +25,15 @@ test('CLOB multiplex keeps complementary tokens together and balances markets', 
   ]);
   assert.equal(clob._shardIndex('A_UP'), clob._shardIndex('A_DOWN'));
 });
+
+test('CLOB multiplex reports aggregate connection and repaired-book gaps', () => {
+  const clob = new ClobMultiplex(() => null, { shardCount: 3 });
+  clob.shards[0].connectionGaps = 2;
+  clob.shards[1].bookStateGaps = 1;
+  const health = clob.health();
+  assert.equal(health.expectedSockets, 3);
+  assert.equal(health.connectionGaps, 2);
+  assert.equal(health.bookStateGaps, 1);
+  assert.equal(health.shards.length, 3);
+  clob.close();
+});

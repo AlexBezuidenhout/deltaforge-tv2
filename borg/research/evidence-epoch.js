@@ -69,7 +69,8 @@ function isErrorCounter(key) {
 }
 
 function isGapCounter(key) {
-  return /(?:sequence.?gaps?|discardedsequence|coveragegaps?)$/i.test(String(key));
+  return /(?:sequence.?gaps?|discardedsequence|coveragegaps?|connection.?gaps?|bookstategaps?)$/i
+    .test(String(key));
 }
 
 function latestContinuousHealthySuffix(rows, options = {}) {
@@ -346,6 +347,15 @@ async function assessEvidenceEpoch(pool, options = {}) {
     }
   }
   const flowHeartbeat = eventHeartbeats.flow_heartbeat?.data || {};
+  const primaryClob = eventHeartbeats.heartbeat?.data?.clob || null;
+  if (!primaryClob
+      || finite(primaryClob.expectedSockets, null) == null
+      || finite(primaryClob.activeSockets, null) == null) {
+    critical.push('primary CLOB socket coverage telemetry is missing');
+  } else if (finite(primaryClob.expectedSockets, 0) <= 0
+      || finite(primaryClob.activeSockets, 0) < finite(primaryClob.expectedSockets, 0)) {
+    critical.push(`primary CLOB socket coverage is ${finite(primaryClob.activeSockets, 0)}/${finite(primaryClob.expectedSockets, 0)}`);
+  }
   const activeFlowSockets = finite(flowHeartbeat.activeSockets, null);
   const expectedFlowSockets = finite(flowHeartbeat.expectedSockets, null);
   if (activeFlowSockets == null || expectedFlowSockets == null) {

@@ -91,6 +91,17 @@ class ClobMultiplex {
     for (const shard of this.shards) shard.checkStale();
   }
 
+  health(now = Date.now()) {
+    const shards = this.shards.map((shard) => shard.health(now));
+    return {
+      expectedSockets: shards.length,
+      activeSockets: shards.filter((shard) => shard.connected).length,
+      connectionGaps: shards.reduce((sum, shard) => sum + shard.connectionGaps, 0),
+      bookStateGaps: shards.reduce((sum, shard) => sum + shard.bookStateGaps, 0),
+      shards,
+    };
+  }
+
   // Taker polling is REST-based. Run it once, then scan all shard-local print
   // tapes because returned token IDs need not hash like a condition ID.
   pollTakerTrades(conditionId) {

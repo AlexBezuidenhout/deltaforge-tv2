@@ -730,6 +730,7 @@ async function main() {
           sourceRows: metaPerformanceHealth.sourceRows,
         },
         wal: walHealth,
+        clob: clob.health(),
         active: evaluationMarkets().map((m) => `${m.asset}:${m.market_type || 'direction_5m'}`).join(',') || null,
         capturePolicy: capturePolicy.describe(),
         sqlTouchMinIntervalMs,
