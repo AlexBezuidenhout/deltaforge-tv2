@@ -1,0 +1,55 @@
+{
+  "experiment_id": "crossvenue-certified-terminal-lock-v5",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-03T14:20:00.000Z",
+  "frozen_at": "2026-08-03T14:20:00.000Z",
+  "evidence_started_at": "2026-08-03T14:20:00.000Z",
+  "selection_data_cutoff": "2026-08-03T14:20:00.000Z",
+  "phase": "scanner",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "entry_authorization": "none until the deterministic terminal-payoff and executable orphan-safety proof both pass",
+  "family": "rule_aware_crossvenue",
+  "strategy_version": "crossvenue-certified-terminal-lock-v5",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "hypothesis": "A Polymarket and Kalshi bundle can be a terminal payoff lock only when every outcome-defining rule dimension is independently certified equal and the worst legal terminal and incomplete-fill states remain non-negative after doubled fees, walked depth and orphan reserve.",
+  "identity_contract": {
+    "required_dimensions": [
+      "subject",
+      "predicate",
+      "comparator",
+      "strike",
+      "resolver",
+      "observationAt",
+      "timezone",
+      "settlementPrecision",
+      "fallback",
+      "voidAndDisputePolicy"
+    ],
+    "certified_different": "automatic hard veto",
+    "unknown": "automatic hard veto",
+    "rule_provenance": "immutable source text and content hash from each venue"
+  },
+  "payoff_and_execution_contract": {
+    "state_space": "enumerate every legal joint terminal state and prove the bundle payout",
+    "price_benchmark": "synchronized executable asks walked at 5, 10 and 25 shares",
+    "costs": "current per-market venue fees at two times, one adverse tick per leg and capital-duration charge",
+    "atomicity": false,
+    "orphan_reserve": "worst immediate executable unwind loss for every non-empty proper subset of filled legs",
+    "fok_feasibility": "required independently on each venue; no simultaneous acknowledgement is assumed",
+    "qualification": "minimum terminal payout minus full executable cost minus orphan reserve is strictly positive"
+  },
+  "independent_unit": "one certified pair-direction-day",
+  "evaluation": {
+    "minimum_fresh_pair_direction_days": 300,
+    "minimum_calendar_days": 30,
+    "required_latency_profiles_ms": [100, 250, 500],
+    "shared_bankrolls_usd": [500, 1000],
+    "minimum_positive_capacity_usd": 1,
+    "no_dominant_pair_or_day": true,
+    "null_outcome": "No fully certified and orphan-safe positive bundle is a valid deterministic-scanner result. Similar wording or arithmetic parity alone is not evidence."
+  },
+  "no_optional_stopping": true
+}

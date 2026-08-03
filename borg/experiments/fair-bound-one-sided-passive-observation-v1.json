@@ -1,0 +1,59 @@
+{
+  "experiment_id": "fair-bound-one-sided-passive-observation-v1",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-03T14:20:00.000Z",
+  "frozen_at": "2026-08-03T14:20:00.000Z",
+  "evidence_started_at": "2026-08-03T14:20:00.000Z",
+  "selection_data_cutoff": "2026-08-03T14:20:00.000Z",
+  "phase": "observation",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "entry_authorization": "none; this manifest authorizes capture and counterfactual replay only",
+  "family": "certified_fair_bound_passive_overlay",
+  "strategy_version": "fair-bound-one-sided-passive-observation-v1",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "hypothesis": "A one-sided post-only quote may earn a neglected low-capacity spread only when an independently certified lower fair-value bound exceeds the quote, all costs and observed adverse selection; midpoint, imbalance and recent flow are not fair-value sources.",
+  "accepted_fair_sources": [
+    "frozen resolver-source residual with a valid lower confidence bound",
+    "deterministic payoff graph with immutable rule certification",
+    "exact-expiry executable option-implied probability interval",
+    "content-addressed cross-venue terminal relation with synchronized books"
+  ],
+  "capture_contract": {
+    "panel": "neglected-capacity-panel-v1",
+    "membership": "frozen per evidence epoch without PnL or toxicity selection",
+    "required_events": [
+      "sequenced public book deltas",
+      "public prints",
+      "source and local receive clocks",
+      "connection epoch",
+      "tick size, minimum size and effective fee metadata"
+    ],
+    "derived_storage": "state transitions and bounded heartbeats only"
+  },
+  "counterfactual_execution": {
+    "order_type": "post-only GTD",
+    "queue_credit": "zero unless public volume trades through displayed queue ahead and our full simulated size",
+    "partial_fills": true,
+    "cancel_acknowledgement": true,
+    "latency_profiles_ms": [100, 250, 500],
+    "markouts_seconds": [1, 5, 30],
+    "costs": "two times effective fees, one adverse unwind tick and full displayed-depth walk",
+    "rewards": "zero unless authenticated attribution is reconstructible"
+  },
+  "independent_unit": "one flat-to-flat quote episode per market session",
+  "evaluation": {
+    "minimum_causally_simulated_fills": 300,
+    "minimum_calendar_days": 30,
+    "positive_doubled_cost_pnl_in_both_chronological_halves": true,
+    "market_and_day_clustered_lower_bound_above_zero": true,
+    "multiple_testing_correction": true,
+    "positive_shared_bankrolls_usd": [500, 1000],
+    "no_dominant_event_category_or_day": true,
+    "null_outcome": "No qualifying independent fair bound or negative queue-stressed markout is a valid rejection and does not authorize looser quoting."
+  },
+  "authenticated_canary": "not authorized; requires a separate decision after the complete paper promotion contract passes",
+  "no_optional_stopping": true
+}

@@ -9,6 +9,7 @@ const {
   slateDocument,
   validateSlate,
 } = require('../borg/research/edge-experiment-slate');
+const { readExperimentManifests } = require('../borg/research/experiment-registry');
 
 test('frozen incubator contains exactly ten unique paper-safe lanes', () => {
   assert.equal(validateSlate(SLATE), true);
@@ -29,4 +30,17 @@ test('slate hash is deterministic and report states the authorization boundary',
   assert.equal(first.manifestHash, second.manifestHash);
   assert.match(first.manifestHash, /^[a-f0-9]{64}$/);
   assert.match(renderSlate(first), /does \*\*not\*\* authorize ten trading bots/);
+});
+
+test('every frozen lane has an immutable paper-only root manifest', () => {
+  const manifests = new Map(readExperimentManifests()
+    .map((manifest) => [manifest.experiment_id, manifest]));
+  for (const lane of SLATE) {
+    const manifest = manifests.get(lane.experimentId);
+    assert.ok(manifest, `${lane.experimentId} manifest is missing`);
+    assert.equal(manifest.paper_only, true, lane.experimentId);
+    assert.ok(manifest.live_order_path === false || manifest.live_order_path === 'disabled',
+      `${lane.experimentId} live path must be disabled`);
+    assert.match(manifest._hash, /^[a-f0-9]{64}$/);
+  }
 });
