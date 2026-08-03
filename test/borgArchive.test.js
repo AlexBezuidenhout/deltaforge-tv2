@@ -59,6 +59,7 @@ test('flow archive leaves trigger trades referenced by retained signals', async 
   assert.equal(result.rows, 0);
   assert.match(selectSql, /NOT EXISTS \(SELECT 1 FROM pm_flow_signals/);
   assert.match(selectSql, /s\.trigger_trade_id=t\.id/);
+  assert.match(selectSql, /ORDER BY t\.observed_at, t\.id LIMIT \$2/);
 });
 
 test('bigint tape archives in indexed append order while retaining the timestamp cutoff', async () => {

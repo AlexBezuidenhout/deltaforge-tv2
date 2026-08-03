@@ -36,6 +36,11 @@ const TABLES = Object.freeze({
   // batch is retried forever and DELETE correctly fails on the FK.
   pm_flow_trades: {
     key: 'id', keyType: 'bigint', time: 'observed_at',
+    // Most old ids are intentionally retained because a signal references
+    // them. Walking the primary key therefore scans a large protected prefix
+    // before finding an archivable row. Use the existing observed_at index,
+    // then id for deterministic ties, so LIMIT remains bounded under load.
+    archiveOrder: 'time_id',
     predicate: 'NOT EXISTS (SELECT 1 FROM pm_flow_signals s WHERE s.trigger_trade_id=t.id)',
   },
   pm_flow_touches: { key: 'id', keyType: 'bigint', time: 'observed_at' },
@@ -178,7 +183,8 @@ async function selectBatch(pool, table, cutoff, batchSize) {
   // sort for borg_clob_touch despite LIMIT 5000. Bigint ids are append-only,
   // deterministic, and indexed, while the timestamp predicate still enforces
   // the exact safe retention cutoff.
-  const order = TABLES[table].keyType === 'bigint' ? 't.id'
+  const order = TABLES[table].archiveOrder === 'time_id' ? `t.${time}, t.id`
+    : TABLES[table].keyType === 'bigint' ? 't.id'
     : TABLES[table].key === 'symbol_ts' ? `t.${time}, t.symbol`
     : TABLES[table].key === 'product_ts' ? `t.${time}, t.product`
     : `t.${time}, t.id`;
