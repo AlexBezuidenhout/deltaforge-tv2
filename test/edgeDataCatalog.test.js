@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   aggregateOffhostState,
+  aggregateParquetLakeState,
   causalReplayGrade,
   classifyTable,
   fieldCoverage,
@@ -60,6 +61,38 @@ test('off-host aggregation accepts only verified objects with SHA-256 metadata',
   assert.equal(summary.verified, 1);
   assert.equal(summary.invalidChecksums, 1);
   assert.equal(summary.destination, 'Google Drive/VPS Data');
+});
+
+test('Parquet lake aggregation counts only verified ZSTD batch outputs as valid', () => {
+  const summary = aggregateParquetLakeState({
+    format: 'deltaforge-parquet-lake-state-v1',
+    updatedAt: '2026-08-03T14:00:00Z',
+    sources: { one: {}, two: {} },
+    batches: {
+      good: {
+        verified: true,
+        outputs: [{
+          relative: 'event-envelope-v1/source=binance/date=2026-08-03/hour=14/part-a.parquet',
+          source: 'binance', date: '2026-08-03', rows: 100, bytes: 200,
+          sha256: 'a'.repeat(64), compression: 'ZSTD', verified: true,
+        }],
+      },
+      bad: {
+        verified: true,
+        outputs: [{
+          relative: 'event-envelope-v1/source=binance/date=2026-08-04/hour=14/part-b.parquet',
+          source: 'binance', date: '2026-08-04', rows: 50, bytes: 100,
+          sha256: '', compression: 'GZIP', verified: true,
+        }],
+      },
+    },
+  });
+  assert.equal(summary.sourceFiles, 2);
+  assert.equal(summary.files, 2);
+  assert.equal(summary.rows, 150);
+  assert.equal(summary.invalidOutputs, 1);
+  assert.equal(summary.groups[0].firstDate, '2026-08-03');
+  assert.equal(summary.groups[0].lastDate, '2026-08-04');
 });
 
 test('PostgreSQL identifier quoting rejects injected identifiers', () => {

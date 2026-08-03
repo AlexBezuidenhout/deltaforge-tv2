@@ -660,6 +660,65 @@ function readOffhostState(file) {
   return aggregateOffhostState(JSON.parse(fs.readFileSync(file, 'utf8')));
 }
 
+function aggregateParquetLakeState(state) {
+  const groups = new Map();
+  let files = 0;
+  let bytes = 0;
+  let rows = 0;
+  let invalidOutputs = 0;
+  let verifiedBatches = 0;
+  for (const batch of Object.values(state?.batches || {})) {
+    if (batch.verified !== true) continue;
+    verifiedBatches += 1;
+    for (const output of batch.outputs || []) {
+      if (!String(output.relative || '').endsWith('.parquet')) continue;
+      const source = String(output.source || output.relative.match(/source=([^/]+)/)?.[1] || 'unknown');
+      const date = String(output.date || output.relative.match(/date=(\d{4}-\d{2}-\d{2})/)?.[1] || '');
+      const size = finite(output.bytes, 0);
+      const rowCount = finite(output.rows, 0);
+      const checksumValid = /^[a-f0-9]{64}$/i.test(String(output.sha256 || ''));
+      const valid = output.verified === true && checksumValid && output.compression === 'ZSTD';
+      const current = groups.get(source) || {
+        source, parquetFiles: 0, bytes: 0, rows: 0,
+        firstDate: null, lastDate: null, invalidOutputs: 0,
+      };
+      current.parquetFiles += 1;
+      current.bytes += size;
+      current.rows += rowCount;
+      files += 1;
+      bytes += size;
+      rows += rowCount;
+      if (!valid) {
+        current.invalidOutputs += 1;
+        invalidOutputs += 1;
+      }
+      if (date && (!current.firstDate || date < current.firstDate)) current.firstDate = date;
+      if (date && (!current.lastDate || date > current.lastDate)) current.lastDate = date;
+      groups.set(source, current);
+    }
+  }
+  return {
+    format: state?.format || null,
+    updatedAt: safeIso(state?.updatedAt),
+    dataset: 'event-envelope-v1',
+    destination: 'Google Drive/VPS Data/parquet',
+    sourceFiles: Object.keys(state?.sources || {}).length,
+    batches: Object.keys(state?.batches || {}).length,
+    verifiedBatches,
+    files,
+    bytes,
+    rows,
+    invalidOutputs,
+    compression: 'ZSTD',
+    groups: [...groups.values()].sort((left, right) => right.bytes - left.bytes),
+  };
+}
+
+function readParquetLakeState(file) {
+  if (!file || !fs.existsSync(file)) return null;
+  return aggregateParquetLakeState(JSON.parse(fs.readFileSync(file, 'utf8')));
+}
+
 function parseReceipt(file) {
   if (!file || !fs.existsSync(file)) return null;
   const values = {};
@@ -766,9 +825,13 @@ function buildStrategyCoverage(catalog) {
 
 function catalogWarnings(catalog) {
   const warnings = [];
-  const parquetFiles = catalog.storage?.parquet?.files || 0;
+  const parquetFiles = catalog.storage?.parquetLake?.files
+    || catalog.storage?.parquet?.files || 0;
   if (parquetFiles === 0) {
     warnings.push('No Parquet research projection exists on the VPS; Google Drive raw objects are durable but not yet query-efficient.');
+  }
+  if (catalog.storage?.parquetLake?.invalidOutputs > 0) {
+    warnings.push(`${catalog.storage.parquetLake.invalidOutputs} Parquet output(s) lack verified SHA-256/ZSTD metadata.`);
   }
   if (catalog.storage?.offhost?.invalidChecksums > 0) {
     warnings.push(`${catalog.storage.offhost.invalidChecksums} off-host object(s) lack valid verification metadata.`);
@@ -792,7 +855,8 @@ async function buildEdgeDataCatalog(options = {}) {
   const roots = {
     wal: options.walRoot || process.env.BORG_WAL_DIR || '/var/lib/deltaforge/wal/borg',
     archive: options.archiveRoot || process.env.BORG_ARCHIVE_DIR || '/var/lib/deltaforge/archive/borg-raw',
-    parquet: options.parquetRoot || process.env.BORG_PARQUET_MIRROR_DIR || '/var/lib/deltaforge/parquet',
+    parquet: options.parquetRoot || process.env.PARQUET_HOT_ROOT
+      || process.env.BORG_PARQUET_MIRROR_DIR || '/var/lib/deltaforge/parquet-hot',
   };
   const [database, wal, archive, parquet] = await Promise.all([
     options.pool ? queryDatabaseCatalog(options.pool, options) : Promise.resolve(null),
@@ -806,6 +870,9 @@ async function buildEdgeDataCatalog(options = {}) {
   const receiptFile = options.receiptFile
     || process.env.BORG_OFFHOST_ARCHIVE_RECEIPT
     || '/var/lib/deltaforge/offhost-archive.receipt';
+  const parquetLakeStateFile = options.parquetLakeStateFile
+    || process.env.PARQUET_LAKE_STATE_FILE
+    || '/var/lib/deltaforge/parquet-lake/state.json';
   const catalog = {
     format: 'deltaforge-edge-data-catalog-v1',
     generatedAt: new Date().toISOString(),
@@ -823,6 +890,7 @@ async function buildEdgeDataCatalog(options = {}) {
       wal,
       normalizedArchive: archive,
       parquet,
+      parquetLake: readParquetLakeState(parquetLakeStateFile),
       offhost: readOffhostState(offhostStateFile),
       offhostReceipt: parseReceipt(receiptFile),
     },
@@ -846,6 +914,8 @@ function markdownCatalog(catalog) {
     `| ${group.namespace} | \`${group.source}\` | ${group.files.toLocaleString('en-US')} | ${byteText(group.bytes)} | ${group.verified.toLocaleString('en-US')} | ${group.firstMtime || '—'} | ${group.lastMtime || '—'} |`);
   const coverageRows = (catalog.strategyCoverage || []).map((row) =>
     `| ${row.programme} | **${row.readiness}** | ${row.supports} | ${row.blocks} |`);
+  const parquetRows = (catalog.storage?.parquetLake?.groups || []).map((group) =>
+    `| \`${group.source}\` | ${group.parquetFiles.toLocaleString('en-US')} | ${group.rows.toLocaleString('en-US')} | ${byteText(group.bytes)} | ${group.firstDate || '—'} | ${group.lastDate || '—'} | ${group.invalidOutputs} |`);
   return `${[
     '# DeltaForge edge data catalog',
     '',
@@ -859,7 +929,8 @@ function markdownCatalog(catalog) {
     `- Hot PostgreSQL: ${byteText(catalog.database?.bytes || 0)} across ${databaseTables.length} public tables.`,
     `- Local WAL: ${(catalog.storage?.wal?.files || 0).toLocaleString('en-US')} files, ${byteText(catalog.storage?.wal?.bytes || 0)}.`,
     `- Verified off-host index: ${(catalog.storage?.offhost?.verified || 0).toLocaleString('en-US')} / ${(catalog.storage?.offhost?.files || 0).toLocaleString('en-US')} objects, ${byteText(catalog.storage?.offhost?.bytes || 0)}.`,
-    `- VPS Parquet projection: ${(catalog.storage?.parquet?.parquetFiles || catalog.storage?.parquet?.groups?.reduce((sum, row) => sum + row.parquetFiles, 0) || 0).toLocaleString('en-US')} files.`,
+    `- Verified Parquet lake: ${(catalog.storage?.parquetLake?.files || 0).toLocaleString('en-US')} ZSTD files / ${(catalog.storage?.parquetLake?.rows || 0).toLocaleString('en-US')} events from ${(catalog.storage?.parquetLake?.sourceFiles || 0).toLocaleString('en-US')} raw segments; ${byteText(catalog.storage?.parquetLake?.bytes || 0)} off-host.`,
+    `- VPS hot Parquet cache: ${(catalog.storage?.parquet?.parquetFiles || catalog.storage?.parquet?.groups?.reduce((sum, row) => sum + row.parquetFiles, 0) || 0).toLocaleString('en-US')} files.`,
     '',
     '## Binding warnings',
     '',
@@ -887,6 +958,14 @@ function markdownCatalog(catalog) {
     '',
     `Receipt: ${catalog.storage?.offhostReceipt?.completedAt || 'missing'}; remote check: ${catalog.storage?.offhostReceipt?.remoteVerification || 'unknown'}. The state index records uploader verification; any object selected for research must still be downloaded/staged and SHA-256 checked before use.`,
     '',
+    '## Queryable Parquet projection',
+    '',
+    '| Source | Parquet files | Events | Stored size | First date | Latest date | Invalid outputs |',
+    '|---|---:|---:|---:|---|---|---:|',
+    ...parquetRows,
+    '',
+    'The Parquet projection is a typed causal envelope with ZSTD compression. The immutable gzip-WAL and its SHA-256 remain the byte-authoritative source; Parquet is a verified query projection and may be selectively hydrated to the VPS hot cache.',
+    '',
     '## PostgreSQL hot-tier tables',
     '',
     '| Table | Family | Tier | Rows | Total size | First timestamp | Last timestamp | Data/execution grade | Defensible replay profiles |',
@@ -909,6 +988,7 @@ module.exports = {
   CONTENT_FIELD_GROUPS,
   WAL_PROFILES,
   aggregateOffhostState,
+  aggregateParquetLakeState,
   buildEdgeDataCatalog,
   buildStrategyCoverage,
   causalReplayGrade,
@@ -920,5 +1000,6 @@ module.exports = {
   markdownCatalog,
   quoteIdentifier,
   queryDatabaseCatalog,
+  readParquetLakeState,
   walkFiles,
 };

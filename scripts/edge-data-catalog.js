@@ -66,6 +66,7 @@ async function main() {
       walRoot: arg('--wal-root', undefined),
       archiveRoot: arg('--archive-root', undefined),
       parquetRoot: arg('--parquet-root', undefined),
+      parquetLakeStateFile: arg('--parquet-lake-state', undefined),
       offhostStateFile: arg('--offhost-state', undefined),
       receiptFile: arg('--receipt', undefined),
       maxBoundaryQueries: Number(arg('--max-boundary-queries', 80)),
@@ -91,8 +92,9 @@ async function main() {
         offhostFiles: catalog.storage.offhost?.files || 0,
         offhostVerified: catalog.storage.offhost?.verified || 0,
         offhostBytes: catalog.storage.offhost?.bytes || 0,
-        parquetFiles: catalog.storage.parquet.groups
-          .reduce((sum, group) => sum + group.parquetFiles, 0),
+        parquetFiles: catalog.storage.parquetLake?.files
+          || catalog.storage.parquet.groups.reduce((sum, group) => sum + group.parquetFiles, 0),
+        parquetRows: catalog.storage.parquetLake?.rows || 0,
         warnings: catalog.warnings,
         jsonOut: jsonOut ? path.resolve(jsonOut) : null,
         markdownOut: markdownOut ? path.resolve(markdownOut) : null,
