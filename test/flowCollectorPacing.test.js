@@ -121,7 +121,7 @@ test('bounded trade pagination exposes an explicit coverage gap', async () => {
   assert.equal(result.trades.length, 6);
 });
 
-test('saturated flow discovery retries one stable offset-zero rescue snapshot', async () => {
+test('saturated flow discovery retries one overlapped two-page rescue snapshot', async () => {
   const calls = [];
   const result = await collectStableTradeSnapshot(async (offset, limit) => {
     calls.push({ offset, limit });
@@ -131,18 +131,72 @@ test('saturated flow discovery retries one stable offset-zero rescue snapshot', 
         { timestamp: '104', id: 'primary-b' },
       ];
     }
-    return [
+    if (offset === 0) return [
       { timestamp: '106', id: 'rescue-a' },
       { timestamp: '103', id: 'rescue-b' },
       { timestamp: '99', id: 'old' },
     ];
-  }, { sinceSec: 100, pageSize: 2, rescueLimit: 10 });
+    return [];
+  }, {
+    sinceSec: 100, pageSize: 2, rescueLimit: 10,
+    rescueOverlap: 2, minimumOverlapRows: 1,
+  });
 
-  assert.deepEqual(calls, [{ offset: 0, limit: 2 }, { offset: 0, limit: 10 }]);
+  assert.deepEqual(calls, [
+    { offset: 0, limit: 2 },
+    { offset: 0, limit: 10 },
+    { offset: 8, limit: 10 },
+  ]);
   assert.equal(result.rescueSnapshot, true);
   assert.equal(result.primaryOldestSec, 104);
   assert.equal(result.saturated, false);
+  assert.equal(result.coverageProof, 'HEAD_REACHED_CURSOR');
   assert.deepEqual(result.trades.map((row) => row.id), ['rescue-a', 'rescue-b']);
+});
+
+test('overlapped rescue proves continuity before accepting a tail that reaches the cursor', async () => {
+  const head = Array.from({ length: 10 }, (_, index) => ({
+    timestamp: String(210 - index), id: `head-${index}`,
+  }));
+  const tail = [head[8], head[9],
+    { timestamp: '199', id: 'tail-1' },
+    { timestamp: '99', id: 'tail-old' }];
+  const result = await collectStableTradeSnapshot(async (offset, limit) => {
+    if (limit === 2) return head.slice(0, 2);
+    return offset === 0 ? head : tail;
+  }, {
+    sinceSec: 100, pageSize: 2, rescueLimit: 10,
+    rescueOverlap: 2, minimumOverlapRows: 2,
+  });
+
+  assert.equal(result.overlapRows, 2);
+  assert.equal(result.overlapProved, true);
+  assert.equal(result.saturated, false);
+  assert.equal(result.coverageProof, 'OVERLAPPED_TAIL_REACHED_CURSOR');
+  assert.equal(result.trades.some((row) => row.id === 'tail-old'), false);
+  assert.equal(new Set(result.trades.map((row) => row.id)).size, result.trades.length);
+});
+
+test('disconnected offset snapshots remain an explicit flow coverage gap', async () => {
+  const head = Array.from({ length: 10 }, (_, index) => ({
+    timestamp: String(210 - index), id: `head-${index}`,
+  }));
+  const tail = [
+    { timestamp: '199', id: 'different-1' },
+    { timestamp: '99', id: 'different-old' },
+  ];
+  const result = await collectStableTradeSnapshot(async (offset, limit) => {
+    if (limit === 2) return head.slice(0, 2);
+    return offset === 0 ? head : tail;
+  }, {
+    sinceSec: 100, pageSize: 2, rescueLimit: 10,
+    rescueOverlap: 2, minimumOverlapRows: 1,
+  });
+
+  assert.equal(result.overlapRows, 0);
+  assert.equal(result.overlapProved, false);
+  assert.equal(result.saturated, true);
+  assert.equal(result.coverageProof, 'UNPROVED_PAGE_CONTINUITY');
 });
 
 test('complete primary flow snapshot does not spend the rescue request', async () => {

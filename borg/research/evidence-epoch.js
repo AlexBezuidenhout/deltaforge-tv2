@@ -310,6 +310,13 @@ async function assessEvidenceEpoch(pool, options = {}) {
     }
   }
   const flowHeartbeat = eventHeartbeats.flow_heartbeat?.data || {};
+  const activeFlowSockets = finite(flowHeartbeat.activeSockets, null);
+  const expectedFlowSockets = finite(flowHeartbeat.expectedSockets, null);
+  if (activeFlowSockets == null || expectedFlowSockets == null) {
+    critical.push('public-flow CLOB socket coverage telemetry is missing');
+  } else if (expectedFlowSockets <= 0 || activeFlowSockets < expectedFlowSockets) {
+    critical.push(`public-flow CLOB socket coverage is ${activeFlowSockets}/${expectedFlowSockets}`);
+  }
   const globalDbQueue = finite(flowHeartbeat.globalDbQueue, null);
   const globalDbQueueOldestAgeMs = finite(flowHeartbeat.globalDbQueueOldestAgeMs, null);
   if (globalDbQueue == null || globalDbQueueOldestAgeMs == null) {

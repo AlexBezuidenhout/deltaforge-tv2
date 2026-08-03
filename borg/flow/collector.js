@@ -57,12 +57,20 @@ const DATA_TRADE_PAGE_SIZE = Math.max(100, Math.min(1000,
   Number(process.env.FLOW_DATA_TRADE_PAGE_SIZE || 500)));
 // Offset pages are not one atomic Data API snapshot: trades inserted between
 // requests shift later offsets and can manufacture a coverage gap. Use one
-// ordinary page, then one larger offset-zero rescue snapshot only when that
+// ordinary page, then a pair of overlap-proved rescue snapshots only when that
 // page cannot reach the prior source cursor. The documented endpoint limit is
 // 10,000 rows.
 const DATA_TRADE_MAX_PAGES = 1;
+// Use a deliberately uncommon documented limit for both rescue URLs. The Data
+// API caches each exact URL for 300 seconds; keeping the two URLs private to
+// this collector lets their cache generations start together. The overlapping
+// pages are accepted as contiguous only when they share enough exact rows.
 const DATA_TRADE_RESCUE_LIMIT = Math.max(DATA_TRADE_PAGE_SIZE, Math.min(10_000,
-  Number(process.env.FLOW_DATA_TRADE_RESCUE_LIMIT || 10_000)));
+  Number(process.env.FLOW_DATA_TRADE_RESCUE_LIMIT || 9_999)));
+const DATA_TRADE_RESCUE_OVERLAP = Math.max(1, Math.min(DATA_TRADE_RESCUE_LIMIT - 1,
+  Number(process.env.FLOW_DATA_TRADE_RESCUE_OVERLAP || 1_000)));
+const DATA_TRADE_RESCUE_MIN_OVERLAP = Math.max(1, Math.min(DATA_TRADE_RESCUE_OVERLAP,
+  Number(process.env.FLOW_DATA_TRADE_RESCUE_MIN_OVERLAP || 100)));
 const REST_MAX_ATTEMPTS = Math.max(1, Math.min(6,
   Number(process.env.FLOW_REST_MAX_ATTEMPTS || 4)));
 const DATA_API_TIMEOUT_MS = Math.max(5_000,
@@ -112,6 +120,13 @@ function hash(parts) {
   return crypto.createHash('sha256').update(parts.map((value) => value ?? '').join('|')).digest('hex');
 }
 
+function globalTradeKey(trade) {
+  return hash([
+    trade?.transactionHash, trade?.asset, trade?.proxyWallet, trade?.side,
+    trade?.price, trade?.size, trade?.timestamp,
+  ]);
+}
+
 function marketMetadataRecord(market, observedAt = Date.now()) {
   const raw = market?.raw && typeof market.raw === 'object' ? market.raw : {};
   const serialized = JSON.stringify(raw);
@@ -143,6 +158,7 @@ async function collectRecentTradePages(fetchPage, {
   sinceSec,
   pageSize = DATA_TRADE_PAGE_SIZE,
   maxPages = DATA_TRADE_MAX_PAGES,
+  startOffset = 0,
 } = {}) {
   const cutoff = Number.isFinite(Number(sinceSec)) ? Number(sinceSec) : 0;
   const collected = [];
@@ -150,7 +166,7 @@ async function collectRecentTradePages(fetchPage, {
   let oldestSec = null;
   let saturated = false;
   for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
-    const page = await fetchPage(pageIndex * pageSize, pageSize);
+    const page = await fetchPage(startOffset + pageIndex * pageSize, pageSize);
     if (!Array.isArray(page)) throw new Error('Data API trades response is not an array');
     pages += 1;
     const timestamps = page.map((trade) => Math.floor((epochMs(trade?.timestamp) || 0) / 1000))
@@ -178,6 +194,8 @@ async function collectStableTradeSnapshot(fetchPage, {
   sinceSec,
   pageSize = DATA_TRADE_PAGE_SIZE,
   rescueLimit = DATA_TRADE_RESCUE_LIMIT,
+  rescueOverlap = DATA_TRADE_RESCUE_OVERLAP,
+  minimumOverlapRows = DATA_TRADE_RESCUE_MIN_OVERLAP,
 } = {}) {
   const primary = await collectRecentTradePages(fetchPage, {
     sinceSec, pageSize, maxPages: 1,
@@ -187,17 +205,64 @@ async function collectStableTradeSnapshot(fetchPage, {
     return { ...primary, rescueSnapshot: false, primaryOldestSec: primary.oldestSec };
   }
 
-  // Fetch offset zero again at the wider limit. It is acceptable for this
-  // second request to observe a newer snapshot: coverage is proved only when
-  // that single response itself reaches the prior causal cursor.
-  const rescue = await collectRecentTradePages(fetchPage, {
-    sinceSec, pageSize: rescueLimit, maxPages: 1,
+  const overlap = Math.max(1, Math.min(rescueLimit - 1, Number(rescueOverlap) || 1));
+  const rescueOffset = rescueLimit - overlap;
+  const overlapRequired = Math.max(1, Math.min(overlap, Number(minimumOverlapRows) || 1));
+
+  // `/trades` is cached for five minutes and one 10k response can be shorter
+  // than a busy cache generation. Fetch two documented offset pages at once,
+  // with a deliberate overlap. Offset pagination is considered connected only
+  // when exact immutable trade identities occur in both snapshots. This turns
+  // cache skew or a shifting offset into an explicit GAP instead of silently
+  // claiming complete coverage.
+  const [head, tail] = await Promise.all([
+    collectRecentTradePages(fetchPage, {
+      sinceSec: 0, pageSize: rescueLimit, maxPages: 1, startOffset: 0,
+    }),
+    collectRecentTradePages(fetchPage, {
+      sinceSec: 0, pageSize: rescueLimit, maxPages: 1, startOffset: rescueOffset,
+    }),
+  ]);
+  const cutoff = Number.isFinite(Number(sinceSec)) ? Number(sinceSec) : 0;
+  const headReachedCursor = head.trades.length < rescueLimit
+    || (head.oldestSec != null && head.oldestSec <= cutoff);
+  const headKeys = new Set(head.trades.map(globalTradeKey));
+  const overlapRows = tail.trades.reduce(
+    (count, trade) => count + Number(headKeys.has(globalTradeKey(trade))), 0,
+  );
+  const overlapProved = overlapRows >= overlapRequired;
+  const combined = [];
+  const combinedKeys = new Set();
+  for (const trade of [...head.trades, ...tail.trades]) {
+    const key = globalTradeKey(trade);
+    if (combinedKeys.has(key)) continue;
+    combinedKeys.add(key);
+    combined.push(trade);
+  }
+  const timestamps = combined.map((trade) => Math.floor((epochMs(trade?.timestamp) || 0) / 1000))
+    .filter((timestamp) => timestamp > 0);
+  const oldestSec = timestamps.length ? Math.min(...timestamps) : null;
+  const reachesCursor = oldestSec != null && oldestSec <= cutoff;
+  const coverageProved = headReachedCursor || (overlapProved && reachesCursor);
+  const filtered = combined.filter((trade) => {
+    const timestamp = Math.floor((epochMs(trade?.timestamp) || 0) / 1000);
+    return timestamp >= cutoff;
   });
   return {
-    ...rescue,
-    pages: primary.pages + rescue.pages,
+    trades: filtered,
+    pages: primary.pages + head.pages + tail.pages,
+    oldestSec,
+    saturated: !coverageProved,
     rescueSnapshot: true,
     primaryOldestSec: primary.oldestSec,
+    rescueOffset,
+    overlapRows,
+    overlapRequired,
+    overlapProved,
+    coverageProof: headReachedCursor
+      ? 'HEAD_REACHED_CURSOR'
+      : overlapProved && reachesCursor ? 'OVERLAPPED_TAIL_REACHED_CURSOR'
+        : !overlapProved ? 'UNPROVED_PAGE_CONTINUITY' : 'TAIL_DID_NOT_REACH_CURSOR',
   };
 }
 
@@ -499,6 +564,7 @@ class FlowCollector {
       globalTrades: 0, realtimeTrades: 0, eligibleSweeps: 0, signals: 0,
       scored: 0, filled: 0, errors: 0, scheduledSkips: 0, globalCoverageGaps: 0,
       globalBootstrapTruncations: 0, globalRescueSnapshots: 0,
+      realtimeConnectionGaps: 0,
       globalDbPersisted: 0, globalDbQueueHighWater: 0,
       restRetries: 0, lastRestRetryAt: null,
       boundarySourceArmed: 0, boundaryReady: 0, boundaryRejected: 0,
@@ -531,6 +597,8 @@ class FlowCollector {
       global_poll_ms: GLOBAL_POLL_MS, data_trade_page_size: DATA_TRADE_PAGE_SIZE,
       data_trade_max_pages: DATA_TRADE_MAX_PAGES,
       data_trade_rescue_limit: DATA_TRADE_RESCUE_LIMIT,
+      data_trade_rescue_overlap: DATA_TRADE_RESCUE_OVERLAP,
+      data_trade_rescue_min_overlap: DATA_TRADE_RESCUE_MIN_OVERLAP,
       boundary_intent_stream: BOUNDARY_EXPERIMENT_ID,
     });
     await this.heartbeat();
@@ -706,6 +774,9 @@ class FlowCollector {
   onConnection(socket, event, detail) {
     const level = event === 'open' ? 'INFO' : 'WARN';
     const observedAt = Date.now();
+    // A close while the collector is running means at least one interval is
+    // not replay-complete. Planned shutdown sets socket.closed before close.
+    if (event === 'close' && !socket.closed) this.counters.realtimeConnectionGaps += 1;
     this.connectionEvents.push({ at: observedAt, shard: socket.shard, epoch: socket.connectionEpoch, event });
     const cutoff = observedAt - 30_000;
     while (this.connectionEvents.length && this.connectionEvents[0].at < cutoff) {
@@ -1048,10 +1119,7 @@ class FlowCollector {
       maxTimestamp = Math.max(maxTimestamp, Math.floor((sourceAt || 0) / 1000));
       const price = finite(trade.price);
       const size = finite(trade.size);
-      const dedupKey = hash([
-        trade.transactionHash, trade.asset, trade.proxyWallet, trade.side,
-        price, size, trade.timestamp,
-      ]);
+      const dedupKey = globalTradeKey(trade);
       return { dedupKey, sourceAt, trade, row: [
         dedupKey, 'global_data_api', new Date(receivedAt), sourceAt ? new Date(sourceAt) : null,
         sourceAt ? Math.max(0, receivedAt - sourceAt) : null, trade.conditionId || null,
@@ -1081,6 +1149,10 @@ class FlowCollector {
           pages: recent.pages, page_size: DATA_TRADE_PAGE_SIZE, saturated: recent.saturated,
           rescue_snapshot: recent.rescueSnapshot,
           rescue_limit: DATA_TRADE_RESCUE_LIMIT,
+          rescue_offset: recent.rescueOffset,
+          overlap_rows: recent.overlapRows,
+          overlap_required: recent.overlapRequired,
+          coverage_proof: recent.coverageProof,
           coverage_state: completedCoverageState,
         },
         trades: uniqueEntries.map((entry) => entry.trade),
@@ -1108,6 +1180,8 @@ class FlowCollector {
         await logEvent('WARN', 'flow', 'bounded global trade sample did not reach the prior cursor', {
           start, end, pages: recent.pages, page_size: DATA_TRADE_PAGE_SIZE,
           rescue_snapshot: recent.rescueSnapshot, rescue_limit: DATA_TRADE_RESCUE_LIMIT,
+          rescue_offset: recent.rescueOffset, overlap_rows: recent.overlapRows,
+          overlap_required: recent.overlapRequired, coverage_proof: recent.coverageProof,
           oldest_sec: recent.oldestSec,
           interpretation: 'global discovery tape may have a gap; realtime CLOB experiment panel is unaffected',
         });
@@ -1339,6 +1413,7 @@ class FlowCollector {
       uptimeMin: Math.round((Date.now() - new Date(this.counters.startedAt).getTime()) / 60000),
       selectedMarkets: this.markets.size,
       activeSockets: this.sockets.filter((socket) => socket.ws?.readyState === WebSocket.OPEN).length,
+      expectedSockets: this.sockets.length,
       lastSocketMessageAt: this.sockets.map((socket) => socket.lastMessageAt || null),
       lastGlobalResponseAt: this.lastGlobalResponseAt || null,
       globalDbQueue: this.globalDbQueue.size,
@@ -1411,6 +1486,7 @@ module.exports = {
   fetchJson,
   fetchText,
   globalCoverageState,
+  globalTradeKey,
   latestSourceWindow,
   makeNonOverlappingTask,
   restoreMapBatch,

@@ -90,12 +90,16 @@ The service has two capture planes:
    of the latest completed public trades, then advances a cursor in API source
    time. Offset pagination is not used for live coverage because concurrent
    inserts shift later pages. When the ordinary snapshot cannot reach the prior
-   cursor, the sampler makes one offset-zero rescue request at the endpoint's
-   documented 10,000-row limit. It stores newly observed rows in the raw WAL and
-   `pm_flow_trades`. The API does not expose a global time cursor, so this plane
-   remains a bounded discovery sample rather than a guaranteed complete all-market
-   tape. A rescue snapshot that still cannot reach the cursor increments
-   `globalCoverageGaps`; those rows remain D-grade.
+   cursor, the sampler requests two concurrent documented offset pages with a
+   1,000-row overlap (9,999 rows per page). Polymarket caches each exact Data API
+   URL for 300 seconds, so one page can be shorter than a busy cache generation.
+   The collector accepts the joined rescue only when at least 100 immutable trade
+   identities overlap and the tail reaches the prior source cursor. Cache skew,
+   offset drift, or insufficient depth increments `globalCoverageGaps`; those rows
+   remain D-grade and invalidate the evidence epoch. It stores newly observed rows
+   in the raw WAL and `pm_flow_trades`. The API still exposes no global time cursor,
+   so this plane remains a bounded discovery sample rather than a guaranteed
+   complete all-market tape.
 2. Two market-channel sockets capture full raw frames plus compact event-time
    touches for the four most actively traded binary markets in the final 90
    seconds of the bounded API sample, anchored to that sample's newest source
