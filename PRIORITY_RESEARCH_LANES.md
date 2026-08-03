@@ -7,7 +7,7 @@ wallet, signer or live-order path.
 | Priority | Programme | Runtime contract | Frozen experiment | Promotion unit |
 |---:|---|---|---|---|
 | 1 | Resolver-boundary transfer | H43 runs unchanged inside the BORG shadow engine | `research-h43-forward-v1` | first order per independent market |
-| 2 | Certified payoff graph | deterministic rule snapshots, finite-state payoff proof, synchronized executable depth, full orphan reserve and a queue-aware passive arm | `structural-certified-payoff-graph-v5-orphan-reserve` | certified event/candidate |
+| 2 | Certified payoff graph | deterministic rule snapshots, finite-state payoff proof, synchronized executable depth, full orphan reserve and a queue-aware passive arm; nested crypto strikes receive a fresh dedicated evidence identity | `structural-certified-payoff-graph-v5-orphan-reserve` + `structural-ordered-strike-orphan-safe-v1` | certified event/candidate |
 | 3 | Rule-aware Polymarket/Kalshi | complete exact-rule keys only; proven conflicts are hard vetoes and missing fields remain non-trading review items | `crossvenue-exact-rule-convergence-v7` | first pair/direction/UTC day |
 | 4 | Deribit options-implied residual | exact-expiry A-fidelity surfaces only for evidence; bounded interpolation is diagnostic and unsupported extrapolation fails closed | `options-exact-expiry-residual-v4` | first market/side observation |
 | 5 | Fair-bound passive making | **capture only** on a frozen, PnL-independent neglected-market panel; quote signals are disabled | `fair-bound-passive-overlay-v1` (staged) | no evidence until a certified bound exists |
@@ -48,7 +48,7 @@ The dashboard exposes the current five-lane state at
 `/api/borg/research/priority-lanes` and in Book Lab. The command-line equivalent
 is `npm run research:priority-lanes`.
 
-Cross-venue V6 uses exactly five shares, a provisional +1% executable
+Cross-venue V7 uses exactly five shares, a provisional +1% executable
 liquidation target and a one-hour maximum hold. It also records explicit
 5/10/25-share capacity failures and the observed Kalshi series fee schedule.
 Run its forward read with `npm run research:crossvenue-exact -- --days=30`.

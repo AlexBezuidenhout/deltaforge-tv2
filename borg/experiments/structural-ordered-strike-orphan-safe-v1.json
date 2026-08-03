@@ -1,0 +1,55 @@
+{
+  "experiment_id": "structural-ordered-strike-orphan-safe-v1",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-03T12:40:00.000Z",
+  "frozen_at": "2026-08-03T12:40:00.000Z",
+  "evidence_started_at": "2026-08-03T12:40:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "certified_ordered_strike_implication",
+  "supersedes": "structural-certified-payoff-graph-v5-orphan-reserve",
+  "strategy_version": "structural-ordered-strike-orphan-safe-v1",
+  "starting_bankroll_usd": 500,
+  "target_notional_usd": 10,
+  "historical_rows_reused": false,
+  "hypothesis": "Two thresholds on the same measured variable, resolver and observation timestamp may violate their deterministic implication ordering at executable depth; passive entry on one leg may preserve enough spread to survive doubled fees and immediate orphan reserve.",
+  "certification": {
+    "structure_type": "nested_threshold",
+    "same_event_variable": true,
+    "same_resolver": true,
+    "same_observation_timestamp_timezone_and_precision": true,
+    "comparator_normalization": "strict and inclusive operators remain distinct unless endpoint precision proves equivalence",
+    "payoff_identity": "for K_low < K_high, buy YES(low) plus NO(high); every valid terminal state pays at least one dollar per equal-share bundle",
+    "proof": "content-addressed exhaustive state/payoff vector",
+    "unknown_rule_field": "automatic exclusion"
+  },
+  "execution": {
+    "taker_control": "walk complete displayed ask depth on both legs; equal shares; current fee schedule at 2x; FOK feasibility",
+    "passive_arm": "join one best bid behind full displayed queue; cancellations give no queue credit; public trade-through consumes queue; immediately cross the other leg after each partial fill",
+    "non_atomicity": "reserve the worst executable unwind loss for every possible non-empty proper filled subset",
+    "qualification": "worst-state payout - complete entry cost - doubled fees - orphan reserve >= $0.05 at <=$10 deployed capital",
+    "latency_profiles_ms": [20, 50, 100, 250, 500]
+  },
+  "evaluation": {
+    "minimum_fresh_independent_candidates": 300,
+    "minimum_calendar_days": 30,
+    "positive_2x_cost_pnl_in_both_chronological_halves": true,
+    "candidate_and_day_clustered_lower_bounds_above_zero": true,
+    "multiple_testing_correction": true,
+    "positive_at_100_250_500ms": true,
+    "no_dominant_event_or_day": true,
+    "null_outcome": "Certified logical anomalies may be too rare, too shallow or too expensive to execute profitably."
+  },
+  "strategy_bindings": [{
+    "strategy": "structural_ordered_strike_orphan_safe_v1",
+    "family": "certified_ordered_strike_implication",
+    "arm": "taker_control_and_passive_one_leg",
+    "phase": "eval",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "closed_passive_pnl_2x_after_orphan_unwind"
+  }],
+  "no_optional_stopping": true
+}

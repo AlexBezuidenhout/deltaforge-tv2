@@ -32,6 +32,8 @@ const {
 } =
   require('../../borg/crossvenue/terminal-carry');
 const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
+const { ORDERED_STRIKE_EVIDENCE_START, ORDERED_STRIKE_EXPERIMENT_ID } =
+  require('../../borg/structural/experiment');
 const PYTH_EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v2';
 
 router.get('/research/priority-lanes', authMiddleware, async (req, res) => {
@@ -1514,7 +1516,7 @@ router.get('/pairedmaker/observations', authMiddleware, async (req, res) => {
 router.get('/structural/summary', authMiddleware, async (req, res) => {
   try {
     const value = await dashboardReports.get('structural-summary', 15_000, async () => {
-      const [heartbeat, candidates, rows, passive] = await Promise.all([
+      const [heartbeat, candidates, rows, passive, orderedStrike] = await Promise.all([
         pool.query(`SELECT beat_at,meta FROM system_heartbeats WHERE component='structural_scanner'`),
         pool.query(`SELECT universe_id,universe_class,structure_type,
                          count(*)::int catalog_candidates,
@@ -1549,6 +1551,18 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
                       FROM borg_structural_passive_quotes
                      GROUP BY structure_type,latency_ms
                      ORDER BY structure_type,latency_ms`),
+        pool.query(`SELECT count(*)::int quotes,
+                           count(DISTINCT candidate_id)::int independent_candidates,
+                           count(DISTINCT (quoted_at AT TIME ZONE 'UTC')::date)::int calendar_days,
+                           count(*) FILTER (WHERE filled_at IS NOT NULL)::int fills,
+                           count(*) FILTER (WHERE status='FILLED_HEDGED_POSITIVE')::int positive_locks,
+                           count(*) FILTER (WHERE status='FILLED_HEDGED_NEGATIVE')::int negative_locks,
+                           count(*) FILTER (WHERE status LIKE 'FILLED_ORPHAN%')::int orphan_fills,
+                           COALESCE(sum(locked_pnl_2x_usd)
+                             FILTER (WHERE closed_at IS NOT NULL),0)::float closed_pnl_2x,
+                           max(updated_at) latest
+                      FROM borg_structural_passive_quotes
+                     WHERE experiment_id=$1`, [ORDERED_STRIKE_EXPERIMENT_ID]),
       ]);
       const hb = heartbeat.rows[0] || null;
       const ageSec = hb ? Math.max(0, Math.round((Date.now() - new Date(hb.beat_at).getTime()) / 1000)) : null;
@@ -1557,6 +1571,12 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
         experimentId: STRUCTURAL_EXPERIMENT_ID,
         contract: 'Frozen V5 content-addressed rule universe. A bundle qualifies only when its doubled-cost displayed profit remains positive after reserving the worst executable proper-subset fill unwind across the bundle. The passive arm consumes public prints behind frozen queue-ahead and immediately crosses every partial hedge; it is C-grade until authenticated queue and cancel acknowledgements exist.',
         candidates: candidates.rows, rows: rows.rows, passive: passive.rows,
+        orderedStrike: {
+          experimentId: ORDERED_STRIKE_EXPERIMENT_ID,
+          evidenceStartedAt: ORDERED_STRIKE_EVIDENCE_START,
+          paperOnly: true,
+          ...(orderedStrike.rows[0] || {}),
+        },
       };
     });
     res.json(value);

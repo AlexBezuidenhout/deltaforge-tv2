@@ -777,6 +777,7 @@ CREATE INDEX IF NOT EXISTS borg_structural_candidates_universe
 CREATE TABLE IF NOT EXISTS borg_structural_evaluations (
   id BIGSERIAL PRIMARY KEY,
   dedup_key TEXT UNIQUE NOT NULL,
+  experiment_id TEXT,
   evaluated_at TIMESTAMPTZ NOT NULL,
   candidate_id TEXT NOT NULL REFERENCES borg_structural_candidates(candidate_id),
   trigger_token TEXT,
@@ -823,6 +824,7 @@ CREATE INDEX IF NOT EXISTS borg_structural_evaluations_evaluated_brin
 CREATE UNIQUE INDEX IF NOT EXISTS borg_structural_evaluations_dedup_evaluated_uq
   ON borg_structural_evaluations (dedup_key, evaluated_at);
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS trigger_received_at TIMESTAMPTZ;
+ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS experiment_id TEXT;
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS latency_ms INT NOT NULL DEFAULT 0;
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS reaction_us NUMERIC;
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS pass_proof BOOLEAN NOT NULL DEFAULT false;
@@ -832,9 +834,12 @@ ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS rule_certificat
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS orphan_unwind_available BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS orphan_reserve_usd NUMERIC;
 ALTER TABLE borg_structural_evaluations ADD COLUMN IF NOT EXISTS orphan_safe_profit_2x_usd NUMERIC;
+CREATE INDEX IF NOT EXISTS borg_structural_evaluations_experiment_time
+  ON borg_structural_evaluations (experiment_id,evaluated_at DESC);
 
 CREATE TABLE IF NOT EXISTS borg_structural_passive_quotes (
   quote_id TEXT PRIMARY KEY,
+  experiment_id TEXT,
   candidate_id TEXT NOT NULL,
   structure_type TEXT NOT NULL,
   passive_leg_index INT NOT NULL,
@@ -871,6 +876,9 @@ CREATE INDEX IF NOT EXISTS borg_structural_passive_quotes_candidate_time
   ON borg_structural_passive_quotes (candidate_id,quoted_at DESC);
 CREATE INDEX IF NOT EXISTS borg_structural_passive_quotes_status_time
   ON borg_structural_passive_quotes (status,quoted_at DESC);
+ALTER TABLE borg_structural_passive_quotes ADD COLUMN IF NOT EXISTS experiment_id TEXT;
+CREATE INDEX IF NOT EXISTS borg_structural_passive_quotes_experiment_time
+  ON borg_structural_passive_quotes (experiment_id,quoted_at DESC);
 `;
 
 async function migrateStructural() {

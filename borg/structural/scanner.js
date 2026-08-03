@@ -22,6 +22,7 @@ const {
 const {
   createPassiveQuoteState, proposePassiveQuotes, updatePassiveQuoteState,
 } = require('./passive-entry');
+const { ORDERED_STRIKE_EXPERIMENT_ID, structuralExperimentId } = require('./experiment');
 
 const GAMMA = 'https://gamma-api.polymarket.com';
 const MAX_CANDIDATES = Math.max(4, Number(process.env.STRUCTURAL_MAX_CANDIDATES || 24));
@@ -184,6 +185,7 @@ function structuralFailureReasons(item) {
 function compactEvaluationDetail(item) {
   return {
     format: 'structural-hot-detail-v1',
+    experimentId: item.experimentId,
     dedupKey: item.dedupKey,
     candidateId: item.candidateId,
     trigger: {
@@ -224,7 +226,7 @@ function compactEvaluationDetail(item) {
 
 function passiveQuoteRow(state, latencyMs) {
   return [
-    state.quoteId, state.candidateId, state.structureType,
+    state.quoteId, state.experimentId, state.candidateId, state.structureType,
     state.passiveLegIndex, state.passiveToken, state.passiveOutcome,
     state.quotedAt, state.expiresAt, state.filledAt || null, state.closedAt || null,
     state.status, latencyMs, state.quotePrice, state.shares,
@@ -428,6 +430,7 @@ async function main() {
             try { reactionUs = Number(process.hrtime.bigint() - BigInt(event.receiveMonoNs)) / 1000; } catch (_) {}
             const durable = {
               type: 'structural_evaluation', ...evaluation,
+              experimentId: structuralExperimentId(candidate.structureType),
               dedupKey: [candidate.candidateId, event.assetId, latencyMs,
                 event.connectionEpoch || 0, event.eventSequence || event.receiveWallMs || evaluatedAt].join(':'),
               triggerToken: event.assetId,
@@ -500,6 +503,7 @@ async function main() {
                   timeoutMs: PASSIVE_TIMEOUT_MS,
                 });
                 state.runId = RUN_ID;
+                state.experimentId = structuralExperimentId(candidate.structureType);
                 recordPassiveState(state, latencyMs, 'PLACED', event.sourceMs);
                 passiveStates.set(passiveKey, state);
               }
@@ -555,7 +559,7 @@ async function main() {
       for (const item of rows) {
         await pool.query(`
           INSERT INTO borg_structural_evaluations (
-            dedup_key, evaluated_at, candidate_id, trigger_token, trigger_source_ts,
+            dedup_key, experiment_id, evaluated_at, candidate_id, trigger_token, trigger_source_ts,
             trigger_received_at, trigger_wal_event_id, latency_ms, reaction_us,
             structure_type, guaranteed_min_payout, cost_per_bundle, fees_2x_per_bundle,
             residual_2x_per_bundle, target_notional_usd, target_shares,
@@ -565,10 +569,10 @@ async function main() {
             pass_orphan_risk, orphan_loss_stress_usd, orphan_unwind_available,
             orphan_reserve_usd, orphan_safe_profit_2x_usd,
             economic_candidate, qualified, detail)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36::jsonb)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37::jsonb)
           ON CONFLICT (dedup_key,evaluated_at) DO NOTHING
         `, [
-          item.dedupKey, item.evaluatedAt, item.candidateId, item.triggerToken,
+          item.dedupKey, item.experimentId, item.evaluatedAt, item.candidateId, item.triggerToken,
           item.triggerSourceMs == null ? null : new Date(item.triggerSourceMs),
           new Date(item.triggerReceivedAt), item.triggerWalEventId, item.latencyMs, item.reactionUs,
           item.structureType, item.guaranteedMinPayout, item.costPerBundle,
@@ -584,7 +588,7 @@ async function main() {
       }
       if (passiveRows.length) {
         await insertRows('borg_structural_passive_quotes', [
-          'quote_id', 'candidate_id', 'structure_type', 'passive_leg_index',
+          'quote_id', 'experiment_id', 'candidate_id', 'structure_type', 'passive_leg_index',
           'passive_token', 'passive_outcome', 'quoted_at', 'expires_at',
           'filled_at', 'closed_at', 'status', 'latency_ms', 'quote_price',
           'shares', 'queue_ahead_shares', 'proposed_cash_required',
@@ -671,6 +675,7 @@ async function main() {
       successfulFlushes, persistenceErrors, lastPersistedAt, lastPersistenceErrorAt,
       paperOnly: true, walletLoaded: false, allMarket: true, sportsTagId: 1,
       sportsEventPages: SPORTS_EVENT_PAGES, universeVersion: STRUCTURAL_UNIVERSE_VERSION,
+      orderedStrikeExperimentId: ORDERED_STRIKE_EXPERIMENT_ID,
       gammaConcurrency: GAMMA_CONCURRENCY, gammaTimeoutMs: GAMMA_TIMEOUT_MS,
       gammaMaxAttempts: GAMMA_MAX_ATTEMPTS,
       negativeSampleMs: NEGATIVE_SAMPLE_MS, positiveSampleMs: POSITIVE_SAMPLE_MS,
