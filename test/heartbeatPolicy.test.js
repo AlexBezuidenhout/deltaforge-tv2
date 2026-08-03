@@ -5,9 +5,32 @@ const test = require('node:test');
 const {
   FAST_MAX_AGE_SEC,
   TIMER_MAX_AGE_SEC,
+  activeFleetBotComponents,
   classifyHeartbeats,
+  heartbeatRowFresh,
   heartbeatPolicies,
+  researchFleetRequired,
 } = require('../src/monitoring/heartbeatPolicy');
+
+test('dashboard-only TV2 process monitors the fleet without gaining runner authority', () => {
+  assert.equal(researchFleetRequired('tv2-dashboard'), true);
+  assert.equal(researchFleetRequired('tv2'), true);
+  assert.equal(researchFleetRequired('df2-dashboard'), false);
+  assert.equal(researchFleetRequired('tv2-dashboard', 'false'), false);
+});
+
+test('fleet bot count is derived from configured fresh heartbeats', () => {
+  const heartbeats = {
+    main_bot: { ageSec: 7, maxAgeSec: FAST_MAX_AGE_SEC, stale: false },
+    george_bot: { ageSec: 121, maxAgeSec: FAST_MAX_AGE_SEC, stale: false },
+  };
+  assert.equal(heartbeatRowFresh(heartbeats.main_bot), true);
+  assert.equal(heartbeatRowFresh(heartbeats.george_bot), false);
+  assert.deepEqual(activeFleetBotComponents(heartbeats, {
+    is_active: true,
+    george_is_active: true,
+  }), ['main_bot']);
+});
 
 test('five-minute maintenance jobs allow two missed schedules, not 120 seconds', () => {
   const policy = heartbeatPolicies({}, { researchRequired: true });

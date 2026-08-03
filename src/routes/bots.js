@@ -14,6 +14,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../models/db');
 const { authMiddleware } = require('../middleware/auth');
+const { FAST_MAX_AGE_SEC, heartbeatRowFresh } = require('../monitoring/heartbeatPolicy');
 const { buildPortfolioPolicy } = require('../bot/PortfolioRiskPolicy');
 const {
   RESEARCH_CAPITAL_VERSION,
@@ -395,7 +396,9 @@ router.get('/', authMiddleware, async (req, res) => {
       subtitle: st.main_legacy_execution_enabled === true
         ? 'legacy paper execution explicitly enabled · not supported for promotion'
         : 'quote-relative heuristic retired from paper execution · telemetry control for MAIN V2',
-      running: !!mainStatus?.botRunning || !!mainStatus?.isRunning,
+      running: !!mainStatus?.botRunning || !!mainStatus?.isRunning
+        || (st.is_active === true
+          && heartbeatRowFresh(runtimeBeat.main_bot, FAST_MAX_AGE_SEC)),
       activity: {
         label: 'signal evaluator',
         lastAt: runtimeBeat.main_bot?.beat_at || null,
@@ -438,7 +441,9 @@ router.get('/', authMiddleware, async (req, res) => {
       id: 'george', name: 'GEORGE', kind: 'paper',
       mode: 'paper',
       subtitle: 'legacy source retired · RTDS successors H48/H49',
-      running: !!georgeStatus?.isRunning,
+      running: !!georgeStatus?.isRunning
+        || (st.george_is_active === true
+          && heartbeatRowFresh(runtimeBeat.george_bot, FAST_MAX_AGE_SEC)),
       activity: {
         label: 'Chainlink evaluator',
         lastAt: runtimeBeat.george_bot?.beat_at || null,

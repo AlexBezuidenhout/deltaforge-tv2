@@ -9,6 +9,32 @@ function enabled(value, fallback = false) {
   return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
 }
 
+function researchFleetRequired(instanceId, explicitValue) {
+  if (explicitValue != null && String(explicitValue).trim() !== '') {
+    return enabled(explicitValue, false);
+  }
+  return ['tv2', 'tv2-dashboard'].includes(String(instanceId || '').trim());
+}
+
+function heartbeatRowFresh(row, maxAgeSec = FAST_MAX_AGE_SEC) {
+  const parsedAge = parseFloat(row?.age_sec ?? row?.ageSec);
+  return Number.isFinite(parsedAge)
+    && parsedAge >= 0
+    && parsedAge <= maxAgeSec
+    && row?.stale !== true;
+}
+
+function activeFleetBotComponents(heartbeats = {}, settings = {}) {
+  const candidates = [
+    ['main_bot', enabled(settings.is_active, true)],
+    ['george_bot', enabled(settings.george_is_active, false)],
+  ];
+  return candidates
+    .filter(([component, configuredActive]) => configuredActive
+      && heartbeatRowFresh(heartbeats[component], heartbeats[component]?.maxAgeSec))
+    .map(([component]) => component);
+}
+
 function parsedMeta(value) {
   if (value == null || typeof value === 'object') return value || {};
   try { return JSON.parse(value); } catch (_) { return {}; }
@@ -154,9 +180,12 @@ function classifyHeartbeats(rows = [], policies = {}) {
 module.exports = {
   FAST_MAX_AGE_SEC,
   TIMER_MAX_AGE_SEC,
+  activeFleetBotComponents,
   classifyHeartbeats,
   enabled,
   failureDetail,
+  heartbeatRowFresh,
   heartbeatPolicies,
   parsedMeta,
+  researchFleetRequired,
 };

@@ -4552,17 +4552,18 @@
       const stopBtn  = document.getElementById('stopBtn');
       const statusTitle = document.getElementById('statusTitle');
       const statusIndicator = document.getElementById('statusIndicator');
+      const controlsAvailable = data.controlsAvailable !== false;
       if (data.botRunning) {
         statusTitle.textContent = 'STATUS: RUNNING';
         statusBanner.className = 'status-banner running';
         statusIndicator.className = 'status-indicator';
         startBtn.style.display = 'none';
-        stopBtn.style.display = 'block';
+        stopBtn.style.display = controlsAvailable ? 'block' : 'none';
       } else {
         statusTitle.textContent = 'STATUS: STOPPED';
         statusBanner.className = 'status-banner stopped';
         statusIndicator.className = 'status-indicator stopped';
-        startBtn.style.display = 'block';
+        startBtn.style.display = controlsAvailable ? 'block' : 'none';
         stopBtn.style.display = 'none';
       }
       const mainDot = document.getElementById('mainBotDot');

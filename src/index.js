@@ -6,8 +6,11 @@ const { pool, initDB } = require('./models/db');
 const BotManager = require('./bot/BotManager');
 const { isAuthDisabled, isRegistrationAllowed } = require('./middleware/auth');
 const {
+  activeFleetBotComponents,
   classifyHeartbeats,
   heartbeatPolicies,
+  parsedMeta,
+  researchFleetRequired,
 } = require('./monitoring/heartbeatPolicy');
 
 const app = express();
@@ -15,6 +18,10 @@ const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
 const INSTANCE_ID = String(process.env.DELTAFORGE_INSTANCE_ID || `app-${PORT}`);
 const BOT_RUNNER_ENABLED = String(process.env.BOT_RUNNER_ENABLED || 'true').toLowerCase() === 'true';
+const RESEARCH_FLEET_REQUIRED = researchFleetRequired(
+  INSTANCE_ID,
+  process.env.RESEARCH_HEALTH_REQUIRED,
+);
 
 // --- Trust proxy (Railway sits behind a load balancer) ---
 app.set('trust proxy', 1);
@@ -77,6 +84,8 @@ app.get('/api/health', async (req, res) => {
   const { dbHealth, pool } = require('./models/db');
   let dbSizeMb = null, dbWritable = false, heartbeats = {};
   let heartbeatCheckFailed = false;
+  let fleetActiveBotComponents = [];
+  let runnerOwner = null;
   try {
     const r = await pool.query(
       "SELECT pg_database_size(current_database())/1048576 AS mb");
@@ -117,11 +126,27 @@ app.get('/api/health', async (req, res) => {
     ]);
     const settings = settingsResult.rows[0] || {};
     const policy = heartbeatPolicies(settings, {
-      researchRequired: INSTANCE_ID === 'tv2',
-      runnerRequired: BOT_RUNNER_ENABLED,
+      // The public process is deliberately dashboard-only, but it monitors
+      // the same research fleet as the private runner. Local execution
+      // authority and fleet-health responsibility are separate concepts.
+      researchRequired: RESEARCH_FLEET_REQUIRED,
+      runnerRequired: BOT_RUNNER_ENABLED || RESEARCH_FLEET_REQUIRED,
       pairedMakerRequired: process.env.BORG_PAIRED_MAKER_REQUIRED,
     });
     heartbeats = classifyHeartbeats(hb.rows, policy);
+    fleetActiveBotComponents = activeFleetBotComponents(heartbeats, settings);
+    const ownerRow = hb.rows.find((row) => row.component === 'bot_runner_owner');
+    const ownerMeta = parsedMeta(ownerRow?.meta);
+    if (ownerRow) {
+      runnerOwner = {
+        instanceId: ownerMeta.instanceId || null,
+        port: Number.isFinite(parseFloat(ownerMeta.port)) ? parseFloat(ownerMeta.port) : null,
+        runnerEnabled: ownerMeta.runnerEnabled === true,
+        ownsLock: ownerMeta.ownsLock === true,
+        ageSec: heartbeats.bot_runner_owner?.ageSec ?? null,
+        state: heartbeats.bot_runner_owner?.state || 'unknown',
+      };
+    }
   } catch (e) {
     heartbeatCheckFailed = true;
   }
@@ -136,6 +161,8 @@ app.get('/api/health', async (req, res) => {
   }));
   const degraded = !dbWritable || dbHealth.writeErrors > 0
     || heartbeatCheckFailed || staleComponents.length > 0;
+  const localActiveBots = botManager.getActiveCount();
+  const fleetActiveBots = fleetActiveBotComponents.length;
   res.status(degraded ? 503 : 200).json({
     status: degraded ? 'degraded' : 'ok',
     db: _dbReady ? 'ready' : 'initializing',
@@ -151,11 +178,21 @@ app.get('/api/health', async (req, res) => {
     staleDetails,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    activeBots: botManager.getActiveCount(),
+    // Kept for compatibility, but now means the fleet-visible count on a
+    // dashboard-only process instead of the intentionally empty local map.
+    activeBots: BOT_RUNNER_ENABLED
+      ? Math.max(localActiveBots, fleetActiveBots)
+      : fleetActiveBots,
     runtime: {
       instanceId: INSTANCE_ID,
+      role: BOT_RUNNER_ENABLED ? 'runner' : 'dashboard-only',
       botRunnerEnabled: BOT_RUNNER_ENABLED,
       ownsBotRunnerLock: botManager.ownsRunnerLock === true,
+      researchFleetRequired: RESEARCH_FLEET_REQUIRED,
+      localActiveBots,
+      fleetActiveBots,
+      fleetActiveBotComponents,
+      runnerOwner,
     },
     authDisabled: isAuthDisabled(),
     registrationAllowed: isRegistrationAllowed(),
