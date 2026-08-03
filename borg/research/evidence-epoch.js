@@ -134,6 +134,9 @@ function archiveReportFailure(report) {
     return `Google Drive archive failed${report.failedAt ? ` at ${report.failedAt}` : ''}: ${
       String(report.error || 'unknown failure').slice(0, 240)}`;
   }
+  if (report.status !== 'verified') {
+    return `Google Drive archive report status is ${report.status || 'missing'}; verified required`;
+  }
   return null;
 }
 

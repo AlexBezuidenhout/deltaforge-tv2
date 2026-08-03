@@ -114,6 +114,9 @@ test('a current Google Drive failure report invalidates an older success receipt
     failedAt: '2026-08-03T18:49:27.000Z',
     error: 'rateLimitExceeded',
   }), /rateLimitExceeded/);
+  assert.match(archiveReportFailure({
+    format: 'deltaforge-google-drive-archive-v1',
+  }), /verified required/);
 });
 
 test('Parquet evidence requires recurrent remotely verified queryable batches', () => {
@@ -219,7 +222,8 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
   assert.match(launcher, /require\.resolve\('\@duckdb\/node-api'\)/);
   assert.match(launcher, /refusing to start evidence epoch: release dependencies are incomplete/);
   assert.match(launcher, /systemctl is-failed --quiet/);
-  assert.match(launcher, /failed maintenance report/);
+  assert.match(launcher, /systemctl is-active --quiet/);
+  assert.match(launcher, /unverified maintenance report/);
   const maintenanceRestart = launcher.indexOf('deltaforge-google-drive-archive.timer \\\n  deltaforge-parquet-lake.timer');
   const warmupComplete = launcher.lastIndexOf('rm -f "${preflight_report}"');
   assert.ok(maintenanceRestart > warmupComplete,

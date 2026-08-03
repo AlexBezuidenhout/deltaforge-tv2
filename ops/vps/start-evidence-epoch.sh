@@ -38,14 +38,18 @@ for maintenance_unit in \
     echo "refusing to start evidence epoch: ${maintenance_unit} is failed" >&2
     exit 1
   fi
+  if systemctl is-active --quiet "${maintenance_unit}"; then
+    echo "refusing to start evidence epoch: ${maintenance_unit} is still running" >&2
+    exit 1
+  fi
 done
 
 for failure_report in \
     /var/lib/deltaforge/google-drive-archive/last-report.json \
     /var/lib/deltaforge/parquet-lake/last-report.json; do
-  if [[ -f "${failure_report}" ]] \
-      && grep -Eq '"status"[[:space:]]*:[[:space:]]*"failed"' "${failure_report}"; then
-    echo "refusing to start evidence epoch: failed maintenance report ${failure_report}" >&2
+  if [[ ! -f "${failure_report}" ]] \
+      || ! grep -Eq '"status"[[:space:]]*:[[:space:]]*"verified"' "${failure_report}"; then
+    echo "refusing to start evidence epoch: unverified maintenance report ${failure_report}" >&2
     exit 1
   fi
 done
