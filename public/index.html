@@ -2011,7 +2011,7 @@
     <div style="border:1px solid var(--yellow);color:var(--yellow);font-size:10px;font-weight:700;padding:4px 8px;border-radius:4px;letter-spacing:1px;">FORWARD PILOT · PROVISIONAL</div>
   </div>
 
-  <div class="panel"><div class="panel-header"><span>PRIORITY RESEARCH LANES</span><span style="font-size:10px;color:var(--text-muted);">four active paper programs · fair-bound maker capture-only</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
+  <div class="panel"><div class="panel-header"><span>FROZEN TEN-LANE EDGE INCUBATOR</span><span style="font-size:10px;color:var(--text-muted);">status is machinery/evidence state, never inferred profitability</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
     <thead><tr><th>#</th><th>Program</th><th>Run mode</th><th>Status</th><th>Current evidence</th><th>Next falsification</th></tr></thead>
     <tbody id="priorityLanesBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;">Loading frozen research program…</td></tr></tbody>
   </table></div></div></div>
@@ -3339,7 +3339,7 @@
         labApiGet('/allmarket/status'), labApiGet('/allmarket/summary'), labApiGet('/allmarket/intents?limit=75'),
         labApiGet('/structural/summary'), labApiGet('/pairedmaker/status'), labApiGet('/pairedmaker/summary'),
         labApiGet('/pairedmaker/cycles?limit=50'),
-        labApiGet('/research/priority-lanes'),
+        labApiGet('/research/edge-incubator'),
       ]);
     } catch (error) {
       document.getElementById('bookLabStatusTitle').textContent = 'BOOK LAB: API UNAVAILABLE';
@@ -3370,6 +3370,9 @@
 
     const laneEvidence = function (lane) {
       const e = lane.evidence || {};
+      if (lane.mechanismId === 'R07') return (e.scannedRules || 0) + ' rules · ' + (e.certifiedUnits || 0) + ' certified · $' + Number(e.capacityUsd || 0).toFixed(2) + ' capacity';
+      if (lane.mechanismId === 'N09') return (e.proposals || 0) + ' proposals · ' + (e.crossEventProposals || 0) + ' novel cross-event · ' + (e.executable || 0) + ' executable';
+      if (e.fills != null) return (e.fills || 0) + ' A/B fills · ' + (e.markets || 0) + ' markets · ' + _bMoney(e.pnl2x || 0) + ' at 2×';
       if (lane.program === 'resolver_boundary_transfer') return (e.evaluations || 0) + ' evaluations · ' + (e.actions || 0) + ' actions · ' + (e.errors || 0) + ' errors';
       if (lane.program === 'certified_payoff_graph') return (e.candidates || 0) + ' candidates · ' + (e.qualified || 0) + ' qualified';
       if (lane.program === 'rule_aware_crossvenue') return (e.exactRuleMatches || 0) + ' exact pairs · ' + (e.hardMismatchMatches || 0) + ' hard vetoes · ' + (e.paperTradeLeads || 0) + ' eligible leads';
@@ -3377,7 +3380,7 @@
       return (e.selectedMarkets || 0) + ' frozen capture markets · ' + (e.decisions || 0) + ' quote decisions';
     };
     document.getElementById('priorityLanesBody').innerHTML = (priority.lanes || []).map((lane) =>
-      '<tr><td>' + lane.priority + '</td><td style="font-weight:700;">' + escapeHtml(lane.program) + '</td><td>' + escapeHtml(lane.runMode || '—') + '</td><td style="color:' + (lane.active ? 'var(--green)' : 'var(--yellow)') + ';">' + escapeHtml(lane.status) + '</td><td>' + escapeHtml(laneEvidence(lane)) + '</td><td style="max-width:420px;color:var(--text-muted);">' + escapeHtml(lane.nextTest || '') + '</td></tr>'
+      '<tr><td>' + lane.priority + '</td><td style="font-weight:700;">' + escapeHtml(lane.laneId || lane.program) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(lane.lifecycle || '') + '</div></td><td>' + escapeHtml(lane.runMode || '—') + '</td><td style="color:' + (lane.active ? 'var(--green)' : lane.lifecycle === 'DEAD' ? 'var(--danger)' : 'var(--yellow)') + ';">' + escapeHtml(lane.status) + '</td><td>' + escapeHtml(laneEvidence(lane)) + '</td><td style="max-width:420px;color:var(--text-muted);">' + escapeHtml(lane.nextTest || '') + '</td></tr>'
     ).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;">No lane report available.</td></tr>';
 
     document.getElementById('bookLabSummaryBody').innerHTML = summary.rows.length ? summary.rows.map((row) => {

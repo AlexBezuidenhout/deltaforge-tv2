@@ -20,6 +20,7 @@ const { CHALLENGER_STRATEGY_VERSION } = require('../../borg/flow/strategy');
 const { summarizeConvergence } = require('../../borg/crossvenue/convergence');
 const { buildResolverBoundaryPortfolio } = require('../../borg/research/resolver-boundary-portfolio');
 const { buildPriorityLaneStatus } = require('../../borg/research/priority-lane-status');
+const { buildEdgeIncubatorStatus } = require('../../borg/research/edge-incubator-status');
 const { dossierFor } = require('../../borg/research/strategy-dossiers');
 const { createReadThroughCache } = require('../utils/readThroughCache');
 
@@ -40,6 +41,14 @@ router.get('/research/priority-lanes', authMiddleware, async (req, res) => {
   try {
     const value = await dashboardReports.get('priority-research-lanes-v4', 10_000,
       () => buildPriorityLaneStatus(pool));
+    res.json(value);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/research/edge-incubator', authMiddleware, async (req, res) => {
+  try {
+    const value = await dashboardReports.get('edge-incubator-v1', 10_000,
+      () => buildEdgeIncubatorStatus(pool));
     res.json(value);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
