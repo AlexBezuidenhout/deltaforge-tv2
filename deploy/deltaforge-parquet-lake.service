@@ -19,8 +19,8 @@ Environment=PARQUET_LAKE_STATE_ROOT=/var/lib/deltaforge/parquet-lake
 Environment=PARQUET_LAKE_RECEIPT=/var/lib/deltaforge/parquet-lake/receipt
 Environment=PARQUET_HOT_ROOT=/var/lib/deltaforge/parquet-hot
 Environment=PARQUET_STAGE_ROOT=/var/lib/deltaforge/parquet-stage
-Environment=PARQUET_MAX_FILES=25
-Environment=PARQUET_MAX_BYTES=134217728
+Environment=PARQUET_MAX_FILES=12
+Environment=PARQUET_MAX_BYTES=67108864
 # Keep the continuously materialized layer focused on compact decisions,
 # proofs and terminal intents. Multi-gigabyte raw books remain immutable
 # bronze authority and are materialized by explicit source/date hypothesis.
@@ -38,6 +38,11 @@ ExecStart=/usr/bin/flock --exclusive --wait 7200 /run/deltaforge-parquet-lake/ru
 TimeoutStartSec=2h
 Nice=15
 IOSchedulingClass=idle
+IOSchedulingPriority=7
+MemoryHigh=2G
+MemoryMax=3G
+OOMScoreAdjust=500
+TasksMax=64
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true

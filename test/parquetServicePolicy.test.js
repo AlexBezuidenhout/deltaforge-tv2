@@ -27,4 +27,9 @@ test('continuous Parquet projection is frozen to compact decision and proof tape
   for (const raw of ['polymarket-clob', 'polymarket-flow-clob', 'deribit-options']) {
     assert.equal(sources.includes(raw), false, `${raw} must remain on-demand bronze`);
   }
+  assert.match(unit, /^Environment=PARQUET_MAX_FILES=12$/m);
+  assert.match(unit, /^Environment=PARQUET_MAX_BYTES=67108864$/m);
+  assert.match(unit, /^MemoryHigh=2G$/m);
+  assert.match(unit, /^MemoryMax=3G$/m);
+  assert.match(unit, /^OOMScoreAdjust=500$/m);
 });
