@@ -346,11 +346,17 @@ async function assessEvidenceEpoch(pool, options = {}) {
       if (!isAtOrAfter(processStartedAt, epochStart) || uptimeSec == null || uptimeSec < 60) {
         critical.push('pyth_boundary process is warming, stale or repeatedly restarting');
       }
-      if (meta.experimentId !== 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed') {
-        critical.push('pyth_boundary is not running the exact-feed Hermes forward arm');
+      if (meta.experimentId !== 'pyth-resolver-boundary-transfer-v4-frozen-observation-window') {
+        critical.push('pyth_boundary is not running the frozen exact-feed observation-window arm');
       }
       if (meta.transportConnected !== true || finite(meta.symbols, 0) <= 0) {
         critical.push('pyth_boundary exact-feed Hermes transport or feed set is unavailable');
+      }
+      if (finite(meta.observationWindowSec, null) !== 300) {
+        critical.push('pyth_boundary resolver observation window is not the frozen 300 seconds');
+      }
+      if (!meta.hermes?.feedSetFrozenAt) {
+        critical.push('pyth_boundary exact-feed cohort is not frozen');
       }
       if (finite(meta.hermes?.metrics?.unresolvedFeeds, 0) > 0) {
         critical.push(`pyth_boundary has ${finite(meta.hermes.metrics.unresolvedFeeds, 0)} unresolved exact feed(s)`);
@@ -373,7 +379,10 @@ async function assessEvidenceEpoch(pool, options = {}) {
             tickAgeSec == null ? 'missing' : `${Math.round(tickAgeSec)}s old`}`);
         }
       } else {
-        warnings.push('pyth_boundary has no exact-feed market currently inside its resolver window');
+        warnings.push('pyth_boundary has no exact-feed market inside the final 300-second resolver observation window');
+      }
+      if (finite(meta.deferredWindowMarkets, 0) > 0) {
+        warnings.push(`pyth_boundary excludes ${finite(meta.deferredWindowMarkets, 0)} in-window market(s) whose feed was discovered after cohort freeze`);
       }
     }
   }

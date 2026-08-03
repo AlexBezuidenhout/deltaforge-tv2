@@ -1,0 +1,64 @@
+{
+  "experiment_id": "pyth-resolver-boundary-transfer-v4-frozen-observation-window",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-08-03T22:20:00.000Z",
+  "evidence_started_at": "2026-08-03T22:20:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "resolver_source_boundary_residual",
+  "supersedes": "pyth-resolver-boundary-transfer-v3-hermes-exact-feed",
+  "strategy_version": "pyth-market-prior-residual-v4-frozen-observation-window",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "correction": "V3 incorrectly treated the complete daily contract interval as a near-expiry resolver window and replaced its Hermes feed URL as the future Gamma panel changed. V4 freezes exact feed identities at process start, defers newly discovered feed symbols to the next cohort, and permits signals only in the final 300 seconds defined by the largest pre-registered checkpoint.",
+  "source_contract": {
+    "rule_identity": "exact decoded pythdata.app/explore/<feed-symbol> path in the immutable market rule",
+    "catalog_identity": "exact attributes.symbol match from the Pyth Hermes Core feed catalog; fuzzy and search-page matches are vetoed",
+    "trigger_transport": "one process-lifetime frozen Pyth Hermes Core SSE cohort",
+    "diagnostic_transport": "Polymarket equity_prices RTDS; retained in WAL but forbidden from creating signals",
+    "source_clock": "Pyth publish_time",
+    "provider_clock": "Pyth proof_available_time",
+    "new_feed_after_freeze": "defer market to the next evidence cohort",
+    "unresolved_or_ambiguous_feed": "hard veto"
+  },
+  "observation_contract": {
+    "window_seconds": 300,
+    "window_definition": "window_end - 300 seconds through window_end inclusive",
+    "outside_window": "raw source capture only; no signal and no required fresh resolver tick",
+    "inside_window": "fresh exact source tick and complete feed coverage required",
+    "transport_gap": "hard evidence failure at all times"
+  },
+  "model_contract": {
+    "prior": "contemporaneous Polymarket executable quote",
+    "forecast": "Pyth resolver-source residual only",
+    "fair_lower_bound": "unavailable during V4 calibration collection",
+    "entry_rule": "fair lower bound - executable ask - doubled fees - slippage must be strictly positive",
+    "probe_interpretation": "execution/calibration observation, never a claimed trade"
+  },
+  "signals": {
+    "checkpoint_seconds": [300, 120, 60, 30, 10],
+    "additional_trigger": "live exact-feed Pyth sign flip around the certified price-to-beat inside the final 300 seconds only",
+    "latency_profiles_ms": [100, 250, 500],
+    "historical_or_carried_forward_triggers": false
+  },
+  "strategy_bindings": [{
+    "strategy": "resolver_boundary_pyth_residual_v4",
+    "family": "resolver_source_boundary_residual",
+    "arm": "market_prior_measurement",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "terminal_net_pnl_2x_lower_bound_only"
+  }],
+  "evaluation": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "require_positive_at_latency_ms": [100, 250, 500],
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "multiple_testing": "Holm across resolver source, checkpoint, side and latency",
+    "null_outcome": "The exact Pyth resolver residual may be fully reflected in the executable quote."
+  }
+}

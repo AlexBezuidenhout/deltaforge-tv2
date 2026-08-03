@@ -149,11 +149,20 @@ function resolverSide(price, boundary) {
   return 'TIE';
 }
 
+function inResolverObservationWindow(market, observedAtMs, windowSec = 300) {
+  const observedAt = finite(observedAtMs);
+  const endMs = finite(market?.endMs);
+  const seconds = finite(windowSec);
+  if (observedAt == null || endMs == null || !(seconds > 0)) return false;
+  return observedAt >= endMs - seconds * 1000 && observedAt <= endMs;
+}
+
 module.exports = {
   checkpointCrossings,
   entryCost,
   executableMarkout,
   finite,
+  inResolverObservationWindow,
   normalizeLevels,
   resolverSide,
   sizePaperEntry,

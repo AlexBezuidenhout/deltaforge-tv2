@@ -13,7 +13,8 @@ if [[ ! "${epoch_id}" =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 
 minimum_free_gib="${BORG_EPOCH_MIN_FREE_GIB:-30}"
-warmup_timeout_sec="${BORG_EPOCH_WARMUP_TIMEOUT_SEC:-240}"
+warmup_timeout_sec="${BORG_EPOCH_WARMUP_TIMEOUT_SEC:-360}"
+stability_sec="${BORG_EPOCH_STABILITY_SEC:-120}"
 deployed_release="$(basename "$(readlink -f /opt/deltaforge/tv2/current)")"
 # Default to the immutable release identifier. A human cohort label can still
 # be supplied explicitly, but a forgotten override must never stamp a new
@@ -183,6 +184,7 @@ preflight_report="$(mktemp /tmp/deltaforge-evidence-preflight.XXXXXX)"
 deadline="$(( $(date +%s) + warmup_timeout_sec ))"
 attempt=0
 preflight_ready=false
+stable_since=0
 while (( $(date +%s) < deadline )); do
   attempt="$((attempt + 1))"
   preflight_unit="deltaforge-evidence-preflight-$$-${attempt}"
@@ -195,14 +197,23 @@ while (( $(date +%s) < deadline )); do
       /usr/local/bin/node scripts/evidence-epoch-status.js \
       >"${preflight_report}" 2>&1 \
       && grep -q '"status": "PENDING_24H"' "${preflight_report}"; then
-    preflight_ready=true
-    break
+    now_sec="$(date +%s)"
+    if (( stable_since == 0 )); then stable_since="${now_sec}"; fi
+    if (( now_sec - stable_since >= stability_sec )); then
+      preflight_ready=true
+      break
+    fi
+  else
+    # One failed check restarts the uninterrupted preflight clock. This does
+    # not erase any process counter; a real sequence or coverage gap remains
+    # non-zero and therefore cannot become healthy later in the same run.
+    stable_since=0
   fi
   sleep 5
 done
 
 if [[ "${preflight_ready}" != true ]]; then
-  echo "evidence epoch preflight did not become healthy within ${warmup_timeout_sec}s" >&2
+  echo "evidence epoch preflight did not remain healthy for ${stability_sec}s within ${warmup_timeout_sec}s" >&2
   tail -80 "${preflight_report}" >&2 || true
   rm -f "${preflight_report}"
   # A rejected epoch is still an operational collector run. Restore every

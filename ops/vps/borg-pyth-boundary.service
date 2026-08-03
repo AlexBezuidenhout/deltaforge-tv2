@@ -13,7 +13,7 @@ EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
 Environment=NODE_ENV=production
 Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
 Environment=BORG_WAL_MIN_FREE_GB=20
-Environment=BORG_CODE_VERSION=pyth-resolver-boundary-transfer-v3-hermes-exact-feed
+Environment=BORG_CODE_VERSION=pyth-resolver-boundary-transfer-v4-frozen-observation-window
 Environment=PYTH_MAX_MARKETS=24
 Environment=PYTH_CLOB_SHARDS=2
 Environment=PYTH_UNIVERSE_REFRESH_MS=300000

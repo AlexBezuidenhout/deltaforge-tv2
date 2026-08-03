@@ -88,7 +88,7 @@ function normalizeCandidate(event, priceToBeat) {
   const fees = feeMetadata(market);
   const minimumOrderSize = finite(market?.orderMinSize ?? market?.minimum_order_size);
   const ruleDocument = {
-    experiment: 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed',
+    experiment: 'pyth-resolver-boundary-transfer-v4-frozen-observation-window',
     eventId: eventId == null ? null : String(eventId),
     gammaId: gammaId == null ? null : String(gammaId), conditionId: conditionId == null ? null : String(conditionId),
     slug, question, outcomes: outcomes.map(String), tokenIds: tokenIds.map(String),

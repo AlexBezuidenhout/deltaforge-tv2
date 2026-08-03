@@ -21,12 +21,14 @@ const { insertRows, logEvent, migratePyth, pool } = require('../recon/db');
 const { HermesPythStream, extractExactPythFeedSymbol } = require('./hermes');
 const { PythRtds, isSupportedMarketSymbol } = require('./rtds');
 const {
-  checkpointCrossings, executableMarkout, finite, resolverSide, sizePaperEntry,
+  checkpointCrossings, executableMarkout, finite, inResolverObservationWindow,
+  resolverSide, sizePaperEntry,
 } = require('./strategy');
 const { discoverPythUniverse, fetchJson, parseArray } = require('./universe');
 
-const EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed';
+const EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v4-frozen-observation-window';
 const CHECKPOINTS = Object.freeze([300, 120, 60, 30, 10]);
+const OBSERVATION_WINDOW_SEC = Math.max(...CHECKPOINTS);
 const LATENCY_PROFILES_MS = Object.freeze([100, 250, 500]);
 const MARKOUT_HORIZONS_SEC = Object.freeze([1, 5, 30]);
 const REFRESH_MS = Math.max(60_000, Number(process.env.PYTH_UNIVERSE_REFRESH_MS || 300_000));
@@ -90,6 +92,7 @@ class PythBoundaryObserver {
     this.lastTickAt = 0;
     this.lastUsableTickAt = 0;
     this.lastSignalAt = 0;
+    this.deferredFeedSymbols = [];
     this.metrics = {
       ticks: 0, liveTicks: 0, historicalTicks: 0, carriedForward: 0,
       diagnosticRtdsTicks: 0,
@@ -224,14 +227,11 @@ class PythBoundaryObserver {
       market.active = discovered.some((row) => row.conditionId === id) && market.endMs > now;
     }
     const active = [...this.markets.values()].filter((market) => market.active);
-    const feedActive = active.filter((market) => market.pythFeedSymbol);
-    this.targetByToken = new Map(feedActive.flatMap((market) => [
-      [market.upToken, market], [market.downToken, market],
-    ]));
+    const allFeedActive = active.filter((market) => market.pythFeedSymbol);
     // The RTDS socket has an observed 15-subscription ceiling. Put markets in
     // their resolver window first, then the nearest upcoming windows; PythRtds
     // applies the hard bound before opening a clean subscription.
-    const prioritizedFeeds = [...feedActive].sort((left, right) => {
+    const prioritizedFeeds = [...allFeedActive].sort((left, right) => {
       const leftOpen = left.startMs <= now && left.endMs > now ? 0 : 1;
       const rightOpen = right.startMs <= now && right.endMs > now ? 0 : 1;
       return leftOpen - rightOpen
@@ -247,6 +247,15 @@ class PythBoundaryObserver {
       symbol: market.symbol, feedSymbol: market.pythFeedSymbol,
     }])).values()];
     const hermesSelection = await this.hermes.setFeeds(selectedFeeds);
+    const enrolledFeedSymbols = new Set(
+      [...this.hermes.feedById.values()].map((row) => row.feedSymbol),
+    );
+    this.deferredFeedSymbols = [...new Set(hermesSelection.deferred || [])].sort();
+    const feedActive = allFeedActive
+      .filter((market) => enrolledFeedSymbols.has(market.pythFeedSymbol));
+    this.targetByToken = new Map(feedActive.flatMap((market) => [
+      [market.upToken, market], [market.downToken, market],
+    ]));
     this.rtds.setSymbols([...new Set(prioritizedFeeds
       .filter((market) => isSupportedMarketSymbol(market.symbol))
       .map((market) => market.symbol))]);
@@ -255,6 +264,8 @@ class PythBoundaryObserver {
       runId: this.runId, experimentId: EXPERIMENT_ID,
       certifiedRuleMarkets: certifiedUniverse.length,
       unresolvedExactFeeds: hermesSelection.unresolved,
+      deferredExactFeeds: this.deferredFeedSymbols,
+      feedCohortFrozenAt: hermesSelection.frozenAt,
       diagnosticRtdsSymbols: this.rtds.symbols.size,
     });
   }
@@ -295,11 +306,16 @@ class PythBoundaryObserver {
       previousTteSec: null, priorSide: null, firedCheckpoints: new Set(),
     };
     const triggers = [];
-    if ((current.priorSide === 'UP' || current.priorSide === 'DOWN')
+    const inObservationWindow = inResolverObservationWindow(
+      market, tick.receiveWallMs, OBSERVATION_WINDOW_SEC,
+    );
+    if (inObservationWindow
+        && (current.priorSide === 'UP' || current.priorSide === 'DOWN')
         && (side === 'UP' || side === 'DOWN') && side !== current.priorSide) {
       triggers.push({ kind: 'SIGN_FLIP', checkpointSec: null });
     }
-    for (const checkpointSec of checkpointCrossings(current.previousTteSec, tteSec, CHECKPOINTS)) {
+    for (const checkpointSec of inObservationWindow
+      ? checkpointCrossings(current.previousTteSec, tteSec, CHECKPOINTS) : []) {
       if (!current.firedCheckpoints.has(checkpointSec)) {
         current.firedCheckpoints.add(checkpointSec);
         triggers.push({ kind: 'TTE_CHECKPOINT', checkpointSec });
@@ -562,11 +578,19 @@ class PythBoundaryObserver {
 
   async heartbeat() {
     const active = [...this.markets.values()].filter((market) => market.active);
-    const supported = active.filter((market) => market.pythFeedSymbol);
+    const enrolledFeedSymbols = new Set(
+      [...this.hermes.feedById.values()].map((row) => row.feedSymbol),
+    );
+    const supported = active.filter((market) =>
+      market.pythFeedSymbol && enrolledFeedSymbols.has(market.pythFeedSymbol));
     const unsupportedSymbols = [...new Set(active
       .filter((market) => !market.pythFeedSymbol).map((market) => market.symbol))];
     const now = Date.now();
-    const inWindow = supported.filter((market) => now >= market.startMs && now <= market.endMs);
+    const inWindow = supported.filter((market) =>
+      inResolverObservationWindow(market, now, OBSERVATION_WINDOW_SEC));
+    const deferredInWindow = active.filter((market) =>
+      market.pythFeedSymbol && !enrolledFeedSymbols.has(market.pythFeedSymbol)
+      && inResolverObservationWindow(market, now, OBSERVATION_WINDOW_SEC));
     const inWindowSymbols = [...new Set(inWindow.map((market) => market.symbol))];
     const freshWindowSymbols = inWindowSymbols.filter((symbol) => {
       const tick = this.hermes.latest.get(symbol);
@@ -578,8 +602,10 @@ class PythBoundaryObserver {
       const tick = this.hermes.latest.get(market.symbol);
       return !tick?.carriedForward ? Math.max(latest, tick?.receiveWallMs || 0) : latest;
     }, 0);
-    const nextWindowStartAt = supported.reduce((next, market) => market.startMs > now
-      ? Math.min(next, market.startMs) : next, Infinity);
+    const nextWindowStartAt = supported.reduce((next, market) => {
+      const observationStart = market.endMs - OBSERVATION_WINDOW_SEC * 1000;
+      return observationStart > now ? Math.min(next, observationStart) : next;
+    }, Infinity);
     const transport = this.hermes.health(now);
     const diagnosticRtds = this.rtds.health();
     const feedState = !transport.connected ? 'DISCONNECTED'
@@ -592,8 +618,11 @@ class PythBoundaryObserver {
       settlementCostUsd: SETTLEMENT_COST_USD, bookMaxAgeMs: BOOK_MAX_AGE_MS,
       sourceMaxAgeMs: SOURCE_MAX_AGE_MS, hermes: transport, diagnosticRtds,
       feedState, supportedMarkets: supported.length, marketsInWindow: inWindow.length,
+      activeContractMarkets: active.length, observationWindowSec: OBSERVATION_WINDOW_SEC,
+      deferredWindowMarkets: deferredInWindow.length,
       expectedWindowFeeds: inWindowSymbols.length, coveredWindowFeeds: freshWindowSymbols.length,
-      unsupportedSymbols, lastExpectedTickAt: lastExpectedTickAt || null,
+      unsupportedSymbols, deferredFeedSymbols: this.deferredFeedSymbols,
+      lastExpectedTickAt: lastExpectedTickAt || null,
       nextWindowStartAt: Number.isFinite(nextWindowStartAt) ? nextWindowStartAt : null,
       pythWal: this.pythWal.health(), hermesWal: this.hermesWal.health(), clobWal: this.clobWal.health(),
       decisionWal: this.decisionWal.health(),
@@ -629,9 +658,12 @@ class PythBoundaryObserver {
       lastTickAt: this.lastTickAt || null, lastUsableTickAt: this.lastUsableTickAt || null,
       signals: this.metrics.signals, refreshErrors: this.metrics.refreshErrors,
       feedState, marketsInWindow: inWindow.length,
+      activeContractMarkets: active.length, observationWindowSec: OBSERVATION_WINDOW_SEC,
+      deferredWindowMarkets: deferredInWindow.length,
       expectedWindowFeeds: inWindowSymbols.length, coveredWindowFeeds: freshWindowSymbols.length,
       nextWindowStartAt: Number.isFinite(nextWindowStartAt) ? nextWindowStartAt : null,
-      unsupportedSymbols, transportConnected: transport.connected,
+      unsupportedSymbols, deferredFeedSymbols: this.deferredFeedSymbols,
+      transportConnected: transport.connected,
       hermes: transport, diagnosticRtds,
       wal: {
         pythRtds: this.pythWal.health(), pythHermes: this.hermesWal.health(),
@@ -663,7 +695,8 @@ class PythBoundaryObserver {
         this.rtds.checkStale();
         const now = Date.now();
         const expectedLive = [...this.markets.values()].some((market) =>
-          market.active && market.pythFeedSymbol && now >= market.startMs && now <= market.endMs);
+          market.active && market.pythFeedSymbol
+          && inResolverObservationWindow(market, now, OBSERVATION_WINDOW_SEC));
         this.hermes.checkStale(expectedLive);
       }, 10_000),
     ];
@@ -705,5 +738,6 @@ if (require.main === module) main().catch(async (error) => {
 
 module.exports = {
   CHECKPOINTS, EXPERIMENT_ID, LATENCY_PROFILES_MS, MARKOUT_HORIZONS_SEC,
+  OBSERVATION_WINDOW_SEC,
   PythBoundaryObserver, terminalOutcome,
 };

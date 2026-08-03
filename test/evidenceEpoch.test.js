@@ -244,6 +244,9 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
     /code_version="\$\{BORG_EPOCH_CODE_VERSION:-\$\{deployed_release\}\}"/,
   );
   assert.match(launcher, /exact-rule-structural-options-forward-after-runtime-repair/);
+  assert.match(launcher, /BORG_EPOCH_STABILITY_SEC:-120/);
+  assert.match(launcher, /now_sec - stable_since >= stability_sec/);
+  assert.match(launcher, /One failed check restarts the uninterrupted preflight clock/);
 });
 
 test('release dependency installer keys native modules to the immutable lockfile', () => {

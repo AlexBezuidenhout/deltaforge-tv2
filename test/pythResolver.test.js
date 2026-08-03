@@ -8,7 +8,8 @@ const {
   MAX_EQUITY_SUBSCRIPTIONS, parseFrame, PythRtds,
 } = require('../borg/pyth/rtds');
 const {
-  checkpointCrossings, executableMarkout, resolverSide, sizePaperEntry,
+  checkpointCrossings, executableMarkout, inResolverObservationWindow,
+  resolverSide, sizePaperEntry,
 } = require('../borg/pyth/strategy');
 const { normalizeCandidate } = require('../borg/pyth/universe');
 const fs = require('node:fs');
@@ -154,6 +155,22 @@ test('checkpoints fire only when crossed live and resolver side is deterministic
   assert.equal(resolverSide(112.6, 112.57), 'UP');
   assert.equal(resolverSide(112.5, 112.57), 'DOWN');
   assert.equal(resolverSide(112.57, 112.57), 'TIE');
+});
+
+test('resolver observation eligibility is confined to the frozen final window', () => {
+  const market = { endMs: Date.parse('2026-08-04T21:00:00Z') };
+  assert.equal(inResolverObservationWindow(
+    market, Date.parse('2026-08-04T20:54:59.999Z'), 300,
+  ), false);
+  assert.equal(inResolverObservationWindow(
+    market, Date.parse('2026-08-04T20:55:00.000Z'), 300,
+  ), true);
+  assert.equal(inResolverObservationWindow(
+    market, Date.parse('2026-08-04T21:00:00.000Z'), 300,
+  ), true);
+  assert.equal(inResolverObservationWindow(
+    market, Date.parse('2026-08-04T21:00:00.001Z'), 300,
+  ), false);
 });
 
 test('resolver observer has no wallet or order-submission dependency', () => {

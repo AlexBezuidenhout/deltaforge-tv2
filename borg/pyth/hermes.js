@@ -111,6 +111,8 @@ class HermesPythStream {
     this.connecting = false;
     this.connectionEpoch = 0;
     this.eventSequence = 0;
+    this.feedSetFrozenAt = null;
+    this.deferredFeedSymbols = [];
     this.reconnectDelay = 1_000;
     this.reconnectTimer = null;
     this.lastMessageAt = 0;
@@ -166,6 +168,25 @@ class HermesPythStream {
       .map((row) => [String(row.feedSymbol), {
         symbol: String(row.symbol).toUpperCase(), feedSymbol: String(row.feedSymbol),
       }])).values()];
+    // An evidence cohort must not interrupt its own source tape whenever the
+    // rolling Gamma panel discovers a future market. The initial exact feed
+    // set is frozen for the lifetime of this process. Newly discovered feed
+    // symbols are reported and deferred to the next cohort; they are never
+    // silently added through a break-before-make SSE restart.
+    if (this.feedSetFrozenAt) {
+      const enrolled = new Set([...this.feedById.values()].map((row) => row.feedSymbol));
+      const deferred = requested.map((row) => row.feedSymbol)
+        .filter((feedSymbol) => !enrolled.has(feedSymbol)).sort();
+      this.deferredFeedSymbols = deferred;
+      return {
+        requested: requested.length,
+        resolved: requested.length - deferred.length,
+        unresolved: [],
+        deferred,
+        frozen: true,
+        frozenAt: this.feedSetFrozenAt,
+      };
+    }
     const catalog = await this.loadCatalog();
     const exact = new Map();
     for (const row of catalog) {
@@ -199,7 +220,16 @@ class HermesPythStream {
       this.metrics.reconfigurationGaps += 1;
       this.restart();
     }
-    return { requested: requested.length, resolved: selected.length, unresolved };
+    this.feedSetFrozenAt = new Date().toISOString();
+    this.deferredFeedSymbols = [];
+    return {
+      requested: requested.length,
+      resolved: selected.length,
+      unresolved,
+      deferred: [],
+      frozen: true,
+      frozenAt: this.feedSetFrozenAt,
+    };
   }
 
   streamUrl() {
@@ -355,6 +385,8 @@ class HermesPythStream {
       lastMessageAt: this.lastMessageAt || null,
       lastMessageAgeMs: this.lastMessageAt ? Math.max(0, now - this.lastMessageAt) : null,
       catalogSha256: this.catalogHash,
+      feedSetFrozenAt: this.feedSetFrozenAt,
+      deferredFeedSymbols: [...this.deferredFeedSymbols],
       feedCoverage,
       metrics: { ...this.metrics },
     };

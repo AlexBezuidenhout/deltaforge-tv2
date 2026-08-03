@@ -110,7 +110,7 @@ async function buildPriorityLaneStatus(pool, options = {}) {
   );
   const pythExactFeedActive = pythState.active
     && (!pythHasWindow || pythMeta.feedState === 'LIVE')
-    && pythMeta.experimentId === 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed'
+    && pythMeta.experimentId === 'pyth-resolver-boundary-transfer-v4-frozen-observation-window'
     && finite(pythMeta.hermes?.metrics?.catalogFailures) === 0
     && finite(pythMeta.hermes?.metrics?.connectFailures) === 0
     && finite(pythMeta.hermes?.metrics?.connectionGaps) === 0

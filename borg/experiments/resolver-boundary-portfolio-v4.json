@@ -1,0 +1,26 @@
+{
+  "experiment_id": "resolver-boundary-portfolio-v4",
+  "manifest_format": "borg-experiment-v1",
+  "frozen_at": "2026-08-03T22:20:00.000Z",
+  "evidence_started_at": "2026-08-03T22:20:00.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "resolver_source_boundary_residual",
+  "supersedes": "resolver-boundary-portfolio-v3",
+  "strategy_version": "resolver-boundary-portfolio-v4",
+  "primary_control": "research-h43-forward-v1",
+  "calibration_only_lane": "pyth-resolver-boundary-transfer-v4-frozen-observation-window",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "independent_unit": "condition_id",
+  "promotion": {
+    "minimum_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "require_positive_at_latency_ms": [100, 250, 500],
+    "require_both_chronological_halves_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "multiple_testing": "Holm across resolver source, checkpoint, side and latency"
+  }
+}

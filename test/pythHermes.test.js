@@ -77,6 +77,16 @@ test('Hermes catalog resolution is exact and never selects session variants', as
   assert.equal(walRows.length, 1);
   assert.match(walRows[0].raw, /exactMatchOnly/);
 
+  const frozen = await stream.setFeeds([
+    { symbol: 'GOOGL', feedSymbol: 'Equity.US.GOOGL/USD' },
+    { symbol: 'MSFT', feedSymbol: 'Equity.US.MSFT/USD' },
+  ]);
+  assert.equal(frozen.frozen, true);
+  assert.deepEqual(frozen.deferred, ['Equity.US.MSFT/USD']);
+  assert.equal(stream.feedById.size, 1,
+    'future panel discoveries must not restart or mutate an active evidence feed cohort');
+  assert.equal(walRows.length, 1, 'a frozen cohort does not emit a false replacement catalog');
+
   const now = 1785787000000;
   stream.latest.set('GOOGL', { receiveWallMs: now, sourceMs: now - 60_000 });
   assert.equal(stream.health(now).coveredFeeds, 0,
