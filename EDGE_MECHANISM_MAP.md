@@ -1,6 +1,6 @@
 # DeltaForge edge mechanism map
 
-Generated: 2026-08-03T14:11:26.962Z. Research/venue mechanics reviewed through 2026-08-03.
+Generated: 2026-08-03T14:13:18.884Z. Research/venue mechanics reviewed through 2026-08-03.
 
 This registry contains economic hypotheses, not claimed edges. Scores allocate research effort; they are not backtest results. Known failed mechanisms remain visible so they cannot be relaunched under new names. All implementation is paper-only unless separately authorized after promotion.
 
@@ -10,6 +10,7 @@ This registry contains economic hypotheses, not claimed edges. Scores allocate r
 | --- | --- |
 | Prediction-market structural and semantic edge | 18 |
 | Rule-aware prediction/sports cross-venue relationships | 14 |
+| Prediction-market calibration and bounded statistical residuals | 8 |
 | Resolver and observation-boundary transfer | 10 |
 | Options-implied binary pricing and volatility | 12 |
 | Crypto CEX/perpetual relative value | 15 |
@@ -18,7 +19,7 @@ This registry contains economic hypotheses, not claimed edges. Scores allocate r
 | Selective passive liquidity and execution edge | 12 |
 | Portfolio/meta allocation and research controls | 7 |
 
-Total: **110 materially distinct hypotheses**.
+Total: **118 materially distinct hypotheses**.
 
 ## Fixed 100-point rubric
 
@@ -49,8 +50,8 @@ The diversity cap allows at most two rows per family. Data-blocked and already-r
 | 6 | X01 | Certified terminal complement lock | Rule-aware prediction/sports cross-venue relationships | DETERMINISTIC_SCANNER | 74 | No certified-equal pair currently qualifies; UNKNOWN is vetoed. |
 | 7 | P06 | AI anomaly triage queue | Portfolio/meta allocation and research controls | INCUBATE | 73 | No DeltaForge result yet; mechanism prior only. |
 | 8 | P02 | Profit-per-dollar-hour allocator | Portfolio/meta allocation and research controls | INCUBATE | 72 | No DeltaForge result yet; mechanism prior only. |
-| 9 | M01 | Fair-bound one-sided passive making | Selective passive liquidity and execution edge | COLLECT_ONLY | 69 | Staged, not active; authenticated queue/fill evidence is missing. |
-| 10 | X12 | Multi-venue exhaustive outcome set | Rule-aware prediction/sports cross-venue relationships | CHEAP_FALSIFICATION | 68 | No DeltaForge result yet; mechanism prior only. |
+| 9 | Q05 | Source-confirmed quote underreaction | Prediction-market calibration and bounded statistical residuals | COLLECT_ONLY | 71 | No DeltaForge result yet; mechanism prior only. |
+| 10 | M01 | Fair-bound one-sided passive making | Selective passive liquidity and execution edge | COLLECT_ONLY | 69 | Staged, not active; authenticated queue/fill evidence is missing. |
 
 ## Full mechanism registry
 
@@ -692,6 +693,28 @@ The diversity cap allows at most two rows per family. Data-blocked and already-r
 - Existing evidence: No DeltaForge result yet; mechanism prior only.
 - Source keys: overfitPaper
 
+### Q05 — Source-confirmed quote underreaction
+
+- Family: Prediction-market calibration and bounded statistical residuals
+- Decision: **COLLECT_ONLY**; research-priority score: **71/100**.
+- Economic mechanism: After a causally fresh authoritative public source change, estimate only the remaining quote residual and require a multi-tick dwell.
+- Who pays: Temporarily stale prediction quotes.
+- Why it may persist: Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.
+- Capacity and half-life: $5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.
+- Required data/readiness: pre-trade executable quote; frozen model probability; book depth; current fees; terminal outcome; market/day identity. B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.
+- Execution/legs: Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.
+- Latency: Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.
+- Full cost model: Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.
+- Legal/rule dependency: Exact resolution rule, source and market state; category-specific fee schedule must be versioned.
+- Cheapest falsification: Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.
+- Independent unit: One resolved market, clustered by event/day and asset/category.
+- Leakage/selection risk: Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.
+- Infrastructure: Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.
+- Time/storage: 14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.
+- Why this is not stale retail logic: Only a residual around the market prior is allowed; generic market-beating directional models are rejected.
+- Existing evidence: No DeltaForge result yet; mechanism prior only.
+- Source keys: polymarketFees, polymarketBooks, polymarketResolution, overfitPaper
+
 ### M01 — Fair-bound one-sided passive making
 
 - Family: Selective passive liquidity and execution edge
@@ -801,6 +824,28 @@ The diversity cap allows at most two rows per family. Data-blocked and already-r
 - Why this is not stale retail logic: It uses executable 2026 surfaces and small segmented prediction capacity, not textbook Black–Scholes point estimates.
 - Existing evidence: No DeltaForge result yet; mechanism prior only.
 - Source keys: deribitBooks, polymarketFees, polymarketBooks
+
+### Q01 — Market-prior calibration residual
+
+- Family: Prediction-market calibration and bounded statistical residuals
+- Decision: **CHEAP_FALSIFICATION**; research-priority score: **66/100**.
+- Economic mechanism: Fit only the out-of-sample residual around the executable market quote and shrink it toward zero by its uncertainty.
+- Who pays: Makers whose quote is well calibrated overall but conditionally biased in a stable state.
+- Why it may persist: Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.
+- Capacity and half-life: $5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.
+- Required data/readiness: pre-trade executable quote; frozen model probability; book depth; current fees; terminal outcome; market/day identity. B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.
+- Execution/legs: Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.
+- Latency: Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.
+- Full cost model: Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.
+- Legal/rule dependency: Exact resolution rule, source and market state; category-specific fee schedule must be versioned.
+- Cheapest falsification: Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.
+- Independent unit: One resolved market, clustered by event/day and asset/category.
+- Leakage/selection risk: Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.
+- Infrastructure: Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.
+- Time/storage: 14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.
+- Why this is not stale retail logic: Only a residual around the market prior is allowed; generic market-beating directional models are rejected.
+- Existing evidence: No DeltaForge result yet; mechanism prior only.
+- Source keys: polymarketFees, polymarketBooks, polymarketResolution, overfitPaper
 
 ### R02 — Pyth boundary residual
 
@@ -955,6 +1000,28 @@ The diversity cap allows at most two rows per family. Data-blocked and already-r
 - Why this is not stale retail logic: It is conditional and fair-bound-driven; generic two-sided quoting remains a negative control.
 - Existing evidence: No DeltaForge result yet; mechanism prior only.
 - Source keys: polymarketOrders, polymarketBooks, polymarketFees, ofiPaper
+
+### Q04 — Time-to-resolution hazard residual
+
+- Family: Prediction-market calibration and bounded statistical residuals
+- Decision: **CHEAP_FALSIFICATION**; research-priority score: **64/100**.
+- Economic mechanism: Model the residual evolution of a bounded binary martingale by time remaining and quote state without importing GBM price dynamics.
+- Who pays: Quote setters using coarse late-window risk buffers.
+- Why it may persist: Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.
+- Capacity and half-life: $5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.
+- Required data/readiness: pre-trade executable quote; frozen model probability; book depth; current fees; terminal outcome; market/day identity. B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.
+- Execution/legs: Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.
+- Latency: Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.
+- Full cost model: Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.
+- Legal/rule dependency: Exact resolution rule, source and market state; category-specific fee schedule must be versioned.
+- Cheapest falsification: Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.
+- Independent unit: One resolved market, clustered by event/day and asset/category.
+- Leakage/selection risk: Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.
+- Infrastructure: Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.
+- Time/storage: 14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.
+- Why this is not stale retail logic: Only a residual around the market prior is allowed; generic market-beating directional models are rejected.
+- Existing evidence: No DeltaForge result yet; mechanism prior only.
+- Source keys: polymarketFees, polymarketBooks, polymarketResolution, overfitPaper
 
 ### X03 — Typed near-identity convergence
 
@@ -1484,6 +1551,50 @@ The diversity cap allows at most two rows per family. Data-blocked and already-r
 - Existing evidence: No DeltaForge result yet; mechanism prior only.
 - Source keys: overfitPaper
 
+### Q02 — Exact 0–20¢ longshot successor
+
+- Family: Prediction-market calibration and bounded statistical residuals
+- Decision: **CONTINUE_FROZEN**; research-priority score: **61/100**.
+- Economic mechanism: Test whether the unchanged first-intent MAIN rule has a persistent underpricing residual only in the extreme longshot bucket.
+- Who pays: Potential favorite–longshot bias or asymmetric retail demand.
+- Why it may persist: Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.
+- Capacity and half-life: $5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.
+- Required data/readiness: pre-trade executable quote; frozen model probability; book depth; current fees; terminal outcome; market/day identity. B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.
+- Execution/legs: Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.
+- Latency: Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.
+- Full cost model: Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.
+- Legal/rule dependency: Exact resolution rule, source and market state; category-specific fee schedule must be versioned.
+- Cheapest falsification: Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.
+- Independent unit: One resolved market, clustered by event/day and asset/category.
+- Leakage/selection risk: Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.
+- Infrastructure: Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.
+- Time/storage: 14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.
+- Why this is not stale retail logic: Only a residual around the market prior is allowed; generic market-beating directional models are rejected.
+- Existing evidence: Fresh v19 successor: 1 fill, -$8.49 at doubled cost; 29 discovery fills are excluded.
+- Source keys: polymarketFees, polymarketBooks, polymarketResolution, overfitPaper
+
+### Q07 — Absorbed-martingale local volatility
+
+- Family: Prediction-market calibration and bounded statistical residuals
+- Decision: **CHEAP_FALSIFICATION**; research-priority score: **61/100**.
+- Economic mechanism: Estimate state-dependent quote variance on [0,1] with absorbing endpoints and test bounded transition probabilities, not Black–Scholes GBM.
+- Who pays: Participants using misspecified short-horizon binary dynamics.
+- Why it may persist: Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.
+- Capacity and half-life: $5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.
+- Required data/readiness: pre-trade executable quote; frozen model probability; book depth; current fees; terminal outcome; market/day identity. B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.
+- Execution/legs: Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.
+- Latency: Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.
+- Full cost model: Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.
+- Legal/rule dependency: Exact resolution rule, source and market state; category-specific fee schedule must be versioned.
+- Cheapest falsification: Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.
+- Independent unit: One resolved market, clustered by event/day and asset/category.
+- Leakage/selection risk: Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.
+- Infrastructure: Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.
+- Time/storage: 14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.
+- Why this is not stale retail logic: Only a residual around the market prior is allowed; generic market-beating directional models are rejected.
+- Existing evidence: No DeltaForge result yet; mechanism prior only.
+- Source keys: polymarketFees, polymarketBooks, polymarketResolution, overfitPaper
+
 ### C07 — Multivariate error-correction basket
 
 - Family: Crypto CEX/perpetual relative value
@@ -1638,6 +1749,28 @@ The diversity cap allows at most two rows per family. Data-blocked and already-r
 - Existing evidence: No DeltaForge result yet; mechanism prior only.
 - Source keys: deribitBooks, polymarketFees, polymarketBooks
 
+### Q03 — Category-specific favorite–longshot bias
+
+- Family: Prediction-market calibration and bounded statistical residuals
+- Decision: **CHEAP_FALSIFICATION**; research-priority score: **59/100**.
+- Economic mechanism: Estimate a monotone calibration curve by pre-registered category and price region, trading only a lower confidence bound after fees.
+- Who pays: Retail preference for lottery-like or near-certain payoffs.
+- Why it may persist: Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.
+- Capacity and half-life: $5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.
+- Required data/readiness: pre-trade executable quote; frozen model probability; book depth; current fees; terminal outcome; market/day identity. B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.
+- Execution/legs: Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.
+- Latency: Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.
+- Full cost model: Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.
+- Legal/rule dependency: Exact resolution rule, source and market state; category-specific fee schedule must be versioned.
+- Cheapest falsification: Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.
+- Independent unit: One resolved market, clustered by event/day and asset/category.
+- Leakage/selection risk: Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.
+- Infrastructure: Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.
+- Time/storage: 14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.
+- Why this is not stale retail logic: Only a residual around the market prior is allowed; generic market-beating directional models are rejected.
+- Existing evidence: No DeltaForge result yet; mechanism prior only.
+- Source keys: polymarketFees, polymarketBooks, polymarketResolution, overfitPaper
+
 ### C09 — Liquidation-depletion recovery
 
 - Family: Crypto CEX/perpetual relative value
@@ -1791,6 +1924,28 @@ The diversity cap allows at most two rows per family. Data-blocked and already-r
 - Why this is not stale retail logic: It targets messy low-capacity semantic relationships, not the crowded single-market YES+NO identity.
 - Existing evidence: No DeltaForge result yet; mechanism prior only.
 - Source keys: polymarketFees, polymarketOrders, polymarketResolution, predictionGraphPaper, polymarketArbPaper
+
+### Q06 — Ambiguity-conditioned risk premium
+
+- Family: Prediction-market calibration and bounded statistical residuals
+- Decision: **COLLECT_ONLY**; research-priority score: **57/100**.
+- Economic mechanism: Test whether markets with objectively coded fallback/dispute states exhibit a stable excess return after duration and liquidity controls.
+- Who pays: Capital avoiding ambiguous resolution risk.
+- Why it may persist: Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.
+- Capacity and half-life: $5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.
+- Required data/readiness: pre-trade executable quote; frozen model probability; book depth; current fees; terminal outcome; market/day identity. B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.
+- Execution/legs: Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.
+- Latency: Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.
+- Full cost model: Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.
+- Legal/rule dependency: Exact resolution rule, source and market state; category-specific fee schedule must be versioned.
+- Cheapest falsification: Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.
+- Independent unit: One resolved market, clustered by event/day and asset/category.
+- Leakage/selection risk: Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.
+- Infrastructure: Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.
+- Time/storage: 14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.
+- Why this is not stale retail logic: Only a residual around the market prior is allowed; generic market-beating directional models are rejected.
+- Existing evidence: No DeltaForge result yet; mechanism prior only.
+- Source keys: polymarketFees, polymarketBooks, polymarketResolution, overfitPaper
 
 ### X08 — Pre-funded dual-venue inventory rebalance
 
@@ -2341,6 +2496,28 @@ The diversity cap allows at most two rows per family. Data-blocked and already-r
 - Why this is not stale retail logic: It is a governance/capital layer and is explicitly forbidden from treating recent streaks as causal alpha.
 - Existing evidence: Recent-strategy chasing was requested previously but cannot turn noise into alpha.
 - Source keys: overfitPaper
+
+### Q08 — Winning-wallet imitation
+
+- Family: Prediction-market calibration and bounded statistical residuals
+- Decision: **REJECTED_MECHANISM**; research-priority score: **37/100**.
+- Economic mechanism: Copy a historically profitable public wallet after observing its transactions.
+- Who pays: No identified payer; copied fills arrive later and selection ignores hidden inventory/hedges.
+- Why it may persist: Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.
+- Capacity and half-life: $5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.
+- Required data/readiness: pre-trade executable quote; frozen model probability; book depth; current fees; terminal outcome; market/day identity. B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.
+- Execution/legs: Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.
+- Latency: Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.
+- Full cost model: Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.
+- Legal/rule dependency: Exact resolution rule, source and market state; category-specific fee schedule must be versioned.
+- Cheapest falsification: Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.
+- Independent unit: One resolved market, clustered by event/day and asset/category.
+- Leakage/selection risk: Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.
+- Infrastructure: Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.
+- Time/storage: 14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.
+- Why this is not stale retail logic: Only a residual around the market prior is allowed; generic market-beating directional models are rejected.
+- Existing evidence: Wallet forensics can generate hypotheses but past wallet P&L is not a causal executable signal.
+- Source keys: polymarketFees, polymarketBooks, polymarketResolution, overfitPaper
 
 ### M12 — Generic symmetric two-sided maker
 

@@ -1,6 +1,6 @@
 {
   "format": "deltaforge-edge-mechanism-map-v1",
-  "generatedAt": "2026-08-03T14:11:26.962Z",
+  "generatedAt": "2026-08-03T14:13:18.884Z",
   "researchAsOf": "2026-08-03",
   "notice": "Research priorities are not profitability evidence. Paper-only.",
   "rubric": {
@@ -97,7 +97,7 @@
       "url": "https://sdm.lbl.gov/oapapers/ssrn-id2507040-bailey.pdf"
     }
   },
-  "hypothesisCount": 110,
+  "hypothesisCount": 118,
   "selectedScreen": [
     "S01",
     "S03",
@@ -107,8 +107,8 @@
     "X01",
     "P06",
     "P02",
-    "M01",
-    "X12"
+    "Q05",
+    "M01"
   ],
   "hypotheses": [
     {
@@ -2754,6 +2754,98 @@
       }
     },
     {
+      "id": "Q05",
+      "family": "prediction",
+      "familyLabel": "Prediction-market calibration and bounded statistical residuals",
+      "title": "Source-confirmed quote underreaction",
+      "decision": "COLLECT_ONLY",
+      "economicMechanism": "After a causally fresh authoritative public source change, estimate only the remaining quote residual and require a multi-tick dwell.",
+      "whoPays": "Temporarily stale prediction quotes.",
+      "persistence": "Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.",
+      "capacityAndHalfLife": "$5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.",
+      "requiredData": [
+        "pre-trade executable quote",
+        "frozen model probability",
+        "book depth",
+        "current fees",
+        "terminal outcome",
+        "market/day identity"
+      ],
+      "dataReadiness": "B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.",
+      "executionPath": "Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.",
+      "latencySensitivity": "Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.",
+      "costModel": "Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.",
+      "legalTermsDependency": "Exact resolution rule, source and market state; category-specific fee schedule must be versioned.",
+      "cheapestFalsification": "Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.",
+      "independentUnit": "One resolved market, clustered by event/day and asset/category.",
+      "leakageSelectionRisks": "Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.",
+      "infrastructure": "Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.",
+      "testTimeAndDisk": "14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.",
+      "notStaleReason": "Only a residual around the market prior is allowed; generic market-beating directional models are rejected.",
+      "existingEvidence": "No DeltaForge result yet; mechanism prior only.",
+      "sources": [
+        "polymarketFees",
+        "polymarketBooks",
+        "polymarketResolution",
+        "overfitPaper"
+      ],
+      "score": {
+        "total": 71,
+        "breakdown": {
+          "mechanismStrength": {
+            "raw": 4,
+            "weight": 25,
+            "points": 20
+          },
+          "dataReadiness": {
+            "raw": 4,
+            "weight": 15,
+            "points": 12
+          },
+          "bankrollCapacity": {
+            "raw": 4,
+            "weight": 10,
+            "points": 8
+          },
+          "persistence": {
+            "raw": 3,
+            "weight": 10,
+            "points": 6
+          },
+          "dublinFit": {
+            "raw": 3,
+            "weight": 5,
+            "points": 3
+          },
+          "simplicity": {
+            "raw": 4,
+            "weight": 5,
+            "points": 4
+          },
+          "boundedRisk": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "cheapFalsification": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "independence": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "postCostDollarOpportunity": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          }
+        }
+      }
+    },
+    {
       "id": "M01",
       "family": "making",
       "familyLabel": "Selective passive liquidity and execution edge",
@@ -3200,6 +3292,98 @@
             "raw": 4,
             "weight": 5,
             "points": 4
+          },
+          "postCostDollarOpportunity": {
+            "raw": 3,
+            "weight": 10,
+            "points": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "Q01",
+      "family": "prediction",
+      "familyLabel": "Prediction-market calibration and bounded statistical residuals",
+      "title": "Market-prior calibration residual",
+      "decision": "CHEAP_FALSIFICATION",
+      "economicMechanism": "Fit only the out-of-sample residual around the executable market quote and shrink it toward zero by its uncertainty.",
+      "whoPays": "Makers whose quote is well calibrated overall but conditionally biased in a stable state.",
+      "persistence": "Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.",
+      "capacityAndHalfLife": "$5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.",
+      "requiredData": [
+        "pre-trade executable quote",
+        "frozen model probability",
+        "book depth",
+        "current fees",
+        "terminal outcome",
+        "market/day identity"
+      ],
+      "dataReadiness": "B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.",
+      "executionPath": "Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.",
+      "latencySensitivity": "Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.",
+      "costModel": "Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.",
+      "legalTermsDependency": "Exact resolution rule, source and market state; category-specific fee schedule must be versioned.",
+      "cheapestFalsification": "Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.",
+      "independentUnit": "One resolved market, clustered by event/day and asset/category.",
+      "leakageSelectionRisks": "Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.",
+      "infrastructure": "Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.",
+      "testTimeAndDisk": "14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.",
+      "notStaleReason": "Only a residual around the market prior is allowed; generic market-beating directional models are rejected.",
+      "existingEvidence": "No DeltaForge result yet; mechanism prior only.",
+      "sources": [
+        "polymarketFees",
+        "polymarketBooks",
+        "polymarketResolution",
+        "overfitPaper"
+      ],
+      "score": {
+        "total": 66,
+        "breakdown": {
+          "mechanismStrength": {
+            "raw": 3,
+            "weight": 25,
+            "points": 15
+          },
+          "dataReadiness": {
+            "raw": 4,
+            "weight": 15,
+            "points": 12
+          },
+          "bankrollCapacity": {
+            "raw": 4,
+            "weight": 10,
+            "points": 8
+          },
+          "persistence": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "dublinFit": {
+            "raw": 3,
+            "weight": 5,
+            "points": 3
+          },
+          "simplicity": {
+            "raw": 4,
+            "weight": 5,
+            "points": 4
+          },
+          "boundedRisk": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "cheapFalsification": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "independence": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
           },
           "postCostDollarOpportunity": {
             "raw": 3,
@@ -3846,6 +4030,98 @@
             "raw": 3,
             "weight": 10,
             "points": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "Q04",
+      "family": "prediction",
+      "familyLabel": "Prediction-market calibration and bounded statistical residuals",
+      "title": "Time-to-resolution hazard residual",
+      "decision": "CHEAP_FALSIFICATION",
+      "economicMechanism": "Model the residual evolution of a bounded binary martingale by time remaining and quote state without importing GBM price dynamics.",
+      "whoPays": "Quote setters using coarse late-window risk buffers.",
+      "persistence": "Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.",
+      "capacityAndHalfLife": "$5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.",
+      "requiredData": [
+        "pre-trade executable quote",
+        "frozen model probability",
+        "book depth",
+        "current fees",
+        "terminal outcome",
+        "market/day identity"
+      ],
+      "dataReadiness": "B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.",
+      "executionPath": "Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.",
+      "latencySensitivity": "Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.",
+      "costModel": "Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.",
+      "legalTermsDependency": "Exact resolution rule, source and market state; category-specific fee schedule must be versioned.",
+      "cheapestFalsification": "Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.",
+      "independentUnit": "One resolved market, clustered by event/day and asset/category.",
+      "leakageSelectionRisks": "Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.",
+      "infrastructure": "Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.",
+      "testTimeAndDisk": "14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.",
+      "notStaleReason": "Only a residual around the market prior is allowed; generic market-beating directional models are rejected.",
+      "existingEvidence": "No DeltaForge result yet; mechanism prior only.",
+      "sources": [
+        "polymarketFees",
+        "polymarketBooks",
+        "polymarketResolution",
+        "overfitPaper"
+      ],
+      "score": {
+        "total": 64,
+        "breakdown": {
+          "mechanismStrength": {
+            "raw": 3,
+            "weight": 25,
+            "points": 15
+          },
+          "dataReadiness": {
+            "raw": 4,
+            "weight": 15,
+            "points": 12
+          },
+          "bankrollCapacity": {
+            "raw": 4,
+            "weight": 10,
+            "points": 8
+          },
+          "persistence": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "dublinFit": {
+            "raw": 3,
+            "weight": 5,
+            "points": 3
+          },
+          "simplicity": {
+            "raw": 4,
+            "weight": 5,
+            "points": 4
+          },
+          "boundedRisk": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "cheapFalsification": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "independence": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "postCostDollarOpportunity": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
           }
         }
       }
@@ -6039,6 +6315,190 @@
       }
     },
     {
+      "id": "Q02",
+      "family": "prediction",
+      "familyLabel": "Prediction-market calibration and bounded statistical residuals",
+      "title": "Exact 0–20¢ longshot successor",
+      "decision": "CONTINUE_FROZEN",
+      "economicMechanism": "Test whether the unchanged first-intent MAIN rule has a persistent underpricing residual only in the extreme longshot bucket.",
+      "whoPays": "Potential favorite–longshot bias or asymmetric retail demand.",
+      "persistence": "Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.",
+      "capacityAndHalfLife": "$5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.",
+      "requiredData": [
+        "pre-trade executable quote",
+        "frozen model probability",
+        "book depth",
+        "current fees",
+        "terminal outcome",
+        "market/day identity"
+      ],
+      "dataReadiness": "B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.",
+      "executionPath": "Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.",
+      "latencySensitivity": "Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.",
+      "costModel": "Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.",
+      "legalTermsDependency": "Exact resolution rule, source and market state; category-specific fee schedule must be versioned.",
+      "cheapestFalsification": "Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.",
+      "independentUnit": "One resolved market, clustered by event/day and asset/category.",
+      "leakageSelectionRisks": "Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.",
+      "infrastructure": "Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.",
+      "testTimeAndDisk": "14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.",
+      "notStaleReason": "Only a residual around the market prior is allowed; generic market-beating directional models are rejected.",
+      "existingEvidence": "Fresh v19 successor: 1 fill, -$8.49 at doubled cost; 29 discovery fills are excluded.",
+      "sources": [
+        "polymarketFees",
+        "polymarketBooks",
+        "polymarketResolution",
+        "overfitPaper"
+      ],
+      "score": {
+        "total": 61,
+        "breakdown": {
+          "mechanismStrength": {
+            "raw": 2,
+            "weight": 25,
+            "points": 10
+          },
+          "dataReadiness": {
+            "raw": 4,
+            "weight": 15,
+            "points": 12
+          },
+          "bankrollCapacity": {
+            "raw": 4,
+            "weight": 10,
+            "points": 8
+          },
+          "persistence": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "dublinFit": {
+            "raw": 3,
+            "weight": 5,
+            "points": 3
+          },
+          "simplicity": {
+            "raw": 4,
+            "weight": 5,
+            "points": 4
+          },
+          "boundedRisk": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "cheapFalsification": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "independence": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "postCostDollarOpportunity": {
+            "raw": 3,
+            "weight": 10,
+            "points": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "Q07",
+      "family": "prediction",
+      "familyLabel": "Prediction-market calibration and bounded statistical residuals",
+      "title": "Absorbed-martingale local volatility",
+      "decision": "CHEAP_FALSIFICATION",
+      "economicMechanism": "Estimate state-dependent quote variance on [0,1] with absorbing endpoints and test bounded transition probabilities, not Black–Scholes GBM.",
+      "whoPays": "Participants using misspecified short-horizon binary dynamics.",
+      "persistence": "Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.",
+      "capacityAndHalfLife": "$5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.",
+      "requiredData": [
+        "pre-trade executable quote",
+        "frozen model probability",
+        "book depth",
+        "current fees",
+        "terminal outcome",
+        "market/day identity"
+      ],
+      "dataReadiness": "B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.",
+      "executionPath": "Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.",
+      "latencySensitivity": "Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.",
+      "costModel": "Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.",
+      "legalTermsDependency": "Exact resolution rule, source and market state; category-specific fee schedule must be versioned.",
+      "cheapestFalsification": "Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.",
+      "independentUnit": "One resolved market, clustered by event/day and asset/category.",
+      "leakageSelectionRisks": "Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.",
+      "infrastructure": "Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.",
+      "testTimeAndDisk": "14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.",
+      "notStaleReason": "Only a residual around the market prior is allowed; generic market-beating directional models are rejected.",
+      "existingEvidence": "No DeltaForge result yet; mechanism prior only.",
+      "sources": [
+        "polymarketFees",
+        "polymarketBooks",
+        "polymarketResolution",
+        "overfitPaper"
+      ],
+      "score": {
+        "total": 61,
+        "breakdown": {
+          "mechanismStrength": {
+            "raw": 3,
+            "weight": 25,
+            "points": 15
+          },
+          "dataReadiness": {
+            "raw": 4,
+            "weight": 15,
+            "points": 12
+          },
+          "bankrollCapacity": {
+            "raw": 4,
+            "weight": 10,
+            "points": 8
+          },
+          "persistence": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "dublinFit": {
+            "raw": 3,
+            "weight": 5,
+            "points": 3
+          },
+          "simplicity": {
+            "raw": 1,
+            "weight": 5,
+            "points": 1
+          },
+          "boundedRisk": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "cheapFalsification": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "independence": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "postCostDollarOpportunity": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          }
+        }
+      }
+    },
+    {
       "id": "C07",
       "family": "cex",
       "familyLabel": "Crypto CEX/perpetual relative value",
@@ -6664,6 +7124,98 @@
             "raw": 3,
             "weight": 10,
             "points": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "Q03",
+      "family": "prediction",
+      "familyLabel": "Prediction-market calibration and bounded statistical residuals",
+      "title": "Category-specific favorite–longshot bias",
+      "decision": "CHEAP_FALSIFICATION",
+      "economicMechanism": "Estimate a monotone calibration curve by pre-registered category and price region, trading only a lower confidence bound after fees.",
+      "whoPays": "Retail preference for lottery-like or near-certain payoffs.",
+      "persistence": "Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.",
+      "capacityAndHalfLife": "$5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.",
+      "requiredData": [
+        "pre-trade executable quote",
+        "frozen model probability",
+        "book depth",
+        "current fees",
+        "terminal outcome",
+        "market/day identity"
+      ],
+      "dataReadiness": "B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.",
+      "executionPath": "Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.",
+      "latencySensitivity": "Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.",
+      "costModel": "Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.",
+      "legalTermsDependency": "Exact resolution rule, source and market state; category-specific fee schedule must be versioned.",
+      "cheapestFalsification": "Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.",
+      "independentUnit": "One resolved market, clustered by event/day and asset/category.",
+      "leakageSelectionRisks": "Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.",
+      "infrastructure": "Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.",
+      "testTimeAndDisk": "14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.",
+      "notStaleReason": "Only a residual around the market prior is allowed; generic market-beating directional models are rejected.",
+      "existingEvidence": "No DeltaForge result yet; mechanism prior only.",
+      "sources": [
+        "polymarketFees",
+        "polymarketBooks",
+        "polymarketResolution",
+        "overfitPaper"
+      ],
+      "score": {
+        "total": 59,
+        "breakdown": {
+          "mechanismStrength": {
+            "raw": 2,
+            "weight": 25,
+            "points": 10
+          },
+          "dataReadiness": {
+            "raw": 4,
+            "weight": 15,
+            "points": 12
+          },
+          "bankrollCapacity": {
+            "raw": 4,
+            "weight": 10,
+            "points": 8
+          },
+          "persistence": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "dublinFit": {
+            "raw": 3,
+            "weight": 5,
+            "points": 3
+          },
+          "simplicity": {
+            "raw": 4,
+            "weight": 5,
+            "points": 4
+          },
+          "boundedRisk": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "cheapFalsification": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "independence": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "postCostDollarOpportunity": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
           }
         }
       }
@@ -7299,6 +7851,98 @@
             "raw": 3,
             "weight": 10,
             "points": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "Q06",
+      "family": "prediction",
+      "familyLabel": "Prediction-market calibration and bounded statistical residuals",
+      "title": "Ambiguity-conditioned risk premium",
+      "decision": "COLLECT_ONLY",
+      "economicMechanism": "Test whether markets with objectively coded fallback/dispute states exhibit a stable excess return after duration and liquidity controls.",
+      "whoPays": "Capital avoiding ambiguous resolution risk.",
+      "persistence": "Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.",
+      "capacityAndHalfLife": "$5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.",
+      "requiredData": [
+        "pre-trade executable quote",
+        "frozen model probability",
+        "book depth",
+        "current fees",
+        "terminal outcome",
+        "market/day identity"
+      ],
+      "dataReadiness": "B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.",
+      "executionPath": "Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.",
+      "latencySensitivity": "Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.",
+      "costModel": "Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.",
+      "legalTermsDependency": "Exact resolution rule, source and market state; category-specific fee schedule must be versioned.",
+      "cheapestFalsification": "Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.",
+      "independentUnit": "One resolved market, clustered by event/day and asset/category.",
+      "leakageSelectionRisks": "Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.",
+      "infrastructure": "Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.",
+      "testTimeAndDisk": "14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.",
+      "notStaleReason": "Only a residual around the market prior is allowed; generic market-beating directional models are rejected.",
+      "existingEvidence": "No DeltaForge result yet; mechanism prior only.",
+      "sources": [
+        "polymarketFees",
+        "polymarketBooks",
+        "polymarketResolution",
+        "overfitPaper"
+      ],
+      "score": {
+        "total": 57,
+        "breakdown": {
+          "mechanismStrength": {
+            "raw": 2,
+            "weight": 25,
+            "points": 10
+          },
+          "dataReadiness": {
+            "raw": 4,
+            "weight": 15,
+            "points": 12
+          },
+          "bankrollCapacity": {
+            "raw": 4,
+            "weight": 10,
+            "points": 8
+          },
+          "persistence": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
+          },
+          "dublinFit": {
+            "raw": 3,
+            "weight": 5,
+            "points": 3
+          },
+          "simplicity": {
+            "raw": 4,
+            "weight": 5,
+            "points": 4
+          },
+          "boundedRisk": {
+            "raw": 1,
+            "weight": 10,
+            "points": 2
+          },
+          "cheapFalsification": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "independence": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "postCostDollarOpportunity": {
+            "raw": 2,
+            "weight": 10,
+            "points": 4
           }
         }
       }
@@ -9529,6 +10173,98 @@
             "raw": 0,
             "weight": 5,
             "points": 0
+          },
+          "postCostDollarOpportunity": {
+            "raw": 0,
+            "weight": 10,
+            "points": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "Q08",
+      "family": "prediction",
+      "familyLabel": "Prediction-market calibration and bounded statistical residuals",
+      "title": "Winning-wallet imitation",
+      "decision": "REJECTED_MECHANISM",
+      "economicMechanism": "Copy a historically profitable public wallet after observing its transactions.",
+      "whoPays": "No identified payer; copied fills arrive later and selection ignores hidden inventory/hedges.",
+      "persistence": "Behavioral or operational calibration wedges may persist by price/category/time state, but broad directional forecasting is already a negative control.",
+      "capacityAndHalfLife": "$5–$50 per market for this bankroll; half-life ranges from seconds near expiry to the full contract duration.",
+      "requiredData": [
+        "pre-trade executable quote",
+        "frozen model probability",
+        "book depth",
+        "current fees",
+        "terminal outcome",
+        "market/day identity"
+      ],
+      "dataReadiness": "B — resolved markets and books exist, but historical discovery cohorts are heavily selected and some execution is synthetic.",
+      "executionPath": "Start from the market quote, apply a frozen out-of-sample residual with uncertainty shrinkage, and cross only an executable ask below the conservative bound.",
+      "latencySensitivity": "Usually 100 ms–minutes; only source-confirmed late-window residuals warrant faster profiles.",
+      "costModel": "Current taker fee + walked depth + non-fill + latency decay + calibration/model uncertainty reserve.",
+      "legalTermsDependency": "Exact resolution rule, source and market state; category-specific fee schedule must be versioned.",
+      "cheapestFalsification": "Run a bounded causal replay/scanner over the existing prediction-market calibration and bounded statistical residuals data; reject if no positive doubled-cost lower-bound episode exists.",
+      "independentUnit": "One resolved market, clustered by event/day and asset/category.",
+      "leakageSelectionRisks": "Price-bucket mining, repeated signals per market, selecting winning assets and reusing discovery outcomes.",
+      "infrastructure": "Prequential feature ledger, executable book replay, calibration intervals and immutable model/manifest hashes.",
+      "testTimeAndDisk": "14–30 days and at least 300 fresh markets; existing normalized facts are sufficient for initial falsification.",
+      "notStaleReason": "Only a residual around the market prior is allowed; generic market-beating directional models are rejected.",
+      "existingEvidence": "Wallet forensics can generate hypotheses but past wallet P&L is not a causal executable signal.",
+      "sources": [
+        "polymarketFees",
+        "polymarketBooks",
+        "polymarketResolution",
+        "overfitPaper"
+      ],
+      "score": {
+        "total": 37,
+        "breakdown": {
+          "mechanismStrength": {
+            "raw": 0,
+            "weight": 25,
+            "points": 0
+          },
+          "dataReadiness": {
+            "raw": 4,
+            "weight": 15,
+            "points": 12
+          },
+          "bankrollCapacity": {
+            "raw": 4,
+            "weight": 10,
+            "points": 8
+          },
+          "persistence": {
+            "raw": 0,
+            "weight": 10,
+            "points": 0
+          },
+          "dublinFit": {
+            "raw": 3,
+            "weight": 5,
+            "points": 3
+          },
+          "simplicity": {
+            "raw": 4,
+            "weight": 5,
+            "points": 4
+          },
+          "boundedRisk": {
+            "raw": 0,
+            "weight": 10,
+            "points": 0
+          },
+          "cheapFalsification": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
+          },
+          "independence": {
+            "raw": 5,
+            "weight": 5,
+            "points": 5
           },
           "postCostDollarOpportunity": {
             "raw": 0,
