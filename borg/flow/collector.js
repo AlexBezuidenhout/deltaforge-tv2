@@ -50,6 +50,9 @@ const SOCKET_SHARDS = Math.max(1, Math.min(4, Number(process.env.FLOW_CLOB_SHARD
 // returned 408/429. The latency-sensitive experiment remains CLOB WebSocket
 // driven.
 const GLOBAL_POLL_MS = Math.max(1000, Number(process.env.FLOW_GLOBAL_POLL_MS || 2000));
+const GLOBAL_DB_FLUSH_MS = Math.max(100, Number(process.env.FLOW_GLOBAL_DB_FLUSH_MS || 500));
+const GLOBAL_DB_BATCH_ROWS = Math.max(50, Math.min(2000,
+  Number(process.env.FLOW_GLOBAL_DB_BATCH_ROWS || 500)));
 const DATA_TRADE_PAGE_SIZE = Math.max(100, Math.min(1000,
   Number(process.env.FLOW_DATA_TRADE_PAGE_SIZE || 500)));
 // Offset pages are not one atomic Data API snapshot: trades inserted between
@@ -213,6 +216,25 @@ function makeNonOverlappingTask(fn, onSkip = () => {}) {
       pending = false;
     }
   };
+}
+
+function takeMapBatch(map, limit) {
+  const rows = [];
+  for (const [key, value] of map) {
+    rows.push([key, value]);
+    map.delete(key);
+    if (rows.length >= limit) break;
+  }
+  return rows;
+}
+
+function restoreMapBatch(map, rows) {
+  const newer = new Map(map);
+  map.clear();
+  for (const [key, value] of rows) {
+    if (!newer.has(key)) map.set(key, value);
+  }
+  for (const [key, value] of newer) map.set(key, value);
 }
 
 function latestSourceWindow(trades, lookbackSec) {
@@ -460,6 +482,12 @@ class FlowCollector {
     // this cursor from the local clock.
     this.globalCursorSec = 0;
     this.globalSeen = new Map();
+    // The immutable WAL is the authority. SQL is a derived query tier and may
+    // never hold the network cursor hostage: a synchronous 10k-row rescue
+    // insert previously delayed the next poll by minutes and manufactured
+    // globalCoverageGaps. Queue the already-WAL-appended rows and persist them
+    // in bounded batches on a separate non-overlapping task.
+    this.globalDbQueue = new Map();
     this.lastGlobalResponseAt = 0;
     this.lastGlobalSaturationLogAt = 0;
     this.running = false;
@@ -471,6 +499,7 @@ class FlowCollector {
       globalTrades: 0, realtimeTrades: 0, eligibleSweeps: 0, signals: 0,
       scored: 0, filled: 0, errors: 0, scheduledSkips: 0, globalCoverageGaps: 0,
       globalBootstrapTruncations: 0, globalRescueSnapshots: 0,
+      globalDbPersisted: 0, globalDbQueueHighWater: 0,
       restRetries: 0, lastRestRetryAt: null,
       boundarySourceArmed: 0, boundaryReady: 0, boundaryRejected: 0,
       startedAt: new Date().toISOString(),
@@ -487,6 +516,7 @@ class FlowCollector {
     // in flight.
     await this.scanGlobalTrades();
     this._every(() => this.scanGlobalTrades(), GLOBAL_POLL_MS, 'global_trade_scan');
+    this._every(() => this.flushGlobalTrades(), GLOBAL_DB_FLUSH_MS, 'global_trade_db_flush');
     this._every(() => this.flushTouches(), 500, 'touch_flush');
     this._every(() => this.persistBookHeartbeats(), 1000, 'book_heartbeat');
     this._every(() => this.scorePending(), 2000, 'pending_score');
@@ -1059,16 +1089,15 @@ class FlowCollector {
         receiveMonoNs: process.hrtime.bigint().toString(),
       });
     }
-    const rows = uniqueEntries.map((entry) => {
+    uniqueEntries.forEach((entry) => {
       entry.row[17] = provenance.event_id;
-      return entry.row;
     });
-    const inserted = await insertRows('pm_flow_trades', [
-      'dedup_key','source','observed_at','source_ts','source_latency_ms','condition_id','asset_id',
-      'outcome','side','price','size','notional','tx_hash','wallet','connection_epoch',
-      'connection_shard','event_sequence','wal_event_id','data_quality_grade','raw',
-    ], rows, 'ON CONFLICT (dedup_key) DO NOTHING');
-    this.counters.globalTrades += inserted;
+    for (const entry of uniqueEntries) this.globalDbQueue.set(entry.dedupKey, entry.row);
+    this.counters.globalTrades += uniqueEntries.length;
+    this.counters.globalDbQueueHighWater = Math.max(
+      this.counters.globalDbQueueHighWater,
+      this.globalDbQueue.size,
+    );
     this.globalCursorSec = Math.max(this.globalCursorSec, maxTimestamp);
     if (completedCoverageState === 'BOOTSTRAP_TRUNCATED') {
       this.counters.globalBootstrapTruncations += 1;
@@ -1083,6 +1112,23 @@ class FlowCollector {
           interpretation: 'global discovery tape may have a gap; realtime CLOB experiment panel is unaffected',
         });
       }
+    }
+  }
+
+  async flushGlobalTrades() {
+    const batch = takeMapBatch(this.globalDbQueue, GLOBAL_DB_BATCH_ROWS);
+    if (!batch.length) return 0;
+    try {
+      const inserted = await insertRows('pm_flow_trades', [
+        'dedup_key','source','observed_at','source_ts','source_latency_ms','condition_id','asset_id',
+        'outcome','side','price','size','notional','tx_hash','wallet','connection_epoch',
+        'connection_shard','event_sequence','wal_event_id','data_quality_grade','raw',
+      ], batch.map(([, row]) => row), 'ON CONFLICT (dedup_key) DO NOTHING');
+      this.counters.globalDbPersisted += inserted;
+      return inserted;
+    } catch (error) {
+      restoreMapBatch(this.globalDbQueue, batch);
+      throw error;
     }
   }
 
@@ -1284,6 +1330,8 @@ class FlowCollector {
   }
 
   async heartbeat() {
+    const oldestGlobalDbRow = this.globalDbQueue.values().next().value;
+    const oldestGlobalDbAt = oldestGlobalDbRow?.[2] || null;
     await logEvent('INFO', 'flow_heartbeat', 'public-flow paper collector alive', {
       ...this.counters,
       runId: RUN_ID,
@@ -1293,6 +1341,11 @@ class FlowCollector {
       activeSockets: this.sockets.filter((socket) => socket.ws?.readyState === WebSocket.OPEN).length,
       lastSocketMessageAt: this.sockets.map((socket) => socket.lastMessageAt || null),
       lastGlobalResponseAt: this.lastGlobalResponseAt || null,
+      globalDbQueue: this.globalDbQueue.size,
+      globalDbQueueOldestAgeMs: oldestGlobalDbAt
+        ? Math.max(0, Date.now() - new Date(oldestGlobalDbAt).getTime()) : 0,
+      globalDbBatchRows: GLOBAL_DB_BATCH_ROWS,
+      globalDbFlushMs: GLOBAL_DB_FLUSH_MS,
       memoryMb: Object.fromEntries(Object.entries(process.memoryUsage())
         .map(([key, bytes]) => [key, Math.round(bytes / 1024 / 1024)])),
       wal: {
@@ -1321,6 +1374,11 @@ class FlowCollector {
     this.sockets.forEach((socket) => socket.close());
     await this.writeChain;
     await this.flushTouches().catch((error) => this.error(error));
+    // Best-effort derived-tier drain. The WAL already contains every captured
+    // row, so shutdown never waits without bound for PostgreSQL.
+    for (let attempt = 0; attempt < 20 && this.globalDbQueue.size; attempt += 1) {
+      await this.flushGlobalTrades().catch((error) => this.error(error));
+    }
     await Promise.all([
       this.wal.clob.close(), this.wal.global.close(),
       this.wal.boundary.close(), this.wal.metadata.close(),
@@ -1355,9 +1413,11 @@ module.exports = {
   globalCoverageState,
   latestSourceWindow,
   makeNonOverlappingTask,
+  restoreMapBatch,
   marketMetadataRecord,
   normLevels,
   paperArrivalState,
   parseArray,
   sourceCursorCutoff,
+  takeMapBatch,
 };
