@@ -269,6 +269,7 @@ test('evidence report distinguishes the immutable release from the collector fam
   assert.match(source, /requirementsVersion: 'evidence-health-v3-feed-gaps'/);
   assert.match(source, /primary redundant CLOB coverage is/);
   assert.match(source, /primary redundant RTDS coverage is/);
+  assert.match(source, /public-flow process is warming, stale or repeatedly restarting/);
 });
 
 test('recorded failed evidence is data rather than a failed monitor process', () => {

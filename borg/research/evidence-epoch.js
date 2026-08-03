@@ -417,6 +417,15 @@ async function assessEvidenceEpoch(pool, options = {}) {
     critical.push(`${staleHeartbeats.n} transient stale-feed heartbeat(s) in epoch`);
   }
   const flowHeartbeat = eventHeartbeats.flow_heartbeat?.data || {};
+  const flowProcessStartedAt = flowHeartbeat.processStartedAt || flowHeartbeat.startedAt;
+  const flowUptimeSec = ageSeconds(flowProcessStartedAt, nowMs);
+  if (flowHeartbeat.collectionEpochId !== run.epoch_id) {
+    critical.push('public-flow heartbeat belongs to a different collection epoch');
+  }
+  if (!isAtOrAfter(flowProcessStartedAt, epochStart)
+      || flowUptimeSec == null || flowUptimeSec < 60) {
+    critical.push('public-flow process is warming, stale or repeatedly restarting');
+  }
   const primaryClob = eventHeartbeats.heartbeat?.data?.clob || null;
   if (primaryClob?.routingMode === 'redundant-explicit') {
     const expectedAssets = finite(primaryClob.expectedAssets, null);

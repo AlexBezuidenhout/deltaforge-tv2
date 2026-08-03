@@ -43,7 +43,10 @@ const DATA_API = 'https://data-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
 const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const REALTIME_MARKETS = Math.max(2, Math.min(12, Number(process.env.FLOW_REALTIME_MARKETS || 4)));
-const SOCKET_SHARDS = Math.max(1, Math.min(4, Number(process.env.FLOW_CLOB_SHARDS || 2)));
+// Keep each default four-market panel on one logical shard per market. The
+// prior two-shard layout put four high-throughput tokens on each connection;
+// Polymarket reset every redundant copy of one overloaded shard together.
+const SOCKET_SHARDS = Math.max(1, Math.min(12, Number(process.env.FLOW_CLOB_SHARDS || 4)));
 // Each selected token is captured on independent physical market-channel
 // paths. A transport reconnect is therefore diagnostic; it becomes an
 // evidence-breaking gap only when every subscribed path for a token is gone.
@@ -51,9 +54,9 @@ const SOCKET_SHARDS = Math.max(1, Math.min(4, Number(process.env.FLOW_CLOB_SHARD
 // drives the derived strategy/SQL state so duplicate frames cannot manufacture
 // signals.
 const SOCKET_PATHS = Math.max(2, Math.min(3,
-  Number(process.env.FLOW_CLOB_PATHS_PER_ASSET || 3)));
+  Number(process.env.FLOW_CLOB_PATHS_PER_ASSET || 2)));
 const SOCKET_CONNECT_STAGGER_MS = Math.max(0,
-  Number(process.env.FLOW_CLOB_CONNECT_STAGGER_MS || 5000));
+  Number(process.env.FLOW_CLOB_CONNECT_STAGGER_MS || 3000));
 const SOCKET_COVERAGE_MAX_AGE_MS = Math.max(10_000,
   Number(process.env.FLOW_CLOB_COVERAGE_MAX_AGE_MS || 45_000));
 const SOCKET_REHYDRATE_AFTER_MS = Math.max(1_000,
@@ -1637,6 +1640,7 @@ class FlowCollector {
       ...this.counters,
       runId: RUN_ID,
       collectionEpochId: process.env.BORG_COLLECTION_EPOCH_ID || 'flow-unmarked',
+      processStartedAt: this.counters.startedAt,
       uptimeMin: Math.round((Date.now() - new Date(this.counters.startedAt).getTime()) / 60000),
       selectedMarkets: this.markets.size,
       routingMode: clob.routingMode,

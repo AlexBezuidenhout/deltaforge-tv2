@@ -72,6 +72,8 @@ test('flow market sockets assign every logical shard to the configured independe
   assert.deepEqual(flowRouteIndexes(3, 2, 2), [1, 3]);
   assert.deepEqual(flowRouteIndexes(0, 2, 3), [0, 2, 4]);
   assert.deepEqual(flowRouteIndexes(1, 2, 3), [1, 3, 5]);
+  assert.deepEqual(flowRouteIndexes(0, 4, 2), [0, 4]);
+  assert.deepEqual(flowRouteIndexes(3, 4, 2), [3, 7]);
 });
 
 test('flow socket re-requests only missing active snapshots with a cooldown', () => {
