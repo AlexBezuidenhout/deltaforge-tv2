@@ -1,0 +1,295 @@
+{
+  "generatedAt": "2026-08-03T13:57:42.037Z",
+  "evidenceStartedAt": "2026-08-03T12:40:00.000Z",
+  "trial": {
+    "experiment_id": "options-exact-expiry-residual-v4",
+    "strategy": "options_exact_expiry_residual_v4",
+    "status": "COLLECTING",
+    "evidence_started_at": "2026-08-03T12:40:00.000Z",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "manifest_hash": "5c9459f5dc22c7a4e48c996f2e30e5788ce2c34b9944f0c548027d4d2c49e266"
+  },
+  "policy": "first executable exact-expiry A-fidelity surface signal per market; no stacking or best-in-hindsight replacement",
+  "runtime": {
+    "run_id": "options_1785763222531_7dd0a7d47d",
+    "started_at": "2026-08-03T13:20:22.532Z",
+    "stopped_at": null,
+    "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+    "pid": 408251,
+    "paper_only": true,
+    "wallet_loaded": false,
+    "status": "RUNNING",
+    "targets": 66,
+    "subscribed_instruments": 151,
+    "subscribed_poly_tokens": 132,
+    "raw_frames": "179180",
+    "ticker_events": "179049",
+    "stored_touches": "169948",
+    "shadow_marks": "33992",
+    "persistence_queue": 86,
+    "last_event_at": "2026-08-03T13:57:40.306Z",
+    "last_mark_at": "2026-08-03T13:57:40.304Z",
+    "metrics": {
+      "polyWal": {
+        "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+        "bytes": 228493230,
+        "freeGb": 38.98,
+        "source": "options-polymarket-clob",
+        "records": 205800,
+        "checkedAt": "2026-08-03T13:57:40.320Z",
+        "activeFile": "/var/lib/deltaforge/wal/borg/options-polymarket-clob/2026-08-03/2026-08-03T13-53-11-177Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408251__4.open",
+        "lastSyncAt": "2026-08-03T13:57:40.260Z",
+        "lastAppendAt": "2026-08-03T13:57:40.287Z",
+        "lastMirrorAt": null,
+        "collectorRunId": "options_1785763222531_7dd0a7d47d",
+        "sealedSegments": 3,
+        "mirrorConfigured": false,
+        "mirroredSegments": 0,
+        "collectionEpochId": "priority-forward-2026-08-03-v19",
+        "requiredReserveGb": 20
+      },
+      "rtdsWal": {
+        "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+        "bytes": 20785914,
+        "freeGb": 38.98,
+        "source": "options-rtds-chainlink",
+        "records": 28573,
+        "checkedAt": "2026-08-03T13:57:40.320Z",
+        "activeFile": "/var/lib/deltaforge/wal/borg/options-rtds-chainlink/2026-08-03/2026-08-03T13-50-23-231Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408251__3.open",
+        "lastSyncAt": "2026-08-03T13:57:40.090Z",
+        "lastAppendAt": "2026-08-03T13:57:40.090Z",
+        "lastMirrorAt": null,
+        "collectorRunId": "options_1785763222531_7dd0a7d47d",
+        "sealedSegments": 2,
+        "mirrorConfigured": false,
+        "mirroredSegments": 0,
+        "collectionEpochId": "priority-forward-2026-08-03-v19",
+        "requiredReserveGb": 20
+      },
+      "rawFrames": 179180,
+      "dbSampleMs": 5000,
+      "deribitWal": {
+        "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+        "bytes": 234661172,
+        "freeGb": 38.98,
+        "source": "deribit-options",
+        "records": 179180,
+        "checkedAt": "2026-08-03T13:57:40.320Z",
+        "activeFile": "/var/lib/deltaforge/wal/borg/deribit-options/2026-08-03/2026-08-03T13-52-30-385Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408251__4.open",
+        "lastSyncAt": "2026-08-03T13:57:40.174Z",
+        "lastAppendAt": "2026-08-03T13:57:40.306Z",
+        "lastMirrorAt": null,
+        "collectorRunId": "options_1785763222531_7dd0a7d47d",
+        "sealedSegments": 3,
+        "mirrorConfigured": false,
+        "mirroredSegments": 0,
+        "collectionEpochId": "priority-forward-2026-08-03-v19",
+        "requiredReserveGb": 20
+      },
+      "clobStarted": true,
+      "decisionWal": {
+        "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+        "bytes": 121130844,
+        "freeGb": 38.98,
+        "source": "options-decisions",
+        "records": 33992,
+        "checkedAt": "2026-08-03T13:57:40.320Z",
+        "activeFile": "/var/lib/deltaforge/wal/borg/options-decisions/2026-08-03/2026-08-03T13-50-24-210Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408251__3.open",
+        "lastSyncAt": "2026-08-03T13:57:38.714Z",
+        "lastAppendAt": "2026-08-03T13:57:38.646Z",
+        "lastMirrorAt": null,
+        "collectorRunId": "options_1785763222531_7dd0a7d47d",
+        "sealedSegments": 2,
+        "mirrorConfigured": false,
+        "mirroredSegments": 0,
+        "collectionEpochId": "priority-forward-2026-08-03-v19",
+        "requiredReserveGb": 20
+      },
+      "exactExpiry": {
+        "records": 44,
+        "rejected": {},
+        "fetchedEvents": 116,
+        "queriedExpiries": [
+          "2026-08-04T08:00:00.000Z",
+          "2026-08-05T08:00:00.000Z",
+          "2026-08-06T08:00:00.000Z",
+          "2026-08-07T08:00:00.000Z"
+        ],
+        "universeVersion": "options-daily-threshold-surface-v3",
+        "exactExpiryRecords": 0,
+        "listedExpiryCounts": {
+          "BTC": 12,
+          "ETH": 12
+        },
+        "termInterpolatedRecords": 44
+      },
+      "markSampler": {
+        "pruned": 0,
+        "states": 132,
+        "pending": 47900,
+        "accepted": 34008,
+        "suppressed": 12349608
+      },
+      "parseErrors": 0,
+      "shadowMarks": 33992,
+      "clobTriggers": 85890,
+      "flushRetries": 0,
+      "tickerEvents": 179049,
+      "refreshErrors": 0,
+      "storedTouches": 169948,
+      "archiveAnchors": [
+        {
+          "id": "archive:BTC:24h",
+          "strike": 63173.01,
+          "currency": "BTC",
+          "archiveOnly": true,
+          "targetExpiryMs": 1785851724846
+        },
+        {
+          "id": "archive:BTC:168h",
+          "strike": 63173.01,
+          "currency": "BTC",
+          "archiveOnly": true,
+          "targetExpiryMs": 1786370124846
+        },
+        {
+          "id": "archive:ETH:24h",
+          "strike": 1855.87,
+          "currency": "ETH",
+          "archiveOnly": true,
+          "targetExpiryMs": 1785851724846
+        },
+        {
+          "id": "archive:ETH:168h",
+          "strike": 1855.87,
+          "currency": "ETH",
+          "archiveOnly": true,
+          "targetExpiryMs": 1786370124846
+        }
+      ],
+      "deribitTriggers": 179049,
+      "executableMarks": 0,
+      "surfaceFidelity": {
+        "B": 26048,
+        "C": 1364,
+        "D": 6580
+      },
+      "surfaceMaxAgeMs": 3000,
+      "targetBudgetUsd": 10,
+      "polyBookMaxAgeMs": 500,
+      "executionBarriers": {
+        "INCOMPLETE_BID_ASK_IV_INTERVAL": 6580,
+        "TERM_INTERPOLATION_DIAGNOSTIC_ONLY": 26048,
+        "UNSUPPORTED_LONG_HORIZON_VOL_EXTRAPOLATION": 354,
+        "UNSUPPORTED_SHORT_HORIZON_VOL_EXTRAPOLATION": 1010
+      },
+      "persistenceErrors": 0,
+      "requireExactExpiry": true,
+      "diagnosticHeartbeatMs": 300000,
+      "executableHeartbeatMs": 60000,
+      "markTransitionDwellMs": 250,
+      "suppressedDerivedMarks": 12349608
+    },
+    "updated_at": "2026-08-03T13:57:40.320Z"
+  },
+  "capture": {
+    "touches": 129265,
+    "instruments": 151,
+    "first_at": "2026-08-03T12:40:00.000Z",
+    "last_at": "2026-08-03T13:57:40.000Z"
+  },
+  "evidenceProduction": {
+    "diagnostics": [
+      {
+        "surface_fidelity": "B",
+        "surface_mode": "TERM_INTERPOLATED",
+        "barrier": "TERM_INTERPOLATION_DIAGNOSTIC_ONLY",
+        "observations": 28256,
+        "markets": 14,
+        "executable_observations": 0,
+        "positive_depth_walks": 320,
+        "latest": "2026-08-03T13:57:40.414Z"
+      },
+      {
+        "surface_fidelity": "D",
+        "surface_mode": "TERM_INTERPOLATED",
+        "barrier": "INCOMPLETE_BID_ASK_IV_INTERVAL",
+        "observations": 4074,
+        "markets": 42,
+        "executable_observations": 0,
+        "positive_depth_walks": 449,
+        "latest": "2026-08-03T13:57:20.789Z"
+      },
+      {
+        "surface_fidelity": "D",
+        "surface_mode": "SHORT_HORIZON_VOL_EXTRAPOLATION",
+        "barrier": "INCOMPLETE_BID_ASK_IV_INTERVAL",
+        "observations": 1704,
+        "markets": 52,
+        "executable_observations": 0,
+        "positive_depth_walks": 148,
+        "latest": "2026-08-03T13:57:20.110Z"
+      },
+      {
+        "surface_fidelity": "D",
+        "surface_mode": "LONG_HORIZON_VOL_EXTRAPOLATION",
+        "barrier": "INCOMPLETE_BID_ASK_IV_INTERVAL",
+        "observations": 1258,
+        "markets": 27,
+        "executable_observations": 0,
+        "positive_depth_walks": 364,
+        "latest": "2026-08-03T13:57:20.117Z"
+      },
+      {
+        "surface_fidelity": "C",
+        "surface_mode": "SHORT_HORIZON_VOL_EXTRAPOLATION",
+        "barrier": "UNSUPPORTED_SHORT_HORIZON_VOL_EXTRAPOLATION",
+        "observations": 1128,
+        "markets": 24,
+        "executable_observations": 0,
+        "positive_depth_walks": 142,
+        "latest": "2026-08-03T13:57:33.773Z"
+      },
+      {
+        "surface_fidelity": "C",
+        "surface_mode": "LONG_HORIZON_VOL_EXTRAPOLATION",
+        "barrier": "UNSUPPORTED_LONG_HORIZON_VOL_EXTRAPOLATION",
+        "observations": 374,
+        "markets": 11,
+        "executable_observations": 0,
+        "positive_depth_walks": 3,
+        "latest": "2026-08-03T13:57:20.588Z"
+      }
+    ],
+    "interpretation": "No exact-expiry A-fidelity surface exists for the observed targets. Term interpolation and C/D marks are diagnostic collection, not executable evidence and are excluded from PnL."
+  },
+  "pendingOrUnscorable": 0,
+  "overall": {
+    "n": 0,
+    "wins": 0,
+    "pnl2xUsd": 0,
+    "meanPnl2xUsd": null,
+    "firstHalfPnl2xUsd": 0,
+    "secondHalfPnl2xUsd": 0,
+    "hedgeScored": 0,
+    "eventClusteredMeanCi95": {
+      "lower": null,
+      "upper": null,
+      "clusters": 0
+    },
+    "dayClusteredMeanCi95": {
+      "lower": null,
+      "upper": null,
+      "clusters": 0
+    }
+  },
+  "byAsset": {},
+  "verdict": "INSUFFICIENT_FORWARD_EVIDENCE",
+  "caveats": [
+    "The database had no historical full Deribit strike/expiry surface; prior DVOL proxy rows are excluded.",
+    "A missing hedge close uses token PnL minus hedge-cost stress and is not a fully scored hedged trade.",
+    "Paper taker marks use causal displayed depth but do not prove authenticated FOK acknowledgement.",
+    "Do not annualize or promote before 300 independent markets and 30 calendar days."
+  ]
+}

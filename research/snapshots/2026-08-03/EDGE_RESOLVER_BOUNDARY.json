@@ -1,0 +1,99 @@
+{
+  "format": "resolver-boundary-portfolio-v2",
+  "generatedAt": "2026-08-03T13:57:53.881Z",
+  "paperOnly": true,
+  "additivePortfolioPnl": null,
+  "warning": "Lanes retain separate evidence identities and may share resolver/window exposure. Their PnLs must not be added. Calibration probes and blocked source contracts contribute no promotion PnL.",
+  "lanes": {
+    "h43": {
+      "experimentId": "research-h43-forward-v1",
+      "attempts": 81,
+      "promotionEligibleAttempts": 81,
+      "blockedObservations": 0,
+      "independentMarkets": 81,
+      "calendarDays": 13,
+      "executable": 47,
+      "terminalScored": 47,
+      "wins": 45,
+      "pnl2x": 36.482101174,
+      "chronologicalHalvesPnl2x": [
+        20.326318414,
+        16.15578276
+      ],
+      "marketClusteredMeanPnl2x": {
+        "clusters": 47,
+        "mean": 0.7762149185957447,
+        "ci": [
+          0.04035935936170216,
+          1.4617523503829792
+        ]
+      },
+      "dayClusteredMeanPnl2x": {
+        "clusters": 10,
+        "mean": 0.7762149185957445,
+        "ci": [
+          0.30334549600000005,
+          1.321778531388889
+        ]
+      },
+      "minimumRead": {
+        "independentMarkets": 300,
+        "calendarDays": 14
+      },
+      "passesMechanicalRead": false
+    },
+    "pythTransfer": {
+      "experimentId": "pyth-resolver-boundary-transfer-v2",
+      "attempts": 27,
+      "promotionEligibleAttempts": 0,
+      "blockedObservations": 27,
+      "independentMarkets": 27,
+      "calendarDays": 8,
+      "executable": 5,
+      "terminalScored": 0,
+      "wins": 0,
+      "pnl2x": 0,
+      "chronologicalHalvesPnl2x": [
+        0,
+        0
+      ],
+      "marketClusteredMeanPnl2x": {
+        "clusters": 0,
+        "mean": null,
+        "ci": [
+          null,
+          null
+        ]
+      },
+      "dayClusteredMeanPnl2x": {
+        "clusters": 0,
+        "mean": null,
+        "ci": [
+          null,
+          null
+        ]
+      },
+      "minimumRead": {
+        "independentMarkets": 300,
+        "calendarDays": 14
+      },
+      "passesMechanicalRead": false
+    },
+    "chainlinkResidual": {
+      "experimentId": "chainlink-resolver-boundary-residual-v1",
+      "status": "BLOCKED_SOURCE_CONTRACT",
+      "reason": "Exact Chainlink Data Streams price-to-beat contract is not available; push-feed proxies are forbidden.",
+      "attempts": 0,
+      "promotionEligibleAttempts": 0,
+      "passesMechanicalRead": false
+    },
+    "cfResidual": {
+      "experimentId": "cf-resolver-boundary-residual-v1",
+      "status": "BLOCKED_SOURCE_CONTRACT",
+      "reason": "No authoritative official CF resolver stream is configured; CEX proxies are forbidden.",
+      "attempts": 0,
+      "promotionEligibleAttempts": 0,
+      "passesMechanicalRead": false
+    }
+  }
+}

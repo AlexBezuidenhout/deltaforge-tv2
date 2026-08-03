@@ -1,0 +1,5504 @@
+{
+  "format": "borg-neglected-edge-report-v2",
+  "generatedAt": "2026-08-03T13:56:06.156Z",
+  "databaseSnapshotAsOf": "2026-08-03T13:55:25.348Z",
+  "paperOnly": true,
+  "liveAuthority": false,
+  "bankrollUsd": 500,
+  "benchmark": "lower-bound payout - executable principal - stressed fees - stressed slippage - full failure reserve > 0",
+  "lanes": [
+    {
+      "priority": 1,
+      "program": "resolver_boundary_transfer",
+      "strategy": "H43_resolution_boundary_buffer",
+      "runMode": "PAPER_FORWARD_FROZEN",
+      "active": true,
+      "status": "POSITIVE_LEAD_BUT_EXECUTION_FIDELITY_INCOMPLETE",
+      "evidence": {
+        "orders": 81,
+        "fills": 47,
+        "independent_markets": 81,
+        "calendar_days": 13,
+        "fidelity_ab": 26,
+        "pnl_2x": 36.48210525512695,
+        "first_at": "2026-07-19T16:08:45.214Z",
+        "latest": "2026-08-02T02:28:45.136Z"
+      },
+      "nextTest": "Preserve H43 unchanged; repair A/B causal arrival-book replay at 100/250/500ms before interpreting PnL."
+    },
+    {
+      "priority": 2,
+      "program": "certified_payoff_graph",
+      "runMode": "PAPER_SCANNER",
+      "active": true,
+      "status": "ZERO_ATOMIC_QUALIFIED_CANDIDATES",
+      "evidence": {
+        "current_cells": 235,
+        "candidates": 47,
+        "payoff_proved": 235,
+        "rule_certified": 235,
+        "economic": 0,
+        "qualified": 0,
+        "max_displayed_profit_2x": 0,
+        "latest": "2026-08-03T13:55:24.498Z"
+      },
+      "nextTest": "Continue deterministic rule proof; rank only absolute executable dollars after full orphan reserve and capital duration."
+    },
+    {
+      "priority": 3,
+      "program": "rule_aware_crossvenue",
+      "runMode": "PAPER_LIVE_DATA",
+      "active": true,
+      "status": "ZERO_TRADE_ELIGIBLE_PROVED_EPISODES",
+      "evidence": {
+        "observations": 907,
+        "pairs": 9,
+        "episodes": 0,
+        "economic_episodes": 0,
+        "trade_eligible_episodes": 0,
+        "relation_approved_observations": 159,
+        "max_approved_stressed_profit": -0.17495000000000005,
+        "latest": "2026-08-03T13:55:17.739Z"
+      },
+      "nextTest": "Keep terminal identities and risky convergence separate; collect synchronized depth and right-censored capital-release time."
+    },
+    {
+      "priority": 4,
+      "program": "options_implied_binary_residual",
+      "runMode": "PAPER_SURFACE_COLLECTOR",
+      "active": true,
+      "status": "SURFACE_COLLECTING_NO_EXECUTABLE_TARGETS",
+      "evidence": {
+        "observations": 34738,
+        "markets": 66,
+        "surface_ab": 26694,
+        "executable": 0,
+        "max_expected_lower": null,
+        "latest": "2026-08-03T13:55:25.035Z"
+      },
+      "nextTest": "Wait for exact-expiry or bounded-interpolation threshold contracts; subtract residual CVaR from the lower-bound edge."
+    },
+    {
+      "priority": 5,
+      "program": "fair_bound_passive_overlay",
+      "runMode": "CAPTURE_ONLY_NO_QUOTES",
+      "active": false,
+      "status": "STAGED_CAPTURE_ACTIVE_STRATEGY_DISABLED",
+      "evidence": {
+        "active": true,
+        "selectedMarkets": 20,
+        "subscribedTokens": 40,
+        "panelMode": "neglected",
+        "panelVersion": "neglected-capacity-panel-v1",
+        "panelHash": "b1e523028e99d71ea8cdeac15db478aee49314e43207f7b9005b83778bedd0b1",
+        "frozenMemberships": 20,
+        "strategySignalsEnabled": false,
+        "liveOrderPath": false,
+        "heartbeatAgeSec": 9.713,
+        "genericMakerControls": [
+          {
+            "strategy": "AM_passive_maker_v1",
+            "intents": 41671,
+            "fills": 19,
+            "markets": 15,
+            "pnl_5s": -1.8742233559972206,
+            "pnl_30s": -0.09937500000000002
+          },
+          {
+            "strategy": "AM_reward_passive_maker_v1",
+            "intents": 52162,
+            "fills": 156,
+            "markets": 76,
+            "pnl_5s": -24.001806078354655,
+            "pnl_30s": -36.44828298276268
+          }
+        ],
+        "pairedMakerControl": {
+          "cycles": 1323,
+          "markets": 123,
+          "complete_sets": 86,
+          "orphan_cycles": 420,
+          "total_pnl": -3064.045611324801,
+          "reward_adjusted_pnl": -2921.6347288775887
+        }
+      },
+      "nextTest": "Keep quoting disabled until an independently certified A/B lower bound maps to a current token; never revive generic directional or complete-set making."
+    }
+  ],
+  "candidateEconomics": {
+    "observations": 383,
+    "independentUnits": 129,
+    "paperTestEligible": 0,
+    "certifiedLocks": 0,
+    "eligibleConservativeNetUsd": 0,
+    "rejectionReasons": {
+      "DATA_QUALITY_BELOW_B": 274,
+      "EXECUTION_FIDELITY_BELOW_B": 383,
+      "BOOKS_NOT_FRESH": 264,
+      "MECHANISM_UNVERIFIED": 146,
+      "NONPOSITIVE_CONSERVATIVE_NET": 58,
+      "FULL_DEPTH_NOT_PROVED": 359,
+      "BELOW_MINIMUM_EXECUTABLE_CAPACITY": 235,
+      "INVALID_PAYOUT_LOWER_USD": 138,
+      "INVALID_FAILURE_RISK_RESERVE_USD": 261,
+      "INVALID_ENTRY_PRINCIPAL_USD": 249,
+      "INVALID_FEE_STRESS_USD": 249,
+      "INVALID_SLIPPAGE_STRESS_USD": 124,
+      "INVALID_DISPLAYED_CAPACITY_USD": 124,
+      "NONPOSITIVE_DEPLOYED_CAPITAL": 259,
+      "INVALID_MINIMUM_DEPLOYABLE_USD": 21,
+      "INVALID_CAPITAL_DURATION_SEC": 160
+    },
+    "rows": [
+      {
+        "opportunityId": "options:92630322",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672243",
+        "observedAt": "2026-08-03T13:53:44.723Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 10.008468,
+          "entryPrincipalUsd": 9.9986,
+          "feeStressUsd": 0.0014,
+          "slippageStressUsd": 0.000002,
+          "failureRiskReserveUsd": 0.010075,
+          "deployedCapitalUsd": 10,
+          "displayedCapacityUsd": 10,
+          "minimumDeployableUsd": 4.995,
+          "conservativeNetUsd": -0.001609,
+          "roiPct": -0.016088,
+          "capitalDurationSec": 93975.277,
+          "netUsdPerCapitalDay": -0.000148
+        },
+        "quality": {
+          "dataQualityGrade": "C",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "NO",
+          "strike": 2200,
+          "surfaceFidelity": "C",
+          "expectedProfitBeforeResidualRiskUsd": 0.00846578700195966
+        }
+      },
+      {
+        "opportunityId": "options:92631788",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672269",
+        "observedAt": "2026-08-03T13:55:19.363Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 0.160193,
+          "entryPrincipalUsd": 0.1157,
+          "feeStressUsd": 0.016117,
+          "slippageStressUsd": 0.004584,
+          "failureRiskReserveUsd": 0.162537,
+          "deployedCapitalUsd": 0.131817,
+          "displayedCapacityUsd": 0.131817,
+          "minimumDeployableUsd": 0.025,
+          "conservativeNetUsd": -0.138744,
+          "roiPct": -105.255364,
+          "capitalDurationSec": 180280.637,
+          "netUsdPerCapitalDay": -0.504439
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 56000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": 0.02379233770745151
+        }
+      },
+      {
+        "opportunityId": "options:92631755",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672297",
+        "observedAt": "2026-08-03T13:55:18.675Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 0.156465,
+          "entryPrincipalUsd": 0.13,
+          "feeStressUsd": 0.017963,
+          "slippageStressUsd": 0.005818,
+          "failureRiskReserveUsd": 0.159924,
+          "deployedCapitalUsd": 0.147963,
+          "displayedCapacityUsd": 0.147963,
+          "minimumDeployableUsd": 0.065,
+          "conservativeNetUsd": -0.15724,
+          "roiPct": -106.269326,
+          "capitalDurationSec": 266681.325,
+          "netUsdPerCapitalDay": -0.344294
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 68000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": 0.0026838480921521704
+        }
+      },
+      {
+        "opportunityId": "options:92631771",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672247",
+        "observedAt": "2026-08-03T13:55:19.246Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 10.002705,
+          "entryPrincipalUsd": 9.9986,
+          "feeStressUsd": 0.0014,
+          "slippageStressUsd": 0.000269,
+          "failureRiskReserveUsd": 0.180018,
+          "deployedCapitalUsd": 10,
+          "displayedCapacityUsd": 10,
+          "minimumDeployableUsd": 4.995,
+          "conservativeNetUsd": -0.177582,
+          "roiPct": -1.775821,
+          "capitalDurationSec": 93880.754,
+          "netUsdPerCapitalDay": -0.016343
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 56000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": 0.002436063251262174
+        }
+      },
+      {
+        "opportunityId": "structural:sg_0eb4fe7a9748d37dc62bfed3:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_0eb4fe7a9748d37dc62bfed3",
+        "observedAt": "2026-08-03T13:45:46.179Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.285,
+          "feeStressUsd": 0.023006,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 5.308006,
+          "displayedCapacityUsd": 5.308006,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.579174,
+          "roiPct": -10.911322,
+          "capitalDurationSec": 22453.821,
+          "netUsdPerCapitalDay": -0.419856
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_0eb4fe7a9748d37dc62bfed3:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_0eb4fe7a9748d37dc62bfed3",
+        "observedAt": "2026-08-03T13:45:46.128Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.285,
+          "feeStressUsd": 0.023006,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 5.308006,
+          "displayedCapacityUsd": 5.308006,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.579174,
+          "roiPct": -10.911322,
+          "capitalDurationSec": 22453.872,
+          "netUsdPerCapitalDay": -0.419856
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_0eb4fe7a9748d37dc62bfed3:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_0eb4fe7a9748d37dc62bfed3",
+        "observedAt": "2026-08-03T13:45:46.328Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.285,
+          "feeStressUsd": 0.023006,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 5.308006,
+          "displayedCapacityUsd": 5.308006,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.579174,
+          "roiPct": -10.911322,
+          "capitalDurationSec": 22453.672,
+          "netUsdPerCapitalDay": -0.419859
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_0eb4fe7a9748d37dc62bfed3:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_0eb4fe7a9748d37dc62bfed3",
+        "observedAt": "2026-08-03T13:45:46.579Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.285,
+          "feeStressUsd": 0.023006,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 5.308006,
+          "displayedCapacityUsd": 5.308006,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.579174,
+          "roiPct": -10.911322,
+          "capitalDurationSec": 22453.421,
+          "netUsdPerCapitalDay": -0.419864
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_0eb4fe7a9748d37dc62bfed3:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_0eb4fe7a9748d37dc62bfed3",
+        "observedAt": "2026-08-03T13:45:46.098Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.29,
+          "feeStressUsd": 0.023358,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.27652,
+          "deployedCapitalUsd": 5.313358,
+          "displayedCapacityUsd": 5.313358,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.589878,
+          "roiPct": -11.1018,
+          "capitalDurationSec": 22453.902,
+          "netUsdPerCapitalDay": -0.427184
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_02ba332491f70f334f73daaa:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_02ba332491f70f334f73daaa",
+        "observedAt": "2026-08-03T13:55:23.224Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.3,
+          "feeStressUsd": 0.03,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.33,
+          "deployedCapitalUsd": 5.33,
+          "displayedCapacityUsd": 5.33,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.66,
+          "roiPct": -12.382739,
+          "capitalDurationSec": 21876.776,
+          "netUsdPerCapitalDay": -0.489043
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_02ba332491f70f334f73daaa:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_02ba332491f70f334f73daaa",
+        "observedAt": "2026-08-03T13:55:23.254Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.3,
+          "feeStressUsd": 0.03,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.33,
+          "deployedCapitalUsd": 5.33,
+          "displayedCapacityUsd": 5.33,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.66,
+          "roiPct": -12.382739,
+          "capitalDurationSec": 21876.746,
+          "netUsdPerCapitalDay": -0.489044
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_02ba332491f70f334f73daaa:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_02ba332491f70f334f73daaa",
+        "observedAt": "2026-08-03T13:55:23.305Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.3,
+          "feeStressUsd": 0.03,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.33,
+          "deployedCapitalUsd": 5.33,
+          "displayedCapacityUsd": 5.33,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.66,
+          "roiPct": -12.382739,
+          "capitalDurationSec": 21876.695,
+          "netUsdPerCapitalDay": -0.489045
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_02ba332491f70f334f73daaa:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_02ba332491f70f334f73daaa",
+        "observedAt": "2026-08-03T13:55:23.454Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.3,
+          "feeStressUsd": 0.03,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.33,
+          "deployedCapitalUsd": 5.33,
+          "displayedCapacityUsd": 5.33,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.66,
+          "roiPct": -12.382739,
+          "capitalDurationSec": 21876.546,
+          "netUsdPerCapitalDay": -0.489048
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_02ba332491f70f334f73daaa:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_02ba332491f70f334f73daaa",
+        "observedAt": "2026-08-03T13:55:23.705Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.3,
+          "feeStressUsd": 0.03,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.33,
+          "deployedCapitalUsd": 5.33,
+          "displayedCapacityUsd": 5.33,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -0.66,
+          "roiPct": -12.382739,
+          "capitalDurationSec": 21876.295,
+          "netUsdPerCapitalDay": -0.489054
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "nested_threshold",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_c37282df331696abf6f3ecc3:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_c37282df331696abf6f3ecc3",
+        "observedAt": "2026-08-03T13:54:54.544Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.45,
+          "feeStressUsd": 0.14748,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 7.59748,
+          "displayedCapacityUsd": 7.59748,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.28888,
+          "roiPct": -43.289091,
+          "capitalDurationSec": 2455445.456,
+          "netUsdPerCapitalDay": -0.015232
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_c37282df331696abf6f3ecc3:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_c37282df331696abf6f3ecc3",
+        "observedAt": "2026-08-03T13:54:54.467Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.45,
+          "feeStressUsd": 0.14748,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 7.59748,
+          "displayedCapacityUsd": 7.59748,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.28888,
+          "roiPct": -43.289091,
+          "capitalDurationSec": 2455445.533,
+          "netUsdPerCapitalDay": -0.015232
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_c37282df331696abf6f3ecc3:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_c37282df331696abf6f3ecc3",
+        "observedAt": "2026-08-03T13:54:54.696Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.45,
+          "feeStressUsd": 0.14748,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 7.59748,
+          "displayedCapacityUsd": 7.59748,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.28888,
+          "roiPct": -43.289091,
+          "capitalDurationSec": 2455445.304,
+          "netUsdPerCapitalDay": -0.015232
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_c37282df331696abf6f3ecc3:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_c37282df331696abf6f3ecc3",
+        "observedAt": "2026-08-03T13:54:54.494Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.45,
+          "feeStressUsd": 0.14748,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 7.59748,
+          "displayedCapacityUsd": 7.59748,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.28888,
+          "roiPct": -43.289091,
+          "capitalDurationSec": 2455445.506,
+          "netUsdPerCapitalDay": -0.015232
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_c37282df331696abf6f3ecc3:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_c37282df331696abf6f3ecc3",
+        "observedAt": "2026-08-03T13:54:54.713Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.45,
+          "feeStressUsd": 0.14748,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 7.59748,
+          "displayedCapacityUsd": 7.59748,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.28888,
+          "roiPct": -43.289091,
+          "capitalDurationSec": 2455445.287,
+          "netUsdPerCapitalDay": -0.015232
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_800b40e98a69bb7cca628719:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_800b40e98a69bb7cca628719",
+        "observedAt": "2026-08-03T13:54:54.541Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.9,
+          "feeStressUsd": 0.1212,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.38168,
+          "deployedCapitalUsd": 8.0212,
+          "displayedCapacityUsd": 8.0212,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.40288,
+          "roiPct": -42.423578,
+          "capitalDurationSec": 2455445.459,
+          "netUsdPerCapitalDay": -0.014928
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_800b40e98a69bb7cca628719:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_800b40e98a69bb7cca628719",
+        "observedAt": "2026-08-03T13:54:54.465Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.9,
+          "feeStressUsd": 0.1212,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.38168,
+          "deployedCapitalUsd": 8.0212,
+          "displayedCapacityUsd": 8.0212,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.40288,
+          "roiPct": -42.423578,
+          "capitalDurationSec": 2455445.535,
+          "netUsdPerCapitalDay": -0.014928
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_800b40e98a69bb7cca628719:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_800b40e98a69bb7cca628719",
+        "observedAt": "2026-08-03T13:54:54.692Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.9,
+          "feeStressUsd": 0.1212,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.38168,
+          "deployedCapitalUsd": 8.0212,
+          "displayedCapacityUsd": 8.0212,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.40288,
+          "roiPct": -42.423578,
+          "capitalDurationSec": 2455445.308,
+          "netUsdPerCapitalDay": -0.014928
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_800b40e98a69bb7cca628719:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_800b40e98a69bb7cca628719",
+        "observedAt": "2026-08-03T13:54:54.492Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.9,
+          "feeStressUsd": 0.1212,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.38168,
+          "deployedCapitalUsd": 8.0212,
+          "displayedCapacityUsd": 8.0212,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.40288,
+          "roiPct": -42.423578,
+          "capitalDurationSec": 2455445.508,
+          "netUsdPerCapitalDay": -0.014928
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_800b40e98a69bb7cca628719:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_800b40e98a69bb7cca628719",
+        "observedAt": "2026-08-03T13:54:54.710Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 7.9,
+          "feeStressUsd": 0.1212,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.38168,
+          "deployedCapitalUsd": 8.0212,
+          "displayedCapacityUsd": 8.0212,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.40288,
+          "roiPct": -42.423578,
+          "capitalDurationSec": 2455445.29,
+          "netUsdPerCapitalDay": -0.014928
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_98e9bb2b76e6487677582348:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_98e9bb2b76e6487677582348",
+        "observedAt": "2026-08-03T13:54:54.461Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.15,
+          "feeStressUsd": 0.1038,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.38168,
+          "deployedCapitalUsd": 8.2538,
+          "displayedCapacityUsd": 8.2538,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.63548,
+          "roiPct": -44.046136,
+          "capitalDurationSec": 2455445.539,
+          "netUsdPerCapitalDay": -0.015499
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_98e9bb2b76e6487677582348:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_98e9bb2b76e6487677582348",
+        "observedAt": "2026-08-03T13:54:54.711Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.15,
+          "feeStressUsd": 0.1038,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.38168,
+          "deployedCapitalUsd": 8.2538,
+          "displayedCapacityUsd": 8.2538,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.63548,
+          "roiPct": -44.046136,
+          "capitalDurationSec": 2455445.289,
+          "netUsdPerCapitalDay": -0.015499
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_98e9bb2b76e6487677582348:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_98e9bb2b76e6487677582348",
+        "observedAt": "2026-08-03T13:54:54.312Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.2,
+          "feeStressUsd": 0.1024,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.43028,
+          "deployedCapitalUsd": 8.3024,
+          "displayedCapacityUsd": 8.3024,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.73268,
+          "roiPct": -44.959048,
+          "capitalDurationSec": 2455445.688,
+          "netUsdPerCapitalDay": -0.01582
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_98e9bb2b76e6487677582348:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_98e9bb2b76e6487677582348",
+        "observedAt": "2026-08-03T13:54:54.232Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.2,
+          "feeStressUsd": 0.1024,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.43028,
+          "deployedCapitalUsd": 8.3024,
+          "displayedCapacityUsd": 8.3024,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.73268,
+          "roiPct": -44.959048,
+          "capitalDurationSec": 2455445.768,
+          "netUsdPerCapitalDay": -0.01582
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_98e9bb2b76e6487677582348:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_98e9bb2b76e6487677582348",
+        "observedAt": "2026-08-03T13:54:54.261Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.2,
+          "feeStressUsd": 0.1024,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.43028,
+          "deployedCapitalUsd": 8.3024,
+          "displayedCapacityUsd": 8.3024,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -3.73268,
+          "roiPct": -44.959048,
+          "capitalDurationSec": 2455445.739,
+          "netUsdPerCapitalDay": -0.01582
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_8e4b9752c995dc84615a2700:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_8e4b9752c995dc84615a2700",
+        "observedAt": "2026-08-03T13:21:01.248Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.35,
+          "feeStressUsd": 0.04812,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.2448,
+          "deployedCapitalUsd": 9.39812,
+          "displayedCapacityUsd": 9.39812,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.64292,
+          "roiPct": -49.402646,
+          "capitalDurationSec": 2457478.752,
+          "netUsdPerCapitalDay": -0.017369
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_8e4b9752c995dc84615a2700:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_8e4b9752c995dc84615a2700",
+        "observedAt": "2026-08-03T13:21:00.724Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.35,
+          "feeStressUsd": 0.04812,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.2448,
+          "deployedCapitalUsd": 9.39812,
+          "displayedCapacityUsd": 9.39812,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.64292,
+          "roiPct": -49.402646,
+          "capitalDurationSec": 2457479.276,
+          "netUsdPerCapitalDay": -0.017369
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_8e4b9752c995dc84615a2700:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_8e4b9752c995dc84615a2700",
+        "observedAt": "2026-08-03T13:21:01.471Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.35,
+          "feeStressUsd": 0.04812,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.2448,
+          "deployedCapitalUsd": 9.39812,
+          "displayedCapacityUsd": 9.39812,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.64292,
+          "roiPct": -49.402646,
+          "capitalDurationSec": 2457478.529,
+          "netUsdPerCapitalDay": -0.017369
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_8e4b9752c995dc84615a2700:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_8e4b9752c995dc84615a2700",
+        "observedAt": "2026-08-03T13:21:00.998Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.35,
+          "feeStressUsd": 0.04812,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.2448,
+          "deployedCapitalUsd": 9.39812,
+          "displayedCapacityUsd": 9.39812,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.64292,
+          "roiPct": -49.402646,
+          "capitalDurationSec": 2457479.002,
+          "netUsdPerCapitalDay": -0.017369
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_8e4b9752c995dc84615a2700:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_8e4b9752c995dc84615a2700",
+        "observedAt": "2026-08-03T13:21:01.666Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.35,
+          "feeStressUsd": 0.04812,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.2448,
+          "deployedCapitalUsd": 9.39812,
+          "displayedCapacityUsd": 9.39812,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.64292,
+          "roiPct": -49.402646,
+          "capitalDurationSec": 2457478.334,
+          "netUsdPerCapitalDay": -0.017369
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_632fdfedd22fc23e43babbe4:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_632fdfedd22fc23e43babbe4",
+        "observedAt": "2026-08-03T13:31:05.675Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.9,
+          "feeStressUsd": 0.0744,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 8.9744,
+          "displayedCapacityUsd": 8.9744,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.6658,
+          "roiPct": -51.990105,
+          "capitalDurationSec": 2456874.325,
+          "netUsdPerCapitalDay": -0.018283
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_632fdfedd22fc23e43babbe4:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_632fdfedd22fc23e43babbe4",
+        "observedAt": "2026-08-03T13:31:05.543Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.9,
+          "feeStressUsd": 0.0744,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 8.9744,
+          "displayedCapacityUsd": 8.9744,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.6658,
+          "roiPct": -51.990105,
+          "capitalDurationSec": 2456874.457,
+          "netUsdPerCapitalDay": -0.018283
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_632fdfedd22fc23e43babbe4:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_632fdfedd22fc23e43babbe4",
+        "observedAt": "2026-08-03T13:31:05.772Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.9,
+          "feeStressUsd": 0.0744,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 8.9744,
+          "displayedCapacityUsd": 8.9744,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.6658,
+          "roiPct": -51.990105,
+          "capitalDurationSec": 2456874.228,
+          "netUsdPerCapitalDay": -0.018283
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_632fdfedd22fc23e43babbe4:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_632fdfedd22fc23e43babbe4",
+        "observedAt": "2026-08-03T13:31:05.671Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.9,
+          "feeStressUsd": 0.0744,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 8.9744,
+          "displayedCapacityUsd": 8.9744,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.6658,
+          "roiPct": -51.990105,
+          "capitalDurationSec": 2456874.329,
+          "netUsdPerCapitalDay": -0.018283
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_632fdfedd22fc23e43babbe4:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_632fdfedd22fc23e43babbe4",
+        "observedAt": "2026-08-03T13:31:06.039Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 8.9,
+          "feeStressUsd": 0.0744,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 8.9744,
+          "displayedCapacityUsd": 8.9744,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.6658,
+          "roiPct": -51.990105,
+          "capitalDurationSec": 2456873.961,
+          "netUsdPerCapitalDay": -0.018283
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_2932f3660114504d1cb3b72b:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_2932f3660114504d1cb3b72b",
+        "observedAt": "2026-08-03T13:31:05.674Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.05,
+          "feeStressUsd": 0.063,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 9.113,
+          "displayedCapacityUsd": 9.113,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.8044,
+          "roiPct": -52.72029,
+          "capitalDurationSec": 2456874.326,
+          "netUsdPerCapitalDay": -0.01854
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_2932f3660114504d1cb3b72b:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_2932f3660114504d1cb3b72b",
+        "observedAt": "2026-08-03T13:31:05.540Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.05,
+          "feeStressUsd": 0.063,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 9.113,
+          "displayedCapacityUsd": 9.113,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.8044,
+          "roiPct": -52.72029,
+          "capitalDurationSec": 2456874.46,
+          "netUsdPerCapitalDay": -0.01854
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_2932f3660114504d1cb3b72b:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_2932f3660114504d1cb3b72b",
+        "observedAt": "2026-08-03T13:31:05.770Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.05,
+          "feeStressUsd": 0.063,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 9.113,
+          "displayedCapacityUsd": 9.113,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.8044,
+          "roiPct": -52.72029,
+          "capitalDurationSec": 2456874.23,
+          "netUsdPerCapitalDay": -0.01854
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_2932f3660114504d1cb3b72b:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_2932f3660114504d1cb3b72b",
+        "observedAt": "2026-08-03T13:31:05.669Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.05,
+          "feeStressUsd": 0.063,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 9.113,
+          "displayedCapacityUsd": 9.113,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.8044,
+          "roiPct": -52.72029,
+          "capitalDurationSec": 2456874.331,
+          "netUsdPerCapitalDay": -0.01854
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_2932f3660114504d1cb3b72b:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_2932f3660114504d1cb3b72b",
+        "observedAt": "2026-08-03T13:31:06.036Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.05,
+          "feeStressUsd": 0.063,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.6914,
+          "deployedCapitalUsd": 9.113,
+          "displayedCapacityUsd": 9.113,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.8044,
+          "roiPct": -52.72029,
+          "capitalDurationSec": 2456873.964,
+          "netUsdPerCapitalDay": -0.01854
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_3fdd26715ede9e9714e38cf2:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_3fdd26715ede9e9714e38cf2",
+        "observedAt": "2026-08-03T13:21:01.246Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.5,
+          "feeStressUsd": 0.03672,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.53672,
+          "displayedCapacityUsd": 9.53672,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.807888,
+          "roiPct": -50.414478,
+          "capitalDurationSec": 2457478.754,
+          "netUsdPerCapitalDay": -0.017725
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_3fdd26715ede9e9714e38cf2:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_3fdd26715ede9e9714e38cf2",
+        "observedAt": "2026-08-03T13:21:00.710Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.5,
+          "feeStressUsd": 0.03672,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.53672,
+          "displayedCapacityUsd": 9.53672,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.807888,
+          "roiPct": -50.414478,
+          "capitalDurationSec": 2457479.29,
+          "netUsdPerCapitalDay": -0.017725
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_3fdd26715ede9e9714e38cf2:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_3fdd26715ede9e9714e38cf2",
+        "observedAt": "2026-08-03T13:21:01.469Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.5,
+          "feeStressUsd": 0.03672,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.53672,
+          "displayedCapacityUsd": 9.53672,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.807888,
+          "roiPct": -50.414478,
+          "capitalDurationSec": 2457478.531,
+          "netUsdPerCapitalDay": -0.017725
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_3fdd26715ede9e9714e38cf2:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_3fdd26715ede9e9714e38cf2",
+        "observedAt": "2026-08-03T13:21:00.995Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.5,
+          "feeStressUsd": 0.03672,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.53672,
+          "displayedCapacityUsd": 9.53672,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.807888,
+          "roiPct": -50.414478,
+          "capitalDurationSec": 2457479.005,
+          "netUsdPerCapitalDay": -0.017725
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_3fdd26715ede9e9714e38cf2:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_3fdd26715ede9e9714e38cf2",
+        "observedAt": "2026-08-03T13:21:01.664Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.5,
+          "feeStressUsd": 0.03672,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.53672,
+          "displayedCapacityUsd": 9.53672,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -4.807888,
+          "roiPct": -50.414478,
+          "capitalDurationSec": 2457478.336,
+          "netUsdPerCapitalDay": -0.017725
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_700d7172745a1a790ad7fee6:100",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_700d7172745a1a790ad7fee6",
+        "observedAt": "2026-08-03T13:21:01.288Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.75,
+          "feeStressUsd": 0.01932,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.76932,
+          "displayedCapacityUsd": 9.76932,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -5.040488,
+          "roiPct": -51.595071,
+          "capitalDurationSec": 2457478.712,
+          "netUsdPerCapitalDay": -0.01814
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_700d7172745a1a790ad7fee6:20",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_700d7172745a1a790ad7fee6",
+        "observedAt": "2026-08-03T13:21:00.823Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.75,
+          "feeStressUsd": 0.01932,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.76932,
+          "displayedCapacityUsd": 9.76932,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -5.040488,
+          "roiPct": -51.595071,
+          "capitalDurationSec": 2457479.177,
+          "netUsdPerCapitalDay": -0.01814
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_700d7172745a1a790ad7fee6:250",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_700d7172745a1a790ad7fee6",
+        "observedAt": "2026-08-03T13:21:01.513Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.75,
+          "feeStressUsd": 0.01932,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.76932,
+          "displayedCapacityUsd": 9.76932,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -5.040488,
+          "roiPct": -51.595071,
+          "capitalDurationSec": 2457478.487,
+          "netUsdPerCapitalDay": -0.01814
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_700d7172745a1a790ad7fee6:50",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_700d7172745a1a790ad7fee6",
+        "observedAt": "2026-08-03T13:21:01.037Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.75,
+          "feeStressUsd": 0.01932,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.76932,
+          "displayedCapacityUsd": 9.76932,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -5.040488,
+          "roiPct": -51.595071,
+          "capitalDurationSec": 2457478.963,
+          "netUsdPerCapitalDay": -0.01814
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "structural:sg_700d7172745a1a790ad7fee6:500",
+        "program": "certified_payoff_graph",
+        "independentUnit": "sg_700d7172745a1a790ad7fee6",
+        "observedAt": "2026-08-03T13:21:01.721Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BELOW_MINIMUM_EXECUTABLE_CAPACITY",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 9.75,
+          "feeStressUsd": 0.01932,
+          "slippageStressUsd": 0,
+          "failureRiskReserveUsd": 0.271168,
+          "deployedCapitalUsd": 9.76932,
+          "displayedCapacityUsd": 9.76932,
+          "minimumDeployableUsd": 10,
+          "conservativeNetUsd": -5.040488,
+          "roiPct": -51.595071,
+          "capitalDurationSec": 2457478.279,
+          "netUsdPerCapitalDay": -0.01814
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "structureType": "disjoint_ranges",
+          "displayedProfit2xUsd": 0,
+          "ruleCertified": true,
+          "payoffProved": true,
+          "orphanRiskPassed": false
+        }
+      },
+      {
+        "opportunityId": "options:92631798",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672282",
+        "observedAt": "2026-08-03T13:55:19.825Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 11.744805,
+          "entryPrincipalUsd": 8.821765,
+          "feeStressUsd": 1.178235,
+          "slippageStressUsd": 0.204378,
+          "failureRiskReserveUsd": 12.799864,
+          "deployedCapitalUsd": 10,
+          "displayedCapacityUsd": 10,
+          "minimumDeployableUsd": 0.23,
+          "conservativeNetUsd": -11.259438,
+          "roiPct": -112.594378,
+          "capitalDurationSec": 266680.175,
+          "netUsdPerCapitalDay": -0.364787
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "NO",
+          "strike": 1700,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": 1.5404264313351061
+        }
+      },
+      {
+        "opportunityId": "options:92631782",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672260",
+        "observedAt": "2026-08-03T13:55:19.399Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 17.132043,
+          "entryPrincipalUsd": 8.792446,
+          "feeStressUsd": 1.207554,
+          "slippageStressUsd": 0.380505,
+          "failureRiskReserveUsd": 22.040662,
+          "deployedCapitalUsd": 10,
+          "displayedCapacityUsd": 10,
+          "minimumDeployableUsd": 0.095,
+          "conservativeNetUsd": -15.289124,
+          "roiPct": -152.891244,
+          "capitalDurationSec": 180280.601,
+          "netUsdPerCapitalDay": -0.732736
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "NO",
+          "strike": 1700,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": 6.751537535341746
+        }
+      },
+      {
+        "opportunityId": "options:92631891",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672263",
+        "observedAt": "2026-08-03T13:55:25.035Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "EXECUTION_FIDELITY_BELOW_B",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 16.830217,
+          "entryPrincipalUsd": 8.788382,
+          "feeStressUsd": 1.211618,
+          "slippageStressUsd": 0.521719,
+          "failureRiskReserveUsd": 30.627849,
+          "deployedCapitalUsd": 10,
+          "displayedCapacityUsd": 10,
+          "minimumDeployableUsd": 0.075,
+          "conservativeNetUsd": -24.31935,
+          "roiPct": -243.193502,
+          "capitalDurationSec": 180274.965,
+          "netUsdPerCapitalDay": -1.165548
+        },
+        "quality": {
+          "dataQualityGrade": "B",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "YES",
+          "strike": 2000,
+          "surfaceFidelity": "B",
+          "expectedProfitBeforeResidualRiskUsd": 6.308498702365937
+        }
+      },
+      {
+        "opportunityId": "options:92631790",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672270",
+        "observedAt": "2026-08-03T13:55:19.322Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_CONSERVATIVE_NET"
+        ],
+        "economics": {
+          "payoutLowerUsd": 13.208087,
+          "entryPrincipalUsd": 8.782661,
+          "feeStressUsd": 1.217339,
+          "slippageStressUsd": 0.424408,
+          "failureRiskReserveUsd": 28.032183,
+          "deployedCapitalUsd": 10,
+          "displayedCapacityUsd": 10,
+          "minimumDeployableUsd": 0.045,
+          "conservativeNetUsd": -25.248504,
+          "roiPct": -252.485037,
+          "capitalDurationSec": 180280.678,
+          "netUsdPerCapitalDay": -1.210041
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 58000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": 2.7836790641053204
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785763360284:3292e32b-0ce2-42ae-9a25-7f818e63366f",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0xbdfde2fd2472d48a0b126c360eab593687d87208a0f54a89079680af25007e92:KXTORONTOMAYOR-26OCT26-BBRA:POLY_NO+KALSHI_YES",
+        "observedAt": "2026-08-03T13:22:40.284Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.64262,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.19262,
+          "failureRiskReserveUsd": 0.57,
+          "deployedCapitalUsd": 5.64262,
+          "displayedCapacityUsd": 5.64262,
+          "minimumDeployableUsd": 5.64262,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38795839.716,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_NO+KALSHI_YES",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.6426199999999991,
+          "stressedProfitUsd": -0.835239999999999,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785763360284:bd439817-8fc0-4892-8ac7-565d7fa4acf9",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0xbdfde2fd2472d48a0b126c360eab593687d87208a0f54a89079680af25007e92:KXTORONTOMAYOR-26OCT26-BBRA:POLY_YES+KALSHI_NO",
+        "observedAt": "2026-08-03T13:22:40.284Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.0755,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.1755,
+          "failureRiskReserveUsd": 0.57,
+          "deployedCapitalUsd": 5.0755,
+          "displayedCapacityUsd": 5.0755,
+          "minimumDeployableUsd": 5.0755,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38795839.716,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_YES+KALSHI_NO",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.0754999999999999,
+          "stressedProfitUsd": -0.2509999999999999,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785763360285:2dba5122-159c-4448-bfd3-9a05406c83cd",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0x6bc524ffd762f834357072923abe48110ad6a117fd5cf2d52077175f5851114b:KXTORONTOMAYOR-26OCT26-AFUR:POLY_NO+KALSHI_YES",
+        "observedAt": "2026-08-03T13:22:40.285Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.2652,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.0752,
+          "failureRiskReserveUsd": 0.27,
+          "deployedCapitalUsd": 5.2652,
+          "displayedCapacityUsd": 5.2652,
+          "minimumDeployableUsd": 5.2652,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38795839.715,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_NO+KALSHI_YES",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.26519980000000043,
+          "stressedProfitUsd": -0.34039960000000047,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785763360285:c0cba332-0a9d-4eb5-a214-d42cd936c48c",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0x6bc524ffd762f834357072923abe48110ad6a117fd5cf2d52077175f5851114b:KXTORONTOMAYOR-26OCT26-AFUR:POLY_YES+KALSHI_NO",
+        "observedAt": "2026-08-03T13:22:40.285Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.010399,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.060399,
+          "failureRiskReserveUsd": 0.27,
+          "deployedCapitalUsd": 5.010399,
+          "displayedCapacityUsd": 5.010399,
+          "minimumDeployableUsd": 5.010399,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38795839.715,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_YES+KALSHI_NO",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.010399200000000164,
+          "stressedProfitUsd": -0.07079840000000015,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785763371478:41ae451f-bc12-4632-95d2-0c3884804ca9",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0x07aecfdb8b93c2d9ee827358f7623b83cc8b1462d6e7386d4430b85b69522653:KXTORONTOMAYOR-26OCT26-JTOR:POLY_YES+KALSHI_NO",
+        "observedAt": "2026-08-03T13:22:51.478Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.010399,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.065399,
+          "failureRiskReserveUsd": 0.15,
+          "deployedCapitalUsd": 5.010399,
+          "displayedCapacityUsd": 5.010399,
+          "minimumDeployableUsd": 5.010399,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38795828.522,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_YES+KALSHI_NO",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.010399200000000164,
+          "stressedProfitUsd": -0.07579840000000015,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785763371478:5a1fec8f-5433-4039-8eba-33d85ef05f28",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0x07aecfdb8b93c2d9ee827358f7623b83cc8b1462d6e7386d4430b85b69522653:KXTORONTOMAYOR-26OCT26-JTOR:POLY_NO+KALSHI_YES",
+        "observedAt": "2026-08-03T13:22:51.478Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.1452,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.0702,
+          "failureRiskReserveUsd": 0.15,
+          "deployedCapitalUsd": 5.1452,
+          "displayedCapacityUsd": 5.1452,
+          "minimumDeployableUsd": 5.1452,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38795828.522,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_NO+KALSHI_YES",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.14519980000000032,
+          "stressedProfitUsd": -0.2153996000000003,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765305654:79fae057-fc15-47cb-a6bc-fe82ba54ea7c",
+        "program": "crossvenue_certified_terminal_lock",
+        "independentUnit": "cv:0xe10fc4d148f46fb57b8ced09ea771009035d50df28cedcd45150004d3e2be034:KXSEXYMAN-26-CON:POLY_YES+KALSHI_NO",
+        "observedAt": "2026-08-03T13:55:05.654Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.135275,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.185275,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": 5.135275,
+          "displayedCapacityUsd": 5.135275,
+          "minimumDeployableUsd": 5.135275,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 13568694.346,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_YES+KALSHI_NO",
+          "relationType": "EQUIVALENT",
+          "relationApproved": true,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.13527500000000003,
+          "stressedProfitUsd": -0.32055,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765305656:09dd525a-e283-4685-885e-c47c691b8c87",
+        "program": "crossvenue_certified_terminal_lock",
+        "independentUnit": "cv:0x34f6849f2f6d6d7ab6830a62d0a4f13f458b63f27322224cad453b8d642417d1:KXSEXYMAN-26-HUD:POLY_NO+KALSHI_YES",
+        "observedAt": "2026-08-03T13:55:05.656Z",
+        "proofClass": "DETERMINISTIC_LOCK",
+        "mechanismStatus": "CERTIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH"
+        ],
+        "economics": {
+          "payoutLowerUsd": 5,
+          "entryPrincipalUsd": 5.062475,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.112475,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": 5.062475,
+          "displayedCapacityUsd": 5.062475,
+          "minimumDeployableUsd": 5.062475,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 13568694.344,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_NO+KALSHI_YES",
+          "relationType": "EQUIVALENT",
+          "relationApproved": true,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.06247500000000006,
+          "stressedProfitUsd": -0.17495000000000005,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765305658:5cb37ccb-c45f-4224-8537-9ae3a68e140c",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0x1295040186326703b63b9c7d719f8c5bb88ee6fa9672e3924f90ef74ee7b0459:KXTORONTOMAYOR-26OCT26-OCHO:POLY_YES+KALSHI_NO",
+        "observedAt": "2026-08-03T13:55:05.658Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.44688,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.19688,
+          "failureRiskReserveUsd": 0.38,
+          "deployedCapitalUsd": 5.44688,
+          "displayedCapacityUsd": 5.44688,
+          "minimumDeployableUsd": 5.44688,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38793894.342,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_YES+KALSHI_NO",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.44688000000000017,
+          "stressedProfitUsd": -0.6437600000000002,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765305658:9dab3afa-af38-403b-84d1-e19c779a5aca",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0x1295040186326703b63b9c7d719f8c5bb88ee6fa9672e3924f90ef74ee7b0459:KXTORONTOMAYOR-26OCT26-OCHO:POLY_NO+KALSHI_YES",
+        "observedAt": "2026-08-03T13:55:05.658Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.14078,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.19078,
+          "failureRiskReserveUsd": 0.38,
+          "deployedCapitalUsd": 5.14078,
+          "displayedCapacityUsd": 5.14078,
+          "minimumDeployableUsd": 5.14078,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38793894.342,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_NO+KALSHI_YES",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.14078000000000035,
+          "stressedProfitUsd": -0.33156000000000035,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765317669:77d0d1ef-f775-4cf2-8722-4673a1b8eecc",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0xe3a2415eb9cd17f05d6b26a4a4ee6e2b17c6dbf60b99c0ad2ca79a6a1e9c4a03:KXVANCOUVERMAYOR-26OCT17-WAZA:POLY_YES+KALSHI_NO",
+        "observedAt": "2026-08-03T13:55:17.669Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 196.531648,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 5.131648,
+          "failureRiskReserveUsd": 18.42,
+          "deployedCapitalUsd": 196.531648,
+          "displayedCapacityUsd": 196.531648,
+          "minimumDeployableUsd": 196.531648,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38016282.331,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_YES+KALSHI_NO",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": 3.46835200000001,
+          "stressedProfitUsd": -1.6632959999999897,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765317669:a80e909e-05fe-41b1-a897-8b7c43e7c6c1",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0xe3a2415eb9cd17f05d6b26a4a4ee6e2b17c6dbf60b99c0ad2ca79a6a1e9c4a03:KXVANCOUVERMAYOR-26OCT17-WAZA:POLY_NO+KALSHI_YES",
+        "observedAt": "2026-08-03T13:55:17.669Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.63958,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.14458,
+          "failureRiskReserveUsd": 0.37,
+          "deployedCapitalUsd": 5.63958,
+          "displayedCapacityUsd": 5.63958,
+          "minimumDeployableUsd": 5.63958,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 38016282.331,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_NO+KALSHI_YES",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.6395800000000005,
+          "stressedProfitUsd": -0.7841600000000004,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765317737:b5ec94f9-6309-4121-880b-c549ed355b06",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0xf4d3da47cda6b78883ea1877338fce545a8742a8dfdb109c8e84c884b2e6bdf0:KXBRASILEIROGAME-26AUG08BOTFLU-BOT:POLY_NO+KALSHI_YES",
+        "observedAt": "2026-08-03T13:55:17.737Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.1476,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.2476,
+          "failureRiskReserveUsd": 0.22,
+          "deployedCapitalUsd": 5.1476,
+          "displayedCapacityUsd": 5.1476,
+          "minimumDeployableUsd": 5.1476,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 662682.263,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_NO+KALSHI_YES",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.14759999999999973,
+          "stressedProfitUsd": -0.39519999999999966,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765317737:bee22b7f-bf8f-4e29-8d50-f44ccf7c84b1",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0xf4d3da47cda6b78883ea1877338fce545a8742a8dfdb109c8e84c884b2e6bdf0:KXBRASILEIROGAME-26AUG08BOTFLU-BOT:POLY_YES+KALSHI_NO",
+        "observedAt": "2026-08-03T13:55:17.737Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.2889,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.2389,
+          "failureRiskReserveUsd": 0.22,
+          "deployedCapitalUsd": 5.2889,
+          "displayedCapacityUsd": 5.2889,
+          "minimumDeployableUsd": 5.2889,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 662682.263,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_YES+KALSHI_NO",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.28889999999999993,
+          "stressedProfitUsd": -0.5277999999999999,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765317739:5bb2c04c-729c-457f-b558-23b9be44af8f",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0x1206c3ba1f6c40748cedaeb3b9e9d890eaf7fd64933132fb9f282227e917e5b7:KXBRASILEIROGAME-26AUG08BOTFLU-FLU:POLY_YES+KALSHI_NO",
+        "observedAt": "2026-08-03T13:55:17.739Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.2361,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.2361,
+          "failureRiskReserveUsd": 0.21,
+          "deployedCapitalUsd": 5.2361,
+          "displayedCapacityUsd": 5.2361,
+          "minimumDeployableUsd": 5.2361,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 662682.261,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_YES+KALSHI_NO",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.23609999999999953,
+          "stressedProfitUsd": -0.4721999999999995,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "crossvenue:cvop:1785765317739:9edea248-d48b-4959-bde4-0bf39b30f61e",
+        "program": "crossvenue_rule_aware_convergence",
+        "independentUnit": "cv:0x1206c3ba1f6c40748cedaeb3b9e9d890eaf7fd64933132fb9f282227e917e5b7:KXBRASILEIROGAME-26AUG08BOTFLU-FLU:POLY_NO+KALSHI_YES",
+        "observedAt": "2026-08-03T13:55:17.739Z",
+        "proofClass": "STATISTICAL_CONVERGENCE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": 5.135275,
+          "feeStressUsd": 0,
+          "slippageStressUsd": 0.235275,
+          "failureRiskReserveUsd": 0.21,
+          "deployedCapitalUsd": 5.135275,
+          "displayedCapacityUsd": 5.135275,
+          "minimumDeployableUsd": 5.135275,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 662682.261,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "F",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "direction": "POLY_NO+KALSHI_YES",
+          "relationType": "UNREVIEWED",
+          "relationApproved": false,
+          "paperTradeEligible": false,
+          "rawProfitUsd": -0.13527500000000003,
+          "stressedProfitUsd": -0.37055000000000005,
+          "nonAtomic": true
+        }
+      },
+      {
+        "opportunityId": "options:92626824",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672246",
+        "observedAt": "2026-08-03T13:50:26.076Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.005,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94173.924,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 54000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626825",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672246",
+        "observedAt": "2026-08-03T13:50:26.076Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94173.924,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 54000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626828",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672255",
+        "observedAt": "2026-08-03T13:50:26.079Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94173.921,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 72000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626829",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672255",
+        "observedAt": "2026-08-03T13:50:26.079Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.005,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94173.921,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 72000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626830",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672256",
+        "observedAt": "2026-08-03T13:50:26.079Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94173.921,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 74000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626831",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672256",
+        "observedAt": "2026-08-03T13:50:26.079Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.005,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94173.921,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 74000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626834",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672268",
+        "observedAt": "2026-08-03T13:50:26.079Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.025,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 180573.921,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 54000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626835",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672268",
+        "observedAt": "2026-08-03T13:50:26.079Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 180573.921,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 54000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626840",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672277",
+        "observedAt": "2026-08-03T13:50:26.082Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 180573.918,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 72000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626841",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672277",
+        "observedAt": "2026-08-03T13:50:26.082Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.02,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 180573.918,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 72000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626842",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672278",
+        "observedAt": "2026-08-03T13:50:26.083Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 180573.917,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 74000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626843",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672278",
+        "observedAt": "2026-08-03T13:50:26.083Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.015,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 180573.917,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 74000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626846",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672290",
+        "observedAt": "2026-08-03T13:50:26.083Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.045,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 266973.917,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 54000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626847",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672290",
+        "observedAt": "2026-08-03T13:50:26.083Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 266973.917,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 54000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626854",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672299",
+        "observedAt": "2026-08-03T13:50:26.085Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 4.995,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 266973.915,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 72000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626855",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672299",
+        "observedAt": "2026-08-03T13:50:26.085Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.025,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 266973.915,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 72000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626856",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672300",
+        "observedAt": "2026-08-03T13:50:26.086Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 266973.914,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "NO",
+          "strike": 74000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626857",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672300",
+        "observedAt": "2026-08-03T13:50:26.086Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.035,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 266973.914,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "btc",
+          "side": "YES",
+          "strike": 74000,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626878",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672235",
+        "observedAt": "2026-08-03T13:50:28.106Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.025,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94171.894,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "NO",
+          "strike": 1400,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626879",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672235",
+        "observedAt": "2026-08-03T13:50:28.106Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94171.894,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "YES",
+          "strike": 1400,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626880",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672236",
+        "observedAt": "2026-08-03T13:50:28.107Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.01,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94171.893,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "NO",
+          "strike": 1500,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626881",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672236",
+        "observedAt": "2026-08-03T13:50:28.107Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 4.995,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94171.893,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "YES",
+          "strike": 1500,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626882",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672244",
+        "observedAt": "2026-08-03T13:50:28.109Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94171.891,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "NO",
+          "strike": 2300,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626883",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672244",
+        "observedAt": "2026-08-03T13:50:28.109Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.005,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94171.891,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "YES",
+          "strike": 2300,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626884",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672245",
+        "observedAt": "2026-08-03T13:50:28.110Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "INVALID_MINIMUM_DEPLOYABLE_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": null,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94171.89,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "NO",
+          "strike": 2400,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      },
+      {
+        "opportunityId": "options:92626885",
+        "program": "options_implied_binary_residual",
+        "independentUnit": "672245",
+        "observedAt": "2026-08-03T13:50:28.110Z",
+        "proofClass": "BOUNDED_FAIR_VALUE",
+        "mechanismStatus": "UNVERIFIED",
+        "atomic": false,
+        "paperOnly": true,
+        "liveEligible": false,
+        "paperTestEligible": false,
+        "certifiedLock": false,
+        "rejectionReasons": [
+          "INVALID_PAYOUT_LOWER_USD",
+          "INVALID_ENTRY_PRINCIPAL_USD",
+          "INVALID_FEE_STRESS_USD",
+          "INVALID_SLIPPAGE_STRESS_USD",
+          "INVALID_FAILURE_RISK_RESERVE_USD",
+          "INVALID_DISPLAYED_CAPACITY_USD",
+          "DATA_QUALITY_BELOW_B",
+          "EXECUTION_FIDELITY_BELOW_B",
+          "FULL_DEPTH_NOT_PROVED",
+          "BOOKS_NOT_FRESH",
+          "MECHANISM_UNVERIFIED",
+          "NONPOSITIVE_DEPLOYED_CAPITAL"
+        ],
+        "economics": {
+          "payoutLowerUsd": null,
+          "entryPrincipalUsd": null,
+          "feeStressUsd": null,
+          "slippageStressUsd": null,
+          "failureRiskReserveUsd": null,
+          "deployedCapitalUsd": null,
+          "displayedCapacityUsd": null,
+          "minimumDeployableUsd": 0.005,
+          "conservativeNetUsd": null,
+          "roiPct": null,
+          "capitalDurationSec": 94171.89,
+          "netUsdPerCapitalDay": null
+        },
+        "quality": {
+          "dataQualityGrade": "D",
+          "executionFidelityGrade": "F"
+        },
+        "detail": {
+          "asset": "eth",
+          "side": "YES",
+          "strike": 2400,
+          "surfaceFidelity": "D",
+          "expectedProfitBeforeResidualRiskUsd": null
+        }
+      }
+    ]
+  },
+  "infrastructure": {
+    "runtimes": [
+      {
+        "component": "allmarket_lab",
+        "beat_at": "2026-08-03T13:55:15.635Z",
+        "meta": {
+          "pid": 408249,
+          "wal": {
+            "market": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 36019616,
+              "freeGb": 39.09,
+              "source": "allmarket-clob",
+              "records": 30454,
+              "checkedAt": "2026-08-03T13:55:15.635Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/allmarket-clob/2026-08-03/2026-08-03T13-50-22-872Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408249__3.open",
+              "lastSyncAt": "2026-08-03T13:55:15.424Z",
+              "lastAppendAt": "2026-08-03T13:55:15.610Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "allmarket:P8TFSF999N46RDW2MP1O.tradingvps.io:2026-08-03T13:20:22.562Z:408249:2e761e79",
+              "sealedSegments": 2,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            },
+            "decisions": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 0,
+              "freeGb": 39.09,
+              "source": "allmarket-decisions",
+              "records": 0,
+              "checkedAt": "2026-08-03T13:55:15.635Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/allmarket-decisions/2026-08-03/2026-08-03T13-20-22-564Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408249__1.open",
+              "lastSyncAt": null,
+              "lastAppendAt": null,
+              "lastMirrorAt": null,
+              "collectorRunId": "allmarket:P8TFSF999N46RDW2MP1O.tradingvps.io:2026-08-03T13:20:22.562Z:408249:2e761e79",
+              "sealedSegments": 0,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            }
+          },
+          "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+          "fills": 0,
+          "runId": "allmarket:P8TFSF999N46RDW2MP1O.tradingvps.io:2026-08-03T13:20:22.562Z:408249:2e761e79",
+          "events": 3355,
+          "decisions": 0,
+          "panelHash": "b1e523028e99d71ea8cdeac15db478aee49314e43207f7b9005b83778bedd0b1",
+          "panelMode": "neglected",
+          "paperOnly": true,
+          "openQuotes": 0,
+          "lastEventAt": 1785765315189,
+          "panelVersion": "neglected-capacity-panel-v1",
+          "partialFills": 0,
+          "walletLoaded": false,
+          "costConfirmed": 0,
+          "liveOrderPath": false,
+          "reactionCount": 3355,
+          "reactionUsMax": 157785.206,
+          "reactionUsP50": 120.748,
+          "reactionUsP95": 1448.472,
+          "reactionUsSum": 4925253.034000002,
+          "discardedStale": 38,
+          "lastDecisionAt": null,
+          "reactionUsMean": 1468.033691207154,
+          "pendingMarkouts": 0,
+          "selectedMarkets": 20,
+          "universeScanned": 101976,
+          "persistenceDrops": 0,
+          "processStartedAt": "2026-08-03T13:20:22.563Z",
+          "subscribedTokens": 40,
+          "collectionEpochId": "priority-forward-2026-08-03-v19",
+          "discardedSequence": 0,
+          "latencyProfilesMs": [
+            20,
+            50,
+            100,
+            250,
+            500
+          ],
+          "predictorTriggers": 0,
+          "reactionTargetMet": true,
+          "universePersisted": 5000,
+          "universeRefreshMs": 1800000,
+          "universeMaxStaleMs": 7200000,
+          "sqlTouchesPersisted": 2458,
+          "panelMembershipCount": 20,
+          "sqlTouchesSampledOut": 850,
+          "lastUniverseRefreshAt": 1785765081871,
+          "sqlTouchMinIntervalMs": 100,
+          "strategySignalsEnabled": false,
+          "universeRefreshFailures": 0,
+          "universeRefreshTimeouts": 0,
+          "lastUniverseRefreshAttemptAt": 1785765055245,
+          "consecutiveUniverseRefreshTimeouts": 0
+        }
+      },
+      {
+        "component": "crossvenue_lab",
+        "beat_at": "2026-08-03T13:55:21.919Z",
+        "meta": {
+          "wal": {
+            "kalshi": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 5171839,
+              "freeGb": 39.13,
+              "source": "crossvenue-kalshi",
+              "records": 1051,
+              "checkedAt": "2026-08-03T13:55:21.919Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/crossvenue-kalshi/2026-08-03/2026-08-03T13-50-25-010Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408250__3.open",
+              "lastSyncAt": "2026-08-03T13:55:21.410Z",
+              "lastAppendAt": "2026-08-03T13:55:21.410Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "crossvenue:P8TFSF999N46RDW2MP1O.tradingvps.io:2026-08-03T13:20:22.443Z:408250:ee1171de",
+              "sealedSegments": 2,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            },
+            "decisions": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 4086685,
+              "freeGb": 39.13,
+              "source": "crossvenue-decisions",
+              "records": 1632,
+              "checkedAt": "2026-08-03T13:55:21.919Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/crossvenue-decisions/2026-08-03/2026-08-03T13-50-31-262Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408250__3.open",
+              "lastSyncAt": "2026-08-03T13:55:17.669Z",
+              "lastAppendAt": "2026-08-03T13:55:17.740Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "crossvenue:P8TFSF999N46RDW2MP1O.tradingvps.io:2026-08-03T13:20:22.443Z:408250:ee1171de",
+              "sealedSegments": 2,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            },
+            "polymarket": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 6311035,
+              "freeGb": 39.13,
+              "source": "crossvenue-poly",
+              "records": 4582,
+              "checkedAt": "2026-08-03T13:55:21.919Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/crossvenue-poly/2026-08-03/2026-08-03T13-50-24-241Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408250__3.open",
+              "lastSyncAt": "2026-08-03T13:55:21.324Z",
+              "lastAppendAt": "2026-08-03T13:55:21.327Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "crossvenue:P8TFSF999N46RDW2MP1O.tradingvps.io:2026-08-03T13:20:22.443Z:408250:ee1171de",
+              "sealedSegments": 2,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            }
+          },
+          "runId": "crossvenue:P8TFSF999N46RDW2MP1O.tradingvps.io:2026-08-03T13:20:22.443Z:408250:ee1171de",
+          "paperOnly": true,
+          "snapshots": 455,
+          "candidates": 1210,
+          "kalshiFeed": {
+            "books": 6,
+            "deltas": 46,
+            "healthy": false,
+            "tickers": 6,
+            "messages": 60,
+            "connected": true,
+            "lastError": null,
+            "snapshots": 12,
+            "transport": "authenticated_readonly_ws",
+            "configured": true,
+            "reconnects": 1,
+            "connections": 2,
+            "parseErrors": 0,
+            "sequenceGaps": 0,
+            "lastMessageAt": 1785764803093
+          },
+          "polyEvents": 14747,
+          "quantities": [
+            1,
+            5,
+            10,
+            25,
+            50,
+            100
+          ],
+          "broadPollMs": 30000,
+          "evaluations": 769,
+          "kalshiPolls": 5946,
+          "polyMarkets": 54075,
+          "basisSamples": 769,
+          "depthReplays": 0,
+          "experimentId": "crossvenue-exact-rule-convergence-v7",
+          "hotMonitored": 6,
+          "kalshiErrors": 0,
+          "kalshiEvents": 8662,
+          "lastMarketAt": 1785765321444,
+          "sizingMethod": "EQUAL_PAYOUT_DEPTH_BANKROLL_OPTIMIZED",
+          "walletLoaded": false,
+          "basisQuantity": 5,
+          "economicLeads": 0,
+          "kalshiMarkets": 71373,
+          "liveOrderPath": false,
+          "makerEpisodes": 4,
+          "terminalCarry": {
+            "prior": {
+              "clusters": 268,
+              "estimator": "EVENT_CLUSTER_ALL_AGREE_WILSON_95_LOWER",
+              "updatedAt": "2026-08-03T13:50:33.845Z",
+              "agreementLower": 0.8788434640482939,
+              "sourceLatestAt": "2026-07-27T12:07:23.690Z",
+              "allAgreeClusters": 246
+            },
+            "capital": {
+              "totalUsd": 500,
+              "openEntries": 0,
+              "perVenueUsd": 250,
+              "refreshedAt": "2026-08-03T13:50:31.868Z",
+              "polyReservedUsd": 0,
+              "polyAvailableUsd": 250,
+              "totalReservedUsd": 0,
+              "kalshiReservedUsd": 0,
+              "totalAvailableUsd": 500,
+              "kalshiAvailableUsd": 250
+            },
+            "paperOnly": true,
+            "entryHurdle": "WILSON_LOWER_PAYOUT_MINUS_2X_COSTS_TICKS_AND_FULL_ORPHAN_RESERVE_GT_ZERO",
+            "riskClasses": 8,
+            "experimentId": "crossvenue-resolver-risk-terminal-carry-v2",
+            "liveOrderPath": false,
+            "independentUnit": "MATCH_DIRECTION_UTC_ENTRY_DAY",
+            "minimumPriorClusters": 30,
+            "mismatchPayoutAssumption": 0,
+            "minimumGlobalPriorClusters": 100
+          },
+          "kalshiWsEvents": 58,
+          "relationEvents": 4,
+          "approvedMatches": 2,
+          "kalshiTransport": "authenticated_readonly_ws",
+          "paperTradeLeads": 0,
+          "polyFeedStaleMs": 20000,
+          "synchronization": {
+            "historyMs": 30000,
+            "holdbackMs": 250,
+            "maxPairSkewMs": 250,
+            "pendingEvaluations": 0
+          },
+          "totalCapitalUsd": 500,
+          "exactRuleMatches": 0,
+          "lastEvaluationAt": 1785765317739,
+          "monitoredMatches": 6,
+          "processStartedAt": "2026-08-03T13:20:22.444Z",
+          "reviewedRejected": 11,
+          "collectionEpochId": "priority-forward-2026-08-03-v19",
+          "jurisdictionBlock": "DUBLIN_HOST_DO_NOT_TRADE_KALSHI",
+          "kalshiWsFallbacks": 1057,
+          "lockableNonatomic": 0,
+          "pendingCandidates": 1197,
+          "relationLifecycle": {
+            "OBSERVED_NO_EDGE": 4
+          },
+          "capitalPerVenueUsd": 250,
+          "diagnosticControls": 0,
+          "polyUniverseSource": "gamma_events_end_date_windows",
+          "terminalCarryMarks": 90,
+          "unknownRuleMatches": 0,
+          "hardMismatchMatches": 1210,
+          "kalshiBatchRequests": 991,
+          "kalshiCryptoMarkets": 1584,
+          "kalshiUniverseSource": "events_with_nested_markets",
+          "paperApprovedMatches": 0,
+          "structuredCandidates": 15,
+          "terminalCarryEntries": 0,
+          "depthReplayQuantities": [
+            5,
+            10,
+            25
+          ],
+          "paperApprovalOverflow": 0,
+          "paperEvaluationPolicy": {
+            "enabled": true,
+            "semantics": "V6_EXACT_RULE_KEY_ONLY; HARD_MISMATCH_IS_AUTOMATIC_VETO",
+            "approvedAt": "2026-07-19T21:14:45Z",
+            "scoreFloor": 0.8,
+            "scoreOperator": "STRICTLY_GREATER_THAN_DIAGNOSTIC_ONLY",
+            "approvedMatches": 0,
+            "overflowMatches": 0,
+            "monitoredMatches": 0,
+            "exactRuleProtocol": true,
+            "scoreControlsEnabled": true
+          },
+          "paperMonitoredMatches": 0,
+          "polyUniverseTruncated": false,
+          "synchronizedSnapshots": 9,
+          "terminalCarryEligible": 0,
+          "diagnosticControlLimit": 4,
+          "synchronizationRejects": 446,
+          "kalshiUniverseTruncated": false,
+          "exactRuleForwardProtocol": {
+            "quantity": 5,
+            "maxHoldMs": 3600000,
+            "paperOnly": true,
+            "experimentId": "crossvenue-exact-rule-convergence-v7",
+            "targetNetRoi": 0.01,
+            "independentUnit": "match_id + direction + UTC entry day",
+            "minimumFreshUnits": 300,
+            "minimumCalendarDays": 30
+          },
+          "kalshiRestFallbackPollMs": 2000
+        }
+      },
+      {
+        "component": "options_surface",
+        "beat_at": "2026-08-03T13:55:17.423Z",
+        "meta": {
+          "wal": {
+            "deribit": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 220262452,
+              "freeGb": 39.09,
+              "source": "deribit-options",
+              "records": 168198,
+              "checkedAt": "2026-08-03T13:55:17.421Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/deribit-options/2026-08-03/2026-08-03T13-52-30-385Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408251__4.open",
+              "lastSyncAt": "2026-08-03T13:55:17.381Z",
+              "lastAppendAt": "2026-08-03T13:55:17.381Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "options_1785763222531_7dd0a7d47d",
+              "sealedSegments": 3,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            },
+            "chainlink": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 19446613,
+              "freeGb": 39.09,
+              "source": "options-rtds-chainlink",
+              "records": 26734,
+              "checkedAt": "2026-08-03T13:55:17.421Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/options-rtds-chainlink/2026-08-03/2026-08-03T13-50-23-231Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408251__3.open",
+              "lastSyncAt": "2026-08-03T13:55:17.416Z",
+              "lastAppendAt": "2026-08-03T13:55:17.416Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "options_1785763222531_7dd0a7d47d",
+              "sealedSegments": 2,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            },
+            "decisions": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 113027852,
+              "freeGb": 39.09,
+              "source": "options-decisions",
+              "records": 31718,
+              "checkedAt": "2026-08-03T13:55:17.421Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/options-decisions/2026-08-03/2026-08-03T13-50-24-210Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408251__3.open",
+              "lastSyncAt": "2026-08-03T13:55:16.544Z",
+              "lastAppendAt": "2026-08-03T13:55:16.085Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "options_1785763222531_7dd0a7d47d",
+              "sealedSegments": 2,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            },
+            "polymarket": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 211000303,
+              "freeGb": 39.09,
+              "source": "options-polymarket-clob",
+              "records": 190153,
+              "checkedAt": "2026-08-03T13:55:17.421Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/options-polymarket-clob/2026-08-03/2026-08-03T13-53-11-177Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408251__4.open",
+              "lastSyncAt": "2026-08-03T13:55:17.216Z",
+              "lastAppendAt": "2026-08-03T13:55:17.381Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "options_1785763222531_7dd0a7d47d",
+              "sealedSegments": 3,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            }
+          },
+          "runId": "options_1785763222531_7dd0a7d47d",
+          "options": 151,
+          "targets": 66,
+          "paperOnly": true,
+          "lastMarkAt": 1785765316547,
+          "polyTokens": 132,
+          "clobStarted": true,
+          "exactExpiry": {
+            "records": 44,
+            "rejected": {},
+            "fetchedEvents": 116,
+            "queriedExpiries": [
+              "2026-08-04T08:00:00.000Z",
+              "2026-08-05T08:00:00.000Z",
+              "2026-08-06T08:00:00.000Z",
+              "2026-08-07T08:00:00.000Z"
+            ],
+            "universeVersion": "options-daily-threshold-surface-v3",
+            "exactExpiryRecords": 0,
+            "listedExpiryCounts": {
+              "BTC": 12,
+              "ETH": 12
+            },
+            "termInterpolatedRecords": 44
+          },
+          "lastEventAt": 1785765317381,
+          "parseErrors": 0,
+          "shadowMarks": 31712,
+          "flushRetries": 0,
+          "walletLoaded": false,
+          "refreshErrors": 0,
+          "archiveAnchors": 4,
+          "executableMarks": 0,
+          "surfaceFidelity": {
+            "B": 24390,
+            "C": 1190,
+            "D": 6132
+          },
+          "persistenceQueue": 1,
+          "processStartedAt": "2026-08-03T13:20:22.532Z",
+          "collectionEpochId": "priority-forward-2026-08-03-v19",
+          "executionBarriers": {
+            "INCOMPLETE_BID_ASK_IV_INTERVAL": 6132,
+            "TERM_INTERPOLATION_DIAGNOSTIC_ONLY": 24390,
+            "UNSUPPORTED_LONG_HORIZON_VOL_EXTRAPOLATION": 326,
+            "UNSUPPORTED_SHORT_HORIZON_VOL_EXTRAPOLATION": 864
+          },
+          "persistenceErrors": 0
+        }
+      },
+      {
+        "component": "pyth_boundary",
+        "beat_at": "2026-08-03T13:55:16.061Z",
+        "meta": {
+          "wal": {
+            "pyth": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 884,
+              "freeGb": 39.09,
+              "source": "pyth-equity-rtds",
+              "records": 2,
+              "checkedAt": "2026-08-03T13:55:16.060Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/pyth-equity-rtds/2026-08-03/2026-08-03T13-20-22-496Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408252__1.open",
+              "lastSyncAt": "2026-08-03T13:30:28.904Z",
+              "lastAppendAt": "2026-08-03T13:30:28.904Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "pyth_1785763222495_d99b01f099",
+              "sealedSegments": 0,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            },
+            "decisions": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 0,
+              "freeGb": 39.09,
+              "source": "pyth-boundary-decisions",
+              "records": 0,
+              "checkedAt": "2026-08-03T13:55:16.061Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/pyth-boundary-decisions/2026-08-03/2026-08-03T13-20-22-498Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408252__1.open",
+              "lastSyncAt": null,
+              "lastAppendAt": null,
+              "lastMirrorAt": null,
+              "collectorRunId": "pyth_1785763222495_d99b01f099",
+              "sealedSegments": 0,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            },
+            "polymarket": {
+              "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+              "bytes": 163757828,
+              "freeGb": 39.09,
+              "source": "pyth-polymarket-clob",
+              "records": 154542,
+              "checkedAt": "2026-08-03T13:55:16.061Z",
+              "activeFile": "/var/lib/deltaforge/wal/borg/pyth-polymarket-clob/2026-08-03/2026-08-03T13-46-45-439Z__P8TFSF999N46RDW2MP1O.tradingvps.io__408252__3.open",
+              "lastSyncAt": "2026-08-03T13:55:15.851Z",
+              "lastAppendAt": "2026-08-03T13:55:16.056Z",
+              "lastMirrorAt": null,
+              "collectorRunId": "pyth_1785763222495_d99b01f099",
+              "sealedSegments": 2,
+              "mirrorConfigured": false,
+              "mirroredSegments": 0,
+              "collectionEpochId": "priority-forward-2026-08-03-v19",
+              "requiredReserveGb": 20
+            }
+          },
+          "rtds": {
+            "metrics": {
+              "ticks": 0,
+              "rawFrames": 2,
+              "textPings": 417,
+              "parseErrors": 0,
+              "controlFrames": 2,
+              "protocolPings": 417,
+              "protocolPongs": 417,
+              "historicalTicks": 0
+            },
+            "symbols": [
+              "AAPL",
+              "ABNB",
+              "AMZN",
+              "COIN",
+              "EWY",
+              "GOOGL",
+              "HOOD",
+              "META",
+              "MSFT",
+              "NFLX",
+              "NVDA",
+              "OPEN",
+              "PLTR",
+              "RKLB",
+              "SPY"
+            ],
+            "connected": true,
+            "lastPongAt": 1785765314544,
+            "feedSymbols": [
+              "AAPL",
+              "ABNB",
+              "AMZN",
+              "COIN",
+              "EWY",
+              "GOOGL",
+              "HOOD",
+              "META",
+              "MSFT",
+              "NFLX",
+              "NVDA",
+              "OPEN",
+              "PLTR",
+              "RKLB",
+              "SPY"
+            ],
+            "lastMessageAt": 1785763828904,
+            "connectionEpoch": 2
+          },
+          "runId": "pyth_1785763222495_d99b01f099",
+          "markets": 24,
+          "signals": 0,
+          "symbols": 15,
+          "feedState": "CONNECTED_NO_RECENT_TICK",
+          "paperOnly": true,
+          "lastTickAt": null,
+          "polyTokens": 42,
+          "experimentId": "pyth-resolver-boundary-transfer-v2",
+          "walletLoaded": false,
+          "liveOrderPath": false,
+          "refreshErrors": 0,
+          "marketsInWindow": 21,
+          "lastUsableTickAt": null,
+          "nextWindowStartAt": null,
+          "transportConnected": true,
+          "unsupportedSymbols": [
+            "USDMXN",
+            "USDZAR",
+            "USDSEK"
+          ]
+        }
+      },
+      {
+        "component": "structural_scanner",
+        "beat_at": "2026-08-03T13:55:15.560Z",
+        "meta": {
+          "pid": 408253,
+          "host": "P8TFSF999N46RDW2MP1O.tradingvps.io",
+          "runId": "structural:P8TFSF999N46RDW2MP1O.tradingvps.io:2026-08-03T13:20:22.458Z:408253",
+          "queued": 0,
+          "tokens": 128,
+          "allMarket": true,
+          "paperOnly": true,
+          "candidates": 48,
+          "sportsTagId": 1,
+          "walletLoaded": false,
+          "passiveQueued": 0,
+          "gammaTimeoutMs": 30000,
+          "passiveResting": 0,
+          "lastPersistedAt": "2026-08-03T13:55:15.235Z",
+          "universeVersion": "structural-certified-payoff-graph-v5-orphan-reserve",
+          "gammaConcurrency": 4,
+          "gammaMaxAttempts": 4,
+          "negativeSampleMs": 5000,
+          "passiveTimeoutMs": 3600000,
+          "positiveSampleMs": 100,
+          "processStartedAt": "2026-08-03T13:20:22.458Z",
+          "sportsEventPages": 5,
+          "catalogCandidates": 20000,
+          "collectionEpochId": "priority-forward-2026-08-03-v19",
+          "latencyProfilesMs": [
+            20,
+            50,
+            100,
+            250,
+            500
+          ],
+          "persistenceErrors": 0,
+          "successfulFlushes": 1597,
+          "lastPersistenceErrorAt": null,
+          "orderedStrikeExperimentId": "structural-ordered-strike-orphan-safe-v1"
+        }
+      }
+    ],
+    "activeEpochMustRemainUnchanged": true,
+    "currentCapturePanel": "neglected-capacity-panel-v1",
+    "capturePanelHash": "b1e523028e99d71ea8cdeac15db478aee49314e43207f7b9005b83778bedd0b1",
+    "activationCondition": "Capture may run now. Passive quote intents remain disabled until a separately certified lower-bound source is available."
+  },
+  "controls": {
+    "genericMaker": [
+      {
+        "strategy": "AM_passive_maker_v1",
+        "intents": 41671,
+        "fills": 19,
+        "markets": 15,
+        "pnl_5s": -1.8742233559972206,
+        "pnl_30s": -0.09937500000000002
+      },
+      {
+        "strategy": "AM_reward_passive_maker_v1",
+        "intents": 52162,
+        "fills": 156,
+        "markets": 76,
+        "pnl_5s": -24.001806078354655,
+        "pnl_30s": -36.44828298276268
+      }
+    ],
+    "pairedCompleteSetMaker": {
+      "cycles": 1323,
+      "markets": 123,
+      "complete_sets": 86,
+      "orphan_cycles": 420,
+      "total_pnl": -3064.045611324801,
+      "reward_adjusted_pnl": -2921.6347288775887
+    },
+    "verdict": "NEGATIVE_CONTROLS: fills were adversely selected and orphan losses dominated complete-set gains."
+  },
+  "warnings": [
+    "Rows are opportunity diagnostics, not additive portfolio PnL; repeated snapshots share capacity.",
+    "A non-atomic cross-venue or multi-leg bundle is not risk-free before every leg fills.",
+    "H43 remains below 300 independent markets and currently lacks broad A/B execution replay coverage.",
+    "No staged experiment or report grants live-order authority."
+  ]
+}

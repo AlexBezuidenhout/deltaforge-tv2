@@ -1,0 +1,60 @@
+{
+  "format": "crossvenue-exact-rule-forward-v1",
+  "generatedAt": "2026-08-03T13:56:20.321Z",
+  "paperOnly": true,
+  "liveOrderPath": false,
+  "protocol": {
+    "experimentId": "crossvenue-exact-rule-convergence-v7",
+    "quantity": 5,
+    "targetNetRoi": 0.01,
+    "maxHoldMs": 3600000,
+    "independentUnit": "match_id + direction + UTC entry day",
+    "minimumFreshUnits": 300,
+    "minimumCalendarDays": 30,
+    "paperOnly": true
+  },
+  "requestedDays": 30,
+  "summary": {
+    "entries": 0,
+    "realized": 0,
+    "pairs": 0,
+    "pairDirectionDays": 0,
+    "calendarDays": 0,
+    "targetExits": 0,
+    "timeoutExits": 0,
+    "certifiedTerminalFallbacks": 0,
+    "censored": 0,
+    "noExecutableTimeoutExit": 0,
+    "wins": 0,
+    "losses": 0,
+    "pnlUsd": 0,
+    "pnl2xFeesOneTickUsd": 0,
+    "firstHalfStressPnlUsd": 0,
+    "secondHalfStressPnlUsd": 0,
+    "marketClusteredMeanCi95Usd": [
+      null,
+      null
+    ],
+    "dayClusteredMeanCi95Usd": [
+      null,
+      null
+    ],
+    "marketClusters": 0,
+    "dayClusters": 0,
+    "conservativeOneSidedP": 1,
+    "meanHoldMinutes": null,
+    "multipleTestingFamily": [],
+    "multipleTestingMethod": "BONFERRONI_OVER_OBSERVED_DIRECTION_ARMS",
+    "multipleTestingAdjustedP": 1
+  },
+  "promotionReady": false,
+  "byDirection": {},
+  "depth": [],
+  "entries": [],
+  "warnings": [
+    "This is risky convergence, not an atomic or legally risk-free trade.",
+    "The 1% target is provisional because it was inspected in the prior contaminated discovery grid.",
+    "No V5 or earlier row is included.",
+    "No-exit and right-censored entries are never credited as wins."
+  ]
+}

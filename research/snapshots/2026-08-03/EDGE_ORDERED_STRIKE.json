@@ -1,0 +1,139 @@
+{
+  "generatedAt": "2026-08-03T13:56:47.172Z",
+  "experimentId": "structural-ordered-strike-orphan-safe-v1",
+  "evidenceStartedAt": "2026-08-03T12:40:00.000Z",
+  "paperOnly": true,
+  "liveOrderPath": false,
+  "trial": {
+    "id": "6709692",
+    "experiment_id": "structural-ordered-strike-orphan-safe-v1",
+    "strategy": "structural_ordered_strike_orphan_safe_v1",
+    "variant": "taker_control_and_passive_one_leg",
+    "family": "certified_ordered_strike_implication",
+    "phase": "eval",
+    "status": "COLLECTING",
+    "registered_at": "2026-08-03T13:16:31.529Z",
+    "frozen_at": "2026-08-03T12:40:00.000Z",
+    "evidence_started_at": "2026-08-03T12:40:00.000Z",
+    "primary_metric": "closed_passive_pnl_2x_after_orphan_unwind",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "manifest_hash": "5331b3efdc0f22c63517d8623e28925693510a8924095dbe6a68be985f0e1337",
+    "status_reason": null,
+    "status_decided_at": null,
+    "status_manifest_id": null
+  },
+  "catalog": {
+    "candidates": 8376,
+    "active_candidates": 8,
+    "rule_certified": 2214,
+    "latest": "2026-08-03T13:56:19.194Z"
+  },
+  "takerControl": {
+    "rows": [
+      {
+        "latency_ms": 20,
+        "evaluations": 2330,
+        "independent_candidates": 9,
+        "calendar_days": 1,
+        "payoff_proved": 2330,
+        "rule_certified": 2330,
+        "arithmetic_economic": 0,
+        "orphan_safe_qualified": 0,
+        "max_displayed_profit_2x": 0,
+        "max_orphan_safe_profit_2x": -0.1102236,
+        "latest": "2026-08-03T13:56:45.702Z"
+      },
+      {
+        "latency_ms": 50,
+        "evaluations": 2321,
+        "independent_candidates": 9,
+        "calendar_days": 1,
+        "payoff_proved": 2321,
+        "rule_certified": 2321,
+        "arithmetic_economic": 0,
+        "orphan_safe_qualified": 0,
+        "max_displayed_profit_2x": 0,
+        "max_orphan_safe_profit_2x": -0.1102236,
+        "latest": "2026-08-03T13:56:45.731Z"
+      },
+      {
+        "latency_ms": 100,
+        "evaluations": 2345,
+        "independent_candidates": 9,
+        "calendar_days": 1,
+        "payoff_proved": 2345,
+        "rule_certified": 2345,
+        "arithmetic_economic": 0,
+        "orphan_safe_qualified": 0,
+        "max_displayed_profit_2x": 0,
+        "max_orphan_safe_profit_2x": -0.1102236,
+        "latest": "2026-08-03T13:56:45.782Z"
+      },
+      {
+        "latency_ms": 250,
+        "evaluations": 2341,
+        "independent_candidates": 9,
+        "calendar_days": 1,
+        "payoff_proved": 2341,
+        "rule_certified": 2341,
+        "arithmetic_economic": 0,
+        "orphan_safe_qualified": 0,
+        "max_displayed_profit_2x": 0,
+        "max_orphan_safe_profit_2x": -0.1102236,
+        "latest": "2026-08-03T13:56:46.025Z"
+      },
+      {
+        "latency_ms": 500,
+        "evaluations": 2298,
+        "independent_candidates": 9,
+        "calendar_days": 1,
+        "payoff_proved": 2298,
+        "rule_certified": 2298,
+        "arithmetic_economic": 0,
+        "orphan_safe_qualified": 0,
+        "max_displayed_profit_2x": 0,
+        "max_orphan_safe_profit_2x": -0.1102236,
+        "latest": "2026-08-03T13:56:45.080Z"
+      }
+    ],
+    "warning": "Displayed profits are opportunity diagnostics, not portfolio PnL; no atomic two-leg acknowledgement is simulated."
+  },
+  "passive": {
+    "quotes": 0,
+    "closedQuotes": 0,
+    "fills": 0,
+    "independentCandidates": 0,
+    "calendarDays": 0,
+    "pnl2xUsd": 0,
+    "firstHalfPnl2xUsd": 0,
+    "secondHalfPnl2xUsd": 0,
+    "positiveClosedQuotes": 0,
+    "negativeClosedQuotes": 0,
+    "orphanFills": 0,
+    "candidateClusteredMeanCi95": {
+      "clusters": 0,
+      "mean": null,
+      "ci": [
+        null,
+        null
+      ]
+    },
+    "dayClusteredMeanCi95": {
+      "clusters": 0,
+      "mean": null,
+      "ci": [
+        null,
+        null
+      ]
+    }
+  },
+  "promotionReady": false,
+  "verdict": "NO_FRESH_QUALIFYING_QUOTES",
+  "caveats": [
+    "Only nested-threshold rows created after the V1 evidence clock are included.",
+    "A payoff proof removes terminal directional risk only after both legs fill; leg risk remains non-atomic.",
+    "Paper queue position is C-grade until an authenticated user stream supplies real fills and cancel acknowledgements.",
+    "Do not lower the proof, fee, depth, orphan-reserve or sample gates to create activity."
+  ]
+}
