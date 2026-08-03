@@ -580,6 +580,8 @@ async function uploadBatch(batch, options) {
 }
 
 function receiptText(batch, pending) {
+  const parquetFiles = (batch.outputs || [])
+    .filter((output) => String(output.relative || '').endsWith('.parquet')).length;
   return [
     'format=deltaforge-parquet-lake-receipt-v1',
     `completed_at=${new Date().toISOString()}`,
@@ -587,7 +589,7 @@ function receiptText(batch, pending) {
     `latest_batch=${batch.batchHash}`,
     `source_files=${batch.sourceFiles}`,
     `source_rows=${batch.sourceRows}`,
-    `parquet_files=${batch.outputs.length}`,
+    `parquet_files=${parquetFiles}`,
     `pending_source_files=${pending}`,
     'compression=ZSTD',
     'destination=Google Drive/VPS Data/parquet',
@@ -824,6 +826,7 @@ module.exports = {
   parquetCodec,
   pruneHotParquet,
   receiptFile,
+  receiptText,
   selectVerifiedRawObjects,
   sourceFromRelative,
   stageRawRecords,

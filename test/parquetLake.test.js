@@ -15,6 +15,7 @@ const {
   envelopeFor,
   latestVerifiedBatch,
   receiptFile,
+  receiptText,
   selectVerifiedRawObjects,
   sourceFromRelative,
   stageRawRecords,
@@ -101,6 +102,12 @@ test('receipt stays inside the service-owned state directory and can recover the
     failed: { verified: false, verifiedAt: '2026-08-03T12:00:00.000Z' },
     latest: { verified: true, verifiedAt: '2026-08-03T11:00:00.000Z', sourceFiles: 2 },
   } }).batchHash, 'latest');
+  const receipt = receiptText({
+    batchHash: 'batch', sourceFiles: 2, sourceRows: 3,
+    outputs: [{ relative: 'source=x/part.parquet' }, { relative: '_manifests/batch.json' }],
+  }, 4);
+  assert.match(receipt, /parquet_files=1/);
+  assert.match(receipt, /pending_source_files=4/);
 });
 
 test('staging uses one bounded files-from transfer before per-file SHA verification', async (t) => {
