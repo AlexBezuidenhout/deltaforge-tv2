@@ -44,6 +44,7 @@ test('profitability horizons use entry time and parse Postgres numeric strings',
     fills: 2, markets: 2, pnl1x: 0.75, pnl2x: 0.25,
   });
   assert.equal(result['3d'].fills, 2);
+  assert.equal(result['7d'].fills, 3);
 });
 
 test('current-trial evidence cannot pool an older experiment or pre-freeze row', () => {

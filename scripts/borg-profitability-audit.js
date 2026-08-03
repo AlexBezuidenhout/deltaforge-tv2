@@ -27,6 +27,7 @@ const HORIZONS = Object.freeze([
   ['6h', 6 * 60 * 60 * 1000],
   ['24h', 24 * 60 * 60 * 1000],
   ['3d', 3 * 24 * 60 * 60 * 1000],
+  ['7d', 7 * 24 * 60 * 60 * 1000],
 ]);
 
 function number(value, fallback = 0) {
@@ -166,12 +167,12 @@ function markdown(report) {
     '',
     `Holm family-wise correction covers ${report.multipleTestingArms} strategy/phase arms. No row is a live-profitability claim.`,
     '',
-    '| Strategy | Phase | Governance | Historical diagnostic 2× | Current trial n / markets / days | Current 1× | Current 2× | 6h | 24h | 3d | Current halves 2× | Holm p | Read |',
-    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
+    '| Strategy | Phase | Governance | Historical diagnostic 2× | Current trial n / markets / days | Current 1× | Current 2× | 6h | 24h | 3d | 7d | Current halves 2× | Holm p | Read |',
+    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
   ];
   for (const row of report.arms) {
     const current = row.currentTrial;
-    lines.push(`| \`${row.strategy}\` | ${row.phase} | ${current.trialStatus} | ${money(row.pnl2x)} | ${current.eligibleFills} / ${current.independentMarkets} / ${current.calendarDays} | ${money(current.pnl1x)} | ${money(current.pnl2x)} | ${money(current.horizons['6h'].pnl1x)} (${current.horizons['6h'].fills}) | ${money(current.horizons['24h'].pnl1x)} (${current.horizons['24h'].fills}) | ${money(current.horizons['3d'].pnl1x)} (${current.horizons['3d'].fills}) | ${money(current.firstHalfPnl2x)} / ${money(current.secondHalfPnl2x)} | ${current.holmAdjustedP.toFixed(4)} | ${current.interpretation} |`);
+    lines.push(`| \`${row.strategy}\` | ${row.phase} | ${current.trialStatus} | ${money(row.pnl2x)} | ${current.eligibleFills} / ${current.independentMarkets} / ${current.calendarDays} | ${money(current.pnl1x)} | ${money(current.pnl2x)} | ${money(current.horizons['6h'].pnl1x)} (${current.horizons['6h'].fills}) | ${money(current.horizons['24h'].pnl1x)} (${current.horizons['24h'].fills}) | ${money(current.horizons['3d'].pnl1x)} (${current.horizons['3d'].fills}) | ${money(current.horizons['7d'].pnl1x)} (${current.horizons['7d'].fills}) | ${money(current.firstHalfPnl2x)} / ${money(current.secondHalfPnl2x)} | ${current.holmAdjustedP.toFixed(4)} | ${current.interpretation} |`);
   }
   return `${lines.join('\n')}\n`;
 }
