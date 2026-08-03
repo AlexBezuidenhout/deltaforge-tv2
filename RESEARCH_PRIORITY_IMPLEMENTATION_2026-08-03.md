@@ -86,12 +86,10 @@ Parquet failures before it can become the default research surface.
 
 ## Deployment acceptance
 
-Collector and dashboard release `831462a` started the frozen cohort. Independent
-research tooling subsequently advanced to `ee6ae9c` to add source/date-bounded
-Parquet materialization, separate global/scoped backlog accounting and a compact
-decision/proof nearline policy; this did not restart or relabel the collector.
-`priority-forward-2026-08-03-v20` started at `2026-08-03T16:52:57.428Z`; v19
-remains preserved as failed evidence.
+Collector and dashboard release `831462a` started v20. Independent research
+tooling then added source/date-bounded Parquet materialization, separate
+global/scoped backlog accounting and a compact decision/proof nearline policy.
+`priority-forward-2026-08-03-v20` started at `2026-08-03T16:52:57.428Z`.
 
 Initial production acceptance:
 
@@ -111,11 +109,61 @@ Initial production acceptance:
   ten-lane incubator reports, and every lane reported paper-only/no live
   authority.
 
-The current status is `PENDING_24H`, not passed. The earliest possible clean
-read is after 4 August 2026 16:54 UTC, and only if every subsequent sample
-continues to pass. Cross-venue V7 still has zero eligible entries and the
-options lane still has zero exact-expiry executable targets; neither is a
-profit result.
+v20 subsequently failed honestly at 17:20 UTC. `pm_flow_trades` archival used
+primary-key order even though retained signals protect a large prefix of old
+trade IDs. Under maintenance load the query scanned that prefix until its
+45-second statement timeout. The failed sample and v20 remain immutable.
+
+Release `1696810` changes only that selection mechanism to use the existing
+`(observed_at)` index with deterministic `id` ties. The production plan executed
+in 632 ms under load, and successive full archive jobs passed in 4.1 and 1.2
+seconds. The release also caps continuous Parquet work at 12 segments/64 MiB,
+2 GiB memory pressure and 3 GiB hard memory, and drains off-host/Parquet
+maintenance during evidence-epoch startup.
+
+`priority-forward-2026-08-03-v21` started from release `1696810` at
+`2026-08-03T17:28:38.415Z` and also failed honestly. At the five-minute Data
+API cache rollover, its 10,000-row offset-zero rescue ended 65 source seconds
+after the prior cursor (`oldest_sec=1785777873`, cursor cutoff
+`1785777808`). The cause was source capacity, not SQL: Polymarket sends
+`cache-control: public, max-age=300` on this endpoint, and more than 10,000
+global trades occurred inside that cache generation.
+
+Release `aa398d1` replaced the single rescue with two concurrent documented
+overlapping pages. Coverage is accepted only when at least 100 exact trade
+identities overlap and the joined tail reaches the previous source cursor;
+cache skew or insufficient depth still increments `globalCoverageGaps`. Its
+first production rollover caught a second CDN failure mode rather than hiding
+it: the head URL refreshed while the tail briefly served an older cache
+generation, producing zero exact overlap.
+
+Release `b4e8d95` therefore rotates the common rescue page size
+deterministically from 9,900 to 9,999 once per five-minute cache bucket. The
+two valid `limit`/`offset` URLs are requested concurrently and become
+origin-fresh together; exact overlap and cursor reach remain mandatory. A
+production origin probe returned exactly the designed 1,000-row overlap. The
+evidence contract also fails if fewer than all expected public-flow CLOB
+sockets are open or any socket reconnects during the epoch. v19, v20 and v21
+remain preserved as failed evidence.
+
+`priority-forward-2026-08-03-v22` started from collector release `b4e8d95` at
+`2026-08-03T17:59:41.485Z`. Its first production cache rollover captured
+11,927 new rows beyond bootstrap through one overlap-proved rescue, with zero
+global gaps, zero CLOB reconnects, 2/2 sockets and a fully drained SQL queue.
+The first five evidence samples all passed with a 60.479-second maximum gap.
+Its status is `PENDING_24H`, not passed; the earliest possible clean result is
+after 4 August 2026 18:00 UTC and only if every subsequent sample remains
+healthy.
+
+Independent evidence-tool release `e9b867b` also fixes a burn-in accounting
+dead end: a monitoring pause longer than 120 seconds now begins a new clean
+suffix at the first returning sample instead of poisoning every future Parquet
+window forever. It does not forgive the gap or credit the earlier interval;
+v22's Parquet clock restarted at `2026-08-03T18:00:56.360Z` and still requires
+24 uninterrupted hours.
+
+Cross-venue V7 still has zero eligible entries and the options lane still has
+zero exact-expiry executable targets; neither is a profit result.
 
 ## What remains external or accrual-bound
 
