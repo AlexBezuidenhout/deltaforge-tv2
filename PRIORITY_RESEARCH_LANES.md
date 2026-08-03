@@ -59,10 +59,19 @@ data cannot prove authenticated queue position or cancel acknowledgement.
 
 ## Current evidence epoch
 
-The authoritative cohort is `money-finding-2026-07-21-v10`, started at
-`2026-07-21T22:25:22.489Z`. v8 is rejected because overlapping options SQL
-flushes deadlocked; v9 is rejected because its first heartbeat contract omitted
-the new persistence-error counter. Neither interval is relabelled. v10 started
-with zero critical conditions, and a forced hot-tier maintenance overlap passed
-without a deadlock or dropped observation. It remains provisional until the
-24-hour clean-infrastructure gate and each strategy's own sample rules pass.
+The authoritative cohort is `priority-forward-2026-08-03-v19`, started at
+`2026-08-03T13:20:03.780Z` on immutable release `98c4d02`. Its first four
+health samples passed with no sequence, persistence or archive errors and all
+three active shadow strategies registered and evaluating. It is
+`PENDING_24H`, not clean evidence yet. The superseded v18 startup is rejected:
+its health process reconstructed the old 38-strategy fleet instead of reading
+the collector's frozen three-strategy allowlist. v19 persists that allowlist
+inside the collector-run record and validates the same contract.
+
+At startup, typed cross-venue certification contained 11,193 `UNKNOWN`, 1,219
+`CERTIFIED_DIFFERENT` and zero `CERTIFIED_EQUAL` identities. Unknown rules stay
+blocked. Options V4 had zero exact-expiry targets, so its 44 term-interpolated
+targets remain diagnostic. The Pyth public RTDS transport was connected but
+returned no equity ticks even for the official single-symbol example; the lane
+is therefore visibly degraded and cannot contribute evidence until the
+external stream resumes.

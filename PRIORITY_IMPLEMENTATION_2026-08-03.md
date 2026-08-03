@@ -118,3 +118,13 @@ result. Thresholds must not be changed on the new cohort to manufacture P&L.
 
 Only after a full paper pass may a separate review authorize 50 authenticated
 $1–$2 fills. This implementation does not grant that authorization.
+
+## Deployment verification
+
+The paper fleet was deployed to Dublin as release `98c4d02`. Evidence epoch
+`priority-forward-2026-08-03-v19` began at `2026-08-03T13:20:03.780Z` and is
+`PENDING_24H`. Its first four recorded samples were `PASS`; all required
+collectors were active, the Google Drive receipt was fresh, disk reserve was
+approximately 39.5 GiB, and the three active strategies had current runtime
+registrations with zero evaluation errors. No authenticated/live executor was
+enabled or changed.
