@@ -37,3 +37,36 @@ test('CLOB multiplex reports aggregate connection and repaired-book gaps', () =>
   assert.equal(health.shards.length, 3);
   clob.close();
 });
+
+test('CLOB multiplex honors deterministic asset routing across market rotations', () => {
+  const marketByToken = new Map([
+    ['BTC_OLD_UP', 1], ['BTC_OLD_DOWN', 1],
+    ['BTC_NEW_UP', 2], ['BTC_NEW_DOWN', 2],
+    ['ETH_UP', 3], ['ETH_DOWN', 3],
+  ]);
+  const assetByToken = new Map([...marketByToken.keys()].map((token) => [
+    token, token.startsWith('BTC') ? 'btc' : 'eth',
+  ]));
+  const clob = new ClobMultiplex((token) => marketByToken.get(token), {
+    shardCount: 4,
+    shardIndexForAsset: (token) => assetByToken.get(token) === 'btc' ? 0 : 1,
+    describeAsset: (token) => assetByToken.get(token),
+  });
+  const groups = clob.shards.map((shard) => {
+    shard.subscribe = (ids) => { shard.subscribed = new Set(ids); };
+    return shard;
+  });
+
+  clob.subscribe([...marketByToken.keys()]);
+
+  assert.deepEqual([...groups[0].subscribed], [
+    'BTC_OLD_UP', 'BTC_OLD_DOWN', 'BTC_NEW_UP', 'BTC_NEW_DOWN',
+  ]);
+  assert.deepEqual([...groups[1].subscribed], ['ETH_UP', 'ETH_DOWN']);
+  assert.equal(clob._shardIndex('BTC_OLD_UP'), clob._shardIndex('BTC_NEW_UP'));
+  const health = clob.health();
+  assert.equal(health.routingMode, 'explicit');
+  assert.deepEqual(health.shards[0].subscriptionGroups, ['btc']);
+  assert.deepEqual(health.shards[1].subscriptionGroups, ['eth']);
+  clob.close();
+});

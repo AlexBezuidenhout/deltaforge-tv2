@@ -26,6 +26,12 @@ function stableHash(value) {
 class ClobMultiplex {
   constructor(resolveMarketId, options = {}) {
     this.resolveMarketId = resolveMarketId;
+    this.shardIndexForAsset = typeof options.shardIndexForAsset === 'function'
+      ? options.shardIndexForAsset
+      : null;
+    this.describeAsset = typeof options.describeAsset === 'function'
+      ? options.describeAsset
+      : null;
     const configured = Number(options.shardCount ?? process.env.BORG_CLOB_SHARDS ?? 2);
     this.shardCount = Math.max(1, Math.min(16, Math.trunc(configured) || 2));
     this._marketShard = new Map();
@@ -40,8 +46,13 @@ class ClobMultiplex {
     if (marketId != null) {
       const key = String(marketId);
       if (!this._marketShard.has(key)) {
-        this._marketShard.set(key, this._nextShard % this.shardCount);
-        this._nextShard += 1;
+        const requested = Number(this.shardIndexForAsset?.(assetId, marketId));
+        if (Number.isInteger(requested)) {
+          this._marketShard.set(key, ((requested % this.shardCount) + this.shardCount) % this.shardCount);
+        } else {
+          this._marketShard.set(key, this._nextShard % this.shardCount);
+          this._nextShard += 1;
+        }
       }
       return this._marketShard.get(key);
     }
@@ -92,12 +103,22 @@ class ClobMultiplex {
   }
 
   health(now = Date.now()) {
-    const shards = this.shards.map((shard) => shard.health(now));
+    const shards = this.shards.map((shard) => {
+      const health = shard.health(now);
+      if (!this.describeAsset) return health;
+      return {
+        ...health,
+        subscriptionGroups: [...new Set([...shard.subscribed]
+          .map((assetId) => this.describeAsset(assetId))
+          .filter(Boolean))].sort(),
+      };
+    });
     return {
       expectedSockets: shards.length,
       activeSockets: shards.filter((shard) => shard.connected).length,
       connectionGaps: shards.reduce((sum, shard) => sum + shard.connectionGaps, 0),
       bookStateGaps: shards.reduce((sum, shard) => sum + shard.bookStateGaps, 0),
+      routingMode: this.shardIndexForAsset ? 'explicit' : 'balanced-market',
       shards,
     };
   }

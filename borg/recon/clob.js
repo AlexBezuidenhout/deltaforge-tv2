@@ -89,8 +89,16 @@ class ClobRecon {
     this.lastConnectionGapAt = null;
     this.lastBookStateGapAt = null;
     this.frameSequence = 0;
+    this.frameCount = 0;
+    this.frameBytes = 0;
+    this.startedAt = Date.now();
     this.lastPingAt = 0;
     this.lastPongAt = 0;
+    this.hashValidationGraceMs = Math.max(0, Number(
+      options.hashValidationGraceMs
+        ?? process.env.BORG_CLOB_HASH_VALIDATION_GRACE_MS
+        ?? 750,
+    ) || 0);
     this._validationCursor = 0;
     // REST is only a WS recovery path. Without these rails the 7-asset loop
     // bursts 14 requests every 5s even while WS books are fresh, triggering
@@ -191,6 +199,11 @@ class ClobRecon {
       desiredAssets: this.subscribed.size,
       activeSubscriptions: this.activeSubscriptions.size,
       lastWsMessageAgeMs: this.lastWsMsgAt > 0 ? Math.max(0, now - this.lastWsMsgAt) : null,
+      frames: this.frameCount,
+      frameBytes: this.frameBytes,
+      framesPerSecond: this.startedAt < now
+        ? this.frameCount / ((now - this.startedAt) / 1000)
+        : 0,
     };
   }
 
@@ -271,6 +284,8 @@ class ClobRecon {
     const receiveWallMs = Date.now();
     const receiveMonoNs = process.hrtime.bigint().toString();
     this.frameSequence += 1;
+    this.frameCount += 1;
+    this.frameBytes += Buffer.byteLength(buf);
     const provenance = this.wal?.append(buf, {
       channel: 'market', receiveWallMs, receiveMonoNs,
       connectionEpoch: this.connectionEpoch,
@@ -541,24 +556,63 @@ class ClobRecon {
       const asks = normLevels(b.asks).sort((x, y) => x[0] - y[0]);
       const prev = this.books.get(assetId);
       const wsDidNotAdvance = !prev || prev.hash === requestHash;
-      const hashMismatch = Boolean(forceValidate && requestHash && b.hash && requestHash !== b.hash && wsDidNotAdvance);
+      let hashMismatch = Boolean(forceValidate && requestHash && b.hash && requestHash !== b.hash && wsDidNotAdvance);
+      let recoveryBook = b;
+      if (hashMismatch) {
+        // REST and WebSocket observations are not causally simultaneous. A
+        // one-shot mismatch on a fast book often means REST saw the next state
+        // a few milliseconds before its WS frame arrived; treating that race
+        // as a gap both creates false evidence failures and replaces the live
+        // WS book with a REST state. Give the socket a bounded chance to catch
+        // up, then confirm against a fresh REST snapshot while ensuring the WS
+        // state did not advance during either request.
+        const requestAt = prev?.at || current?.at || null;
+        if (this.hashValidationGraceMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, this.hashValidationGraceMs));
+        }
+        const afterGrace = this.books.get(assetId);
+        const wsStillAtRequest = afterGrace
+          && afterGrace.hash === requestHash
+          && (requestAt == null || afterGrace.at === requestAt);
+        if (!wsStillAtRequest) {
+          hashMismatch = false;
+        } else {
+          recoveryBook = await fetchJson(`${CLOB}/book?token_id=${assetId}`);
+          const afterConfirm = this.books.get(assetId);
+          hashMismatch = Boolean(
+            afterConfirm
+            && afterConfirm.hash === requestHash
+            && (requestAt == null || afterConfirm.at === requestAt)
+            && recoveryBook.hash
+            && recoveryBook.hash !== requestHash,
+          );
+        }
+      }
       // REST overrides only a stale/absent WS state or a stable hash mismatch.
       if (!prev || Date.now() - prev.at > 3000 || hashMismatch) {
+        const snapshot = hashMismatch ? recoveryBook : b;
+        const snapshotBids = hashMismatch
+          ? normLevels(snapshot.bids).sort((x, y) => y[0] - x[0])
+          : bids;
+        const snapshotAsks = hashMismatch
+          ? normLevels(snapshot.asks).sort((x, y) => x[0] - y[0])
+          : asks;
         this.books.set(assetId, {
-          bids, asks, at: Date.now(), src: hashMismatch ? 'rest_hash_repair' : 'rest',
-          minOrderSize: parseFloat(b.minimum_order_size ?? b.min_order_size),
-          hash: b.hash || null, sourceAt: epochMs(b.timestamp), connectionEpoch: this.connectionEpoch,
+          bids: snapshotBids, asks: snapshotAsks, at: Date.now(), src: hashMismatch ? 'rest_hash_repair' : 'rest',
+          minOrderSize: parseFloat(snapshot.minimum_order_size ?? snapshot.min_order_size),
+          hash: snapshot.hash || null, sourceAt: epochMs(snapshot.timestamp), connectionEpoch: this.connectionEpoch,
           connectionShard: this.connectionShard,
         });
         if (hashMismatch) {
           this.bookStateGaps += 1;
           this.lastBookStateGapAt = new Date().toISOString();
           await logEvent('WARN', 'clob', 'book hash mismatch repaired from REST', {
-            assetId, wsHash: requestHash, restHash: b.hash,
+            assetId, wsHash: requestHash, restHash: snapshot.hash,
+            confirmationGraceMs: this.hashValidationGraceMs,
           });
           this._bufferEvent(assetId, 'book_hash_repair', null, null, null, {
-            ws_hash: requestHash, rest_hash: b.hash,
-          }, {}, b.timestamp, b.hash);
+            ws_hash: requestHash, rest_hash: snapshot.hash,
+          }, {}, snapshot.timestamp, snapshot.hash);
         }
       }
     } catch (err) {

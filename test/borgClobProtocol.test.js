@@ -105,6 +105,75 @@ test('CLOB disconnects are durable gap counters and invalidate stale books', () 
   assert.equal(clob.health().connectionGaps, 1);
 });
 
+test('CLOB REST validation lets an in-flight WS update win without a false gap', async () => {
+  const originalFetch = global.fetch;
+  let requests = 0;
+  global.fetch = async () => {
+    requests += 1;
+    return {
+      ok: true,
+      json: async () => ({
+        hash: 'h2', timestamp: Date.now(),
+        bids: [{ price: '0.49', size: '10' }],
+        asks: [{ price: '0.51', size: '10' }],
+      }),
+    };
+  };
+  try {
+    const clob = new ClobRecon(() => 1, { hashValidationGraceMs: 20 });
+    const at = Date.now();
+    clob.books.set('YES', {
+      hash: 'h1', src: 'ws', at,
+      bids: [[0.48, 10]], asks: [[0.52, 10]],
+    });
+    setTimeout(() => clob.books.set('YES', {
+      hash: 'h2', src: 'ws', at: Date.now(),
+      bids: [[0.49, 10]], asks: [[0.51, 10]],
+    }), 5);
+
+    await clob.pollBook('YES', { forceValidate: true });
+
+    assert.equal(requests, 1);
+    assert.equal(clob.bookStateGaps, 0);
+    assert.equal(clob.getBook('YES').src, 'ws');
+    assert.equal(clob.getBook('YES').hash, 'h2');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('CLOB REST validation records only a mismatch that survives grace and confirmation', async () => {
+  const originalFetch = global.fetch;
+  let requests = 0;
+  global.fetch = async () => {
+    requests += 1;
+    return {
+      ok: true,
+      json: async () => ({
+        hash: 'h2', timestamp: Date.now(),
+        bids: [{ price: '0.49', size: '10' }],
+        asks: [{ price: '0.51', size: '10' }],
+      }),
+    };
+  };
+  try {
+    const clob = new ClobRecon(() => 1, { hashValidationGraceMs: 0 });
+    clob.books.set('YES', {
+      hash: 'h1', src: 'ws', at: Date.now(),
+      bids: [[0.48, 10]], asks: [[0.52, 10]],
+    });
+
+    await clob.pollBook('YES', { forceValidate: true });
+
+    assert.equal(requests, 2);
+    assert.equal(clob.bookStateGaps, 1);
+    assert.equal(clob.getBook('YES').src, 'rest_hash_repair');
+    assert.equal(clob.getBook('YES').hash, 'h2');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('CLOB propagates documented tick-size changes to event-driven strategies', () => {
   const events = [];
   const clob = new ClobRecon(() => 42, { onMarketEvent: (event) => events.push(event) });

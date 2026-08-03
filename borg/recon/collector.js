@@ -172,16 +172,26 @@ async function main() {
   });
   const markets = new MarketsRecon(feeds, chainlink, assets, rtds);
   const evaluationMarkets = () => capturePolicy.filterMarkets(markets.evaluationAll());
-  const sqlTouchMinIntervalMs = Math.max(0,
-    Number(process.env.BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS || 0) || 0);
-  const clob = new ClobMultiplex((assetId) => {
+  const marketForToken = (assetId) => {
     for (const rec of markets.bySlug.values()) {
-      if (rec.up_token_id === assetId || rec.down_token_id === assetId) return rec.id;
+      if (rec.up_token_id === assetId || rec.down_token_id === assetId) return rec;
     }
     return null;
-  }, {
+  };
+  const primaryShardByAsset = new Map([
+    ['btc', 0], ['eth', 1], ['sol', 2], ['xrp', 3],
+  ]);
+  const sqlTouchMinIntervalMs = Math.max(0,
+    Number(process.env.BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS || 0) || 0);
+  const clob = new ClobMultiplex((assetId) => marketForToken(assetId)?.id || null, {
     wal: wals.clob,
     sqlTouchMinIntervalMs,
+    // One high-rate five-minute market per socket. v23 proved every primary
+    // shard carrying two markets (four outcome tokens) was closed by the venue
+    // with code 1006 while single-market shards stayed connected. Route by the
+    // stable underlying asset so window rotation cannot recreate that load.
+    shardIndexForAsset: (assetId) => primaryShardByAsset.get(marketForToken(assetId)?.asset),
+    describeAsset: (assetId) => marketForToken(assetId)?.asset || null,
     onMarketEvent: (event) => enqueueEventEvaluation(event),
   });
 
