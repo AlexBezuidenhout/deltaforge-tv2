@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TV2 // POLYBOT TERMINAL</title>
+  <title>TV2 — Research operations</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -787,15 +787,16 @@
       opacity: 0.65;
     }
   </style>
+  <link rel="stylesheet" href="/tv2-ui.css?v=20260803">
 </head>
-<body>
+<body class="tv2-shell">
 
 <!-- ═══════════════════════════════════════════════════════ LOGIN OVERLAY -->
 <div id="loginOverlay" class="hidden">
   <div class="login-card">
     <div class="login-logo">
       <div class="login-logo-text">TV2</div>
-      <div class="login-logo-sub">Polymarket Trading Terminal</div>
+      <div class="login-logo-sub">Research operations · paper first</div>
     </div>
     <div class="login-tabs">
       <button class="login-tab active" id="ltab-login" onclick="switchLoginTab('login')">Login</button>
@@ -823,29 +824,60 @@
   </div>
 </div>
 
-<nav>
+<nav class="app-sidebar" aria-label="Primary navigation">
   <div class="nav-container">
-    <div class="logo">TV2</div>
+    <div class="brand-lockup">
+      <div class="logo">TV2</div>
+      <div class="brand-copy"><strong>Research OS</strong><span>Dublin · paper first</span></div>
+    </div>
     <ul class="nav-links">
-      <li><a onclick="showPage('dashboard', this)" class="nav-link active">Dashboard</a></li>
-      <li><a onclick="showPage('trades', this)"    class="nav-link">Trades</a></li>
-      <li><a onclick="showPage('lab', this)"       class="nav-link">⚗ Lab</a></li>
-      <li><a onclick="showPage('backtest', this)"  class="nav-link">🔬 Backtest</a></li>
-      <li><a onclick="showPage('george', this)"    class="nav-link">🧪 George</a></li>
-      <li><a onclick="showPage('borg', this)"      class="nav-link">🛰️ BORG</a></li>
-      <li><a onclick="showPage('flow', this)"      class="nav-link">🌊 Flow Lab</a></li>
-      <li><a onclick="showPage('booklab', this)"   class="nav-link">📚 Book Lab</a></li>
-      <li><a onclick="showPage('crossvenue', this)" class="nav-link">⇄ Cross-Venue</a></li>
-      <li><a onclick="showPage('pyth', this)" class="nav-link">⚡ Resolver</a></li>
-      <li id="claudeNavItem"><a onclick="showPage('claude', this)" class="nav-link">Claude AI</a></li>
-      <li id="adminNavItem" style="display:none"><a onclick="showPage('admin', this)" class="nav-link" style="color:var(--amber);">⚙ Admin</a></li>
+      <li class="nav-group-label">Monitor</li>
+      <li><a href="#dashboard" onclick="showPage('dashboard', this); return false;" class="nav-link active" data-page="dashboard" data-tooltip="System health, bot state and portfolio summary.">Overview</a></li>
+      <li><a href="#trades" onclick="showPage('trades', this); return false;" class="nav-link" data-page="trades" data-tooltip="Executed paper trades, signals and gate decisions.">Trades &amp; decisions</a></li>
+      <li><a href="#george" onclick="showPage('george', this); return false;" class="nav-link" data-page="george" data-tooltip="The separate George model and its split-test results.">George</a></li>
+
+      <li class="nav-group-label">Research</li>
+      <li><a href="#borg" onclick="showPage('borg', this); return false;" class="nav-link" data-page="borg" data-tooltip="Every frozen strategy, lifecycle state and promotion evidence.">Strategy fleet</a></li>
+      <li><a href="#pyth" onclick="showPage('pyth', this); return false;" class="nav-link" data-page="pyth" data-tooltip="Resolver-source boundary experiments using exact certified feeds.">Resolver lab</a></li>
+      <li><a href="#crossvenue" onclick="showPage('crossvenue', this); return false;" class="nav-link" data-page="crossvenue" data-tooltip="Rule-aware Polymarket and Kalshi comparison. Paper only.">Cross-venue</a></li>
+      <li><a href="#booklab" onclick="showPage('booklab', this); return false;" class="nav-link" data-page="booklab" data-tooltip="All-market books and certified structural payoff relationships.">Market structure</a></li>
+      <li><a href="#flow" onclick="showPage('flow', this); return false;" class="nav-link" data-page="flow" data-tooltip="Broad public-flow capture. Strategy authority is currently paused.">Flow capture</a></li>
+
+      <li class="nav-group-label">Tools</li>
+      <li><a href="#backtest" onclick="showPage('backtest', this); return false;" class="nav-link" data-page="backtest" data-tooltip="Retrospective scenarios and replay diagnostics; not automatically causal evidence.">Replay lab</a></li>
+      <li><a href="#lab" onclick="showPage('lab', this); return false;" class="nav-link" data-page="lab" data-tooltip="Main bot configuration, risk settings and connections.">Bot settings</a></li>
+      <li id="claudeNavItem"><a href="#claude" onclick="showPage('claude', this); return false;" class="nav-link" data-page="claude" data-tooltip="Stored AI research commentary and manual analysis tools.">Research assistant</a></li>
+      <li id="adminNavItem" style="display:none"><a href="#admin" onclick="showPage('admin', this); return false;" class="nav-link" data-page="admin" data-tooltip="User, process and audit administration.">Administration</a></li>
     </ul>
     <div class="nav-right">
-      <span id="userEmail"></span>
-      <button type="button" class="btn-logout" id="btnLogout" onclick="logout()">Exit</button>
+      <div class="operator-avatar" aria-hidden="true">A</div>
+      <div class="operator-copy"><span>Signed in</span><strong id="userEmail"></strong></div>
+      <button type="button" class="btn-logout" id="btnLogout" onclick="logout()">Log out</button>
     </div>
   </div>
 </nav>
+
+<header class="app-topbar">
+  <button class="mobile-nav-toggle" id="mobileNavToggle" type="button" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button>
+  <div class="app-context">
+    <div class="app-breadcrumb">TV2 / <span id="appContextSection">Monitor</span></div>
+    <div id="appContextTitle">Overview</div>
+  </div>
+  <div class="app-context-note" id="appContextNote">System state, evidence integrity and current paper operations.</div>
+  <div class="topbar-actions">
+    <span class="paper-lock" data-tooltip="The MAIN bot is configured for paper trading. Individual research canaries are reported separately in the strategy fleet.">Main paper</span>
+    <time id="globalClock" aria-label="Dublin server reference time">—</time>
+  </div>
+</header>
+
+<section class="evidence-ribbon" id="globalEvidenceRail" aria-label="Global research integrity">
+  <div class="rail-intro"><span>Evidence control</span><strong>Running ≠ valid</strong></div>
+  <div class="rail-item" id="globalSystemState" data-state="loading" data-tooltip="Runtime and database liveness. A running process can still have invalid research data."><span>System</span><strong>Checking</strong><small>Runtime health</small></div>
+  <div class="rail-item" id="globalEvidenceState" data-state="loading" data-tooltip="An evidence epoch is valid only after uninterrupted feed, persistence and archive checks."><span>Evidence</span><strong>Checking</strong><small>Forward cohort</small></div>
+  <div class="rail-item" id="globalStorageState" data-state="loading" data-tooltip="Free space on the VPS hot tier. Collection fails closed below the configured reserve."><span>Hot storage</span><strong>Checking</strong><small>VPS SSD</small></div>
+  <div class="rail-item" id="globalArchiveState" data-state="loading" data-tooltip="Last verified immutable off-host receipt and Parquet projection state."><span>Archive</span><strong>Checking</strong><small>Google Drive + Parquet</small></div>
+</section>
+<div class="nav-scrim" id="navScrim" aria-hidden="true"></div>
 <div id="readOnlyBanner">Read-only research viewer · live dashboards and results · trading, settings, credentials and admin actions are locked</div>
 
 <main>
@@ -853,7 +885,7 @@
 
 <!-- ═══════════════════════════════════════════════════════ DASHBOARD -->
 <div id="dashboard" class="page active">
-  <div class="page-title" style="display:flex;align-items:center;"><span>▸</span>&nbsp;SYSTEM STATUS
+  <div class="page-title" style="display:flex;align-items:center;">Overview
     <label id="sessionOnlyLabel" title="Scope P&amp;L, trade counts and win rates to the active trading session. Live signals and balances remain visible."
            style="margin-left:auto;font-size:10px;font-weight:600;letter-spacing:1px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:uppercase;">
       <input type="checkbox" id="sessionOnlyToggle" onchange="toggleSessionOnly()" style="accent-color:var(--cyan);">
@@ -1253,7 +1285,7 @@
 
 <!-- ═══════════════════════════════════════════════════════ TRADES PAGE -->
 <div id="trades" class="page">
-  <div class="page-title"><span>▸</span> TRADES &amp; SIGNALS</div>
+  <div class="page-title">Trades and decisions</div>
 
   <div class="tabs" style="margin-bottom:14px;">
     <button class="tab active" onclick="switchTradesTab('tabTrades', this)">Trades</button>
@@ -1528,7 +1560,7 @@
 <!-- ═══════════════════════════════════════════════════════ CLAUDE AI PAGE -->
 <!-- ═══════════════════════════════════════════════════════ BACKTEST -->
 <div id="backtest" class="page">
-  <div class="page-title"><span>🔬</span> RETROSPECTIVE SCENARIO LAB — NOT A CAUSAL BACKTEST</div>
+  <div class="page-title">Replay lab <small>Retrospective scenarios · not automatically causal evidence</small></div>
   <div class="status-banner" style="margin-bottom:12px;border-color:var(--yellow);">
     <div class="status-indicator" style="background:var(--yellow);"></div>
     <div class="status-text"><div>L0 EVIDENCE ONLY</div><div>This screen re-filters outcomes already in the database. It does not replay event-time books, queue position, quote survival, or a holdout period.</div></div>
@@ -1614,7 +1646,7 @@
 <!-- ═══════════════════════════════════════════════════════ CLAUDE -->
 <!-- ═══════════════ GEORGE — Chainlink-anchored split-test bot ═══════════════ -->
 <div id="george" class="page">
-  <div class="page-title"><span>🧪</span> GEORGE — SPLIT TEST (CHAINLINK MODEL, PAPER ONLY)</div>
+  <div class="page-title">George <small>Chainlink split test · paper only</small></div>
 
   <div class="status-banner" id="georgeStatusBanner" style="margin-bottom:12px;">
     <div class="status-indicator" id="georgeStatusIndicator"></div>
@@ -1781,7 +1813,7 @@
 
 <!-- ═══════════════ BORG — shadow research + independently gated live canaries ═══════════════ -->
 <div id="borg" class="page">
-  <div class="page-title"><span>🛰️</span> BORG — SHADOW EDGE DISCOVERY + CONTROLLED LIVE CANARIES</div>
+  <div class="page-title">Strategy fleet <small>Frozen hypotheses, evidence and lifecycle decisions</small></div>
 
   <div class="status-banner" id="borgStatusBanner" style="margin-bottom:12px;">
     <div class="status-indicator" id="borgStatusIndicator"></div>
@@ -1955,7 +1987,7 @@
 
 <!-- ═══════════════ FLOW LAB — public completed-flow scalp research ═══════════════ -->
 <div id="flow" class="page">
-  <div class="page-title"><span>🌊</span> FLOW LAB — PUBLIC TAKER-SWEEP RESEARCH + CAPPED CANARY</div>
+  <div class="page-title">Flow capture <small>Broad public tape · strategy authority paused</small></div>
   <div class="status-banner" id="flowStatusBanner" style="margin-bottom:12px;">
     <div class="status-indicator" id="flowStatusIndicator"></div>
     <div class="status-text">
@@ -2004,7 +2036,7 @@
 
 <!-- ═══════════════ BOOK LAB — all-market L2 + structural research ═══════════════ -->
 <div id="booklab" class="page">
-  <div class="page-title"><span>📚</span> BOOK LAB — ALL-MARKET L2 + STRUCTURAL ARBITRAGE (PAPER ONLY)</div>
+  <div class="page-title">Market structure <small>All-market L2 and certified payoff relationships</small></div>
   <div class="status-banner" style="margin-bottom:12px;">
     <div class="status-indicator" id="bookLabStatusIndicator"></div>
     <div class="status-text"><div id="bookLabStatusTitle">BOOK LAB: —</div><div id="bookLabStatusSubtitle">Public WebSocket books; no wallet, signer or live order path.</div></div>
@@ -2059,7 +2091,7 @@
 
 <!-- ═══════════════ CROSS-VENUE LAB — Polymarket/Kalshi paper arb ═══════════════ -->
 <div id="crossvenue" class="page">
-  <div class="page-title"><span>⇄</span> CROSS-VENUE LAB — POLYMARKET × KALSHI (LIVE DATA · PAPER ONLY)</div>
+  <div class="page-title">Cross-venue <small>Polymarket × Kalshi · live data, paper execution</small></div>
   <div class="status-banner" style="margin-bottom:12px;">
     <div class="status-indicator" id="cvStatusIndicator"></div>
     <div class="status-text"><div id="cvStatusTitle">CROSS-VENUE: —</div><div id="cvStatusSubtitle">Discovering comparable contracts and synchronized executable books.</div></div>
@@ -2116,7 +2148,7 @@
 
 <!-- ═══════════════ PYTH RESOLVER BOUNDARY LAB ═══════════════ -->
 <div id="pyth" class="page">
-  <div class="page-title"><span>⚡</span> PYTH RESOLVER BOUNDARY — FORWARD PAPER MEASUREMENT</div>
+  <div class="page-title">Resolver lab <small>Exact source identity · forward paper measurement</small></div>
   <div class="status-banner" style="margin-bottom:12px;">
     <div class="status-indicator" id="pythStatusIndicator"></div>
     <div class="status-text"><div id="pythStatusTitle">RESOLVER LAB: —</div><div id="pythStatusSubtitle">Certified Pyth rules + public RTDS + executable Polymarket depth.</div></div>
@@ -2145,7 +2177,7 @@
 </div>
 
 <div id="claude" class="page">
-  <div class="page-title"><span>▸</span> CLAUDE AI — STRATEGY ANALYSIS</div>
+  <div class="page-title">Research assistant <small>Stored analysis and operator-initiated review</small></div>
 
   <div class="panel">
     <div class="panel-header"><span class="panel-title">Analysis Control</span></div>
@@ -2193,7 +2225,7 @@
 <!-- ═══════════════════════════════════════════════════════ SETTINGS PAGE -->
 <!-- ═══════════════════════════════════════════════ LAB PAGE ══ -->
 <div id="lab" class="page">
-  <div class="page-title"><span>⚗</span> LAB &amp; SETTINGS</div>
+  <div class="page-title">Bot settings <small>Main strategy, execution and connections</small></div>
 
   <!-- Top tabs: Lab / Strategy / Risk / Advanced -->
   <div class="tabs" style="margin-bottom:14px;">
@@ -4374,13 +4406,13 @@
         document.getElementById('georgeStatusSubtitle').textContent = "Models the Chainlink resolution print. Flat stakes, hold to resolution, LIVE TRADING.";
         document.getElementById('gBalance').textContent = fmt$(st.liveBalance);
         document.getElementById('gBalance').previousElementSibling.textContent = "Live Balance";
-        document.querySelector('#george .page-title').innerHTML = '<span>🧪</span> GEORGE — SPLIT TEST (CHAINLINK MODEL, LIVE TRADING)';
+        document.querySelector('#george .page-title').innerHTML = 'George <small>Chainlink split test · live trading</small>';
         if (modeEl) { modeEl.textContent = 'LIVE TRADING'; modeEl.style.borderColor = 'var(--red)'; modeEl.style.color = 'var(--red)'; }
       } else {
         document.getElementById('georgeStatusSubtitle').textContent = "Models the Chainlink resolution print, not Binance spot. Flat stakes, hold to resolution, PAPER ONLY.";
         document.getElementById('gBalance').textContent = fmt$(st.paperBalance);
         document.getElementById('gBalance').previousElementSibling.textContent = "George Balance";
-        document.querySelector('#george .page-title').innerHTML = '<span>🧪</span> GEORGE — SPLIT TEST (CHAINLINK MODEL, PAPER ONLY)';
+        document.querySelector('#george .page-title').innerHTML = 'George <small>Chainlink split test · paper only</small>';
         if (modeEl) { modeEl.textContent = 'PAPER MODE'; modeEl.style.borderColor = 'var(--green)'; modeEl.style.color = 'var(--green)'; }
       }
 
@@ -7420,5 +7452,6 @@
 
   // ═══════════════════════════════════════════════════════════════════════════
 </script>
+<script src="/tv2-ui.js?v=20260803"></script>
 </body>
 </html>
