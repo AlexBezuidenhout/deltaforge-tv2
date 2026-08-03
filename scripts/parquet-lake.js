@@ -7,6 +7,7 @@ const {
   compactFromGoogle,
   hydrateParquet,
   loadLakeState,
+  materializeFromGoogle,
 } = require('../borg/research/parquet-lake');
 
 function arg(name, fallback = null) {
@@ -14,13 +15,31 @@ function arg(name, fallback = null) {
   return index >= 0 ? process.argv[index + 1] : fallback;
 }
 
+function compactOptions() {
+  return {
+    sources: arg('--sources'),
+    from: arg('--from'),
+    to: arg('--to'),
+    order: process.argv.includes('--oldest') ? 'oldest' : arg('--order'),
+    maxFiles: arg('--max-files'),
+    maxBytes: arg('--max-bytes'),
+  };
+}
+
 async function main() {
   const command = process.argv[2] || 'compact';
   if (command === 'compact') {
-    const report = await compactFromGoogle({
-      sources: arg('--sources'),
-      maxFiles: arg('--max-files'),
-      maxBytes: arg('--max-bytes'),
+    const report = await compactFromGoogle(compactOptions());
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
+  if (command === 'materialize') {
+    const options = compactOptions();
+    const report = await materializeFromGoogle({
+      ...options,
+      order: process.argv.includes('--newest') ? 'newest' : (options.order || 'oldest'),
+      maxBatches: arg('--max-batches'),
+      maxMinutes: arg('--max-minutes'),
     });
     console.log(JSON.stringify(report, null, 2));
     return;

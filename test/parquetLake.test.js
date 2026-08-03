@@ -15,6 +15,7 @@ const {
   diskFreeBytes,
   envelopeFor,
   latestVerifiedBatch,
+  normalizeSelectionWindow,
   quarantineRawSource,
   receiptFile,
   receiptText,
@@ -63,6 +64,41 @@ test('verified raw selection excludes unverified and already compacted objects',
   const lake = { sources: { done: { batchHash: 'x' } } };
   const selected = selectVerifiedRawObjects(raw, lake, { maxFiles: 10, maxBytes: 1000 });
   assert.deepEqual(selected.records.map((row) => row.id), ['good']);
+});
+
+test('raw selection can materialize an audited source/date window oldest first', () => {
+  const entry = (source, date, name, mtimeMs) => ({
+    namespace: 'wal', verified: true,
+    relative: `${source}/${date}/${name}.ndjson.gz`,
+    size: 100, mtimeMs, sha256: name.repeat(64).slice(0, 64),
+  });
+  const raw = {
+    format: 'deltaforge-google-drive-state-v1',
+    objects: {
+      before: entry('binance', '2026-08-01', 'a', 1),
+      newest: entry('binance', '2026-08-02', 'b', 3),
+      oldest: entry('binance', '2026-08-02', 'c', 2),
+      other: entry('coinbase', '2026-08-02', 'd', 0),
+    },
+  };
+  const selected = selectVerifiedRawObjects(raw, { sources: {} }, {
+    sources: 'binance', from: '2026-08-02', to: '2026-08-02',
+    order: 'oldest', maxFiles: 10, maxBytes: 1000,
+  });
+  assert.deepEqual(selected.records.map((row) => row.id), ['oldest', 'newest']);
+  assert.deepEqual(selected.scope, {
+    sources: ['binance'], from: '2026-08-02', to: '2026-08-02', order: 'oldest',
+  });
+});
+
+test('Parquet materialization scope rejects ambiguous dates and sort order', () => {
+  assert.deepEqual(normalizeSelectionWindow({ from: '2026-08-01', to: '2026-08-03' }), {
+    from: '2026-08-01', to: '2026-08-03', order: 'newest',
+  });
+  assert.throws(() => normalizeSelectionWindow({ from: '03/08/2026' }), /YYYY-MM-DD/);
+  assert.throws(() => normalizeSelectionWindow({ from: '2026-02-31' }), /YYYY-MM-DD/);
+  assert.throws(() => normalizeSelectionWindow({ from: '2026-08-03', to: '2026-08-01' }), /from <= to/);
+  assert.throws(() => normalizeSelectionWindow({ order: 'random' }), /newest or oldest/);
 });
 
 test('raw rejection is content-addressed and a changed object is reconsidered', () => {

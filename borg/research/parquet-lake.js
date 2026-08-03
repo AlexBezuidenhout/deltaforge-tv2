@@ -210,6 +210,29 @@ function normalizeSources(value) {
   return new Set(sources);
 }
 
+function selectionDate(value, label) {
+  if (value == null || value === '') return null;
+  const normalized = String(value).trim();
+  const timestamp = Date.parse(`${normalized}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)
+      || !Number.isFinite(timestamp)
+      || new Date(timestamp).toISOString().slice(0, 10) !== normalized) {
+    throw new Error(`${label} must be YYYY-MM-DD`);
+  }
+  return normalized;
+}
+
+function normalizeSelectionWindow(options = {}) {
+  const from = selectionDate(options.from, 'Parquet selection from');
+  const to = selectionDate(options.to, 'Parquet selection to');
+  if (from && to && from > to) throw new Error('Parquet selection requires from <= to');
+  const order = String(options.order || 'newest').trim().toLowerCase();
+  if (!['newest', 'oldest'].includes(order)) {
+    throw new Error('Parquet selection order must be newest or oldest');
+  }
+  return { from, to, order };
+}
+
 function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
   if (rawState?.format !== 'deltaforge-google-drive-state-v1') {
     throw new Error('verified Google Drive raw state is unavailable or unsupported');
@@ -218,6 +241,7 @@ function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
   const maxFiles = positiveInt(options.maxFiles, DEFAULT_MAX_FILES);
   const maxBytes = positiveInt(options.maxBytes, DEFAULT_MAX_BYTES);
   const cutoffMs = Number.isFinite(Number(options.cutoffMs)) ? Number(options.cutoffMs) : Infinity;
+  const window = normalizeSelectionWindow(options);
   const candidates = [];
   for (const [id, entry] of Object.entries(rawState.objects || {})) {
     if (entry.namespace !== 'wal' || entry.verified !== true) continue;
@@ -230,6 +254,8 @@ function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
     if (rejected?.sha256 === entry.sha256) continue;
     const parsed = sourceFromRelative(entry.relative);
     if (sources && !sources.has(parsed.source)) continue;
+    if (window.from && parsed.pathDate < window.from) continue;
+    if (window.to && parsed.pathDate > window.to) continue;
     if (Number(entry.mtimeMs) > cutoffMs) continue;
     candidates.push({
       id,
@@ -241,7 +267,9 @@ function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
       sha256: entry.sha256,
     });
   }
-  candidates.sort((left, right) => right.mtimeMs - left.mtimeMs || left.relative.localeCompare(right.relative));
+  const direction = window.order === 'oldest' ? 1 : -1;
+  candidates.sort((left, right) => direction * (left.mtimeMs - right.mtimeMs)
+    || left.relative.localeCompare(right.relative));
   const selected = [];
   let bytes = 0;
   for (const record of candidates) {
@@ -250,7 +278,18 @@ function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
     selected.push(record);
     bytes += record.size;
   }
-  return { records: selected, bytes, remaining: Math.max(0, candidates.length - selected.length) };
+  return {
+    records: selected,
+    bytes,
+    remaining: Math.max(0, candidates.length - selected.length),
+    eligible: candidates.length,
+    scope: {
+      sources: sources ? [...sources].sort() : null,
+      from: window.from,
+      to: window.to,
+      order: window.order,
+    },
+  };
 }
 
 function batchHash(records) {
@@ -714,6 +753,9 @@ async function compactFromGoogle(options = {}) {
     maxFiles: options.maxFiles || env.PARQUET_MAX_FILES,
     maxBytes: options.maxBytes || env.PARQUET_MAX_BYTES,
     cutoffMs: options.cutoffMs || Date.now() - positiveInt(env.PARQUET_CUTOFF_SECONDS, 600) * 1000,
+    from: options.from,
+    to: options.to,
+    order: options.order || env.PARQUET_SELECTION_ORDER,
   });
   if (!selection.records.length) {
     // The state checkpoint is written only after remote rclone verification.
@@ -730,6 +772,7 @@ async function compactFromGoogle(options = {}) {
       status: prior ? 'verified_no_new_batch' : 'nothing_to_compact',
       latestVerifiedBatch: prior?.batchHash || null,
       pending: selection.remaining,
+      selection: selection.scope,
       rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
     };
     writeAtomic(path.join(stateRoot, 'last-report.json'), `${JSON.stringify(report, null, 2)}\n`, 0o600);
@@ -791,6 +834,7 @@ async function compactFromGoogle(options = {}) {
         rejected,
         rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
         pendingSourceFiles: selection.remaining,
+        selection: selection.scope,
       };
       writeAtomic(path.join(stateRoot, 'last-report.json'), `${JSON.stringify(report, null, 2)}\n`, 0o600);
       return report;
@@ -840,6 +884,7 @@ async function compactFromGoogle(options = {}) {
       parquetFiles: batch.outputs.length,
       parquetBytes: batch.outputs.reduce((sum, row) => sum + row.bytes, 0),
       pendingSourceFiles: selection.remaining,
+      selection: selection.scope,
       remote: remoteResult,
       hotPrune: prune,
     };
@@ -848,6 +893,52 @@ async function compactFromGoogle(options = {}) {
   } finally {
     fs.rmSync(workRoot, { recursive: true, force: true });
   }
+}
+
+async function materializeFromGoogle(options = {}) {
+  const maxBatches = Math.min(100, positiveInt(options.maxBatches, 1));
+  const maxMinutes = Math.min(24 * 60, positiveInt(options.maxMinutes, 60));
+  const runOptions = { ...options, order: options.order || 'oldest' };
+  const startedAt = new Date().toISOString();
+  const deadlineMs = Date.now() + maxMinutes * 60 * 1000;
+  const batches = [];
+  let complete = false;
+  for (let index = 0; index < maxBatches; index += 1) {
+    if (index > 0 && Date.now() >= deadlineMs) break;
+    const report = await compactFromGoogle(runOptions);
+    batches.push(report);
+    const pending = Number(report.pendingSourceFiles ?? report.pending ?? 0);
+    if (pending <= 0 || ['nothing_to_compact', 'verified_no_new_batch'].includes(report.status)) {
+      complete = true;
+      break;
+    }
+  }
+  const finalReport = batches.at(-1) || null;
+  return {
+    format: 'deltaforge-parquet-materialization-v1',
+    startedAt,
+    completedAt: new Date().toISOString(),
+    complete,
+    requested: {
+      sources: runOptions.sources || null,
+      from: runOptions.from || null,
+      to: runOptions.to || null,
+      order: runOptions.order,
+      maxBatches,
+      maxMinutes,
+    },
+    runs: batches.length,
+    verifiedBatches: batches.filter((row) => row.status === 'verified').length,
+    compactedSourceFiles: batches.reduce(
+      (sum, row) => sum + Number(row.compactedSourceFiles || 0), 0,
+    ),
+    sourceRows: batches.reduce((sum, row) => sum + Number(row.sourceRows || 0), 0),
+    parquetFiles: batches.reduce((sum, row) => sum + Number(row.parquetFiles || 0), 0),
+    finalPendingSourceFiles: Number(
+      finalReport?.pendingSourceFiles ?? finalReport?.pending ?? 0,
+    ),
+    batches,
+  };
 }
 
 function dateRange(from, to) {
@@ -924,7 +1015,9 @@ module.exports = {
   lfDelimitedLines,
   loadLakeState,
   latestVerifiedBatch,
+  materializeFromGoogle,
   normalizeSources,
+  normalizeSelectionWindow,
   outputRelative,
   parquetCodec,
   pruneHotParquet,

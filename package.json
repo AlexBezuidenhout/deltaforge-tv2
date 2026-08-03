@@ -25,6 +25,7 @@
     "replay:latency-sweep": "node scripts/latency-sweep.js",
     "archive:parquet": "node scripts/parquet-mirror.js",
     "archive:parquet-lake": "node scripts/parquet-lake.js compact",
+    "archive:parquet-materialize": "node scripts/parquet-lake.js materialize",
     "research:parquet-query": "node scripts/parquet-query.js",
     "archive:gdrive": "node scripts/google-drive-archive.js",
     "recover:wal": "node scripts/recover-wal-backlog.js",
