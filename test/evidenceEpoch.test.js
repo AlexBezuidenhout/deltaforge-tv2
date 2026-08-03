@@ -270,6 +270,8 @@ test('evidence report distinguishes the immutable release from the collector fam
   assert.match(source, /primary redundant CLOB coverage is/);
   assert.match(source, /primary redundant RTDS coverage is/);
   assert.match(source, /public-flow process is warming, stale or repeatedly restarting/);
+  assert.match(source, /row\.source === 'flow_heartbeat'[\s\S]*strategy_signals_enabled !== true/);
+  assert.match(source, /\.\.\.broadCaptureCounters/);
 });
 
 test('recorded failed evidence is data rather than a failed monitor process', () => {

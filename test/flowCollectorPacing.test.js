@@ -89,6 +89,16 @@ test('flow socket re-requests only missing active snapshots with a cooldown', ()
   assert.equal(socket.active.has('b'), true);
 });
 
+test('production flow service is broad capture only and cannot create socket signals', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const unit = fs.readFileSync(path.join(
+    __dirname, '..', 'ops', 'vps', 'polymarket-flow.service',
+  ), 'utf8');
+  assert.match(unit, /^Environment=FLOW_CLOB_ENABLED=false$/m);
+  assert.match(unit, /^Environment=FLOW_STRATEGY_SIGNALS_ENABLED=false$/m);
+});
+
 test('flow CLOB health remains covered after one physical route disconnects', () => {
   const now = Date.now();
   const collector = Object.create(FlowCollector.prototype);

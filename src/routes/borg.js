@@ -1162,12 +1162,19 @@ router.get('/flow/status', authMiddleware, async (req, res) => {
         evidenceStatus: 'UNPROVEN_POST_SELECTED',
       },
       contract: {
-        mode: 'PAPER_ONLY', pendingOrderVisibility: false,
+        mode: data.clobCaptureEnabled === true
+          ? 'PAPER_ONLY' : 'BROAD_CAPTURE_ONLY_CLOB_STRATEGY_PAUSED',
+        status: data.clobCaptureEnabled === true
+          ? 'TESTING' : 'PAUSED_NEGATIVE_CONTROL',
+        pendingOrderVisibility: false,
         globalScanner: 'all completed public Data API trades; delayed discovery only',
-        realtimePanel: 'bounded high-volume market-channel panel; causal scalp evaluation',
+        realtimePanel: data.clobCaptureEnabled === true
+          ? 'bounded high-volume market-channel panel; causal scalp evaluation'
+          : 'disabled after correlated same-egress socket resets; historical events retained',
         liveOrderPath: 'separate independently gated canary; default dry',
         startingBankrollUsd: 500, targetStakeUsd: 10,
-        activeStrategyVersion: CHALLENGER_STRATEGY_VERSION,
+        activeStrategyVersion: data.clobCaptureEnabled === true
+          ? CHALLENGER_STRATEGY_VERSION : null,
         retiredControl: 'public-flow-scalp-v1 retained as a negative historical control',
       },
     });

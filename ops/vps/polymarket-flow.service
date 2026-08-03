@@ -17,6 +17,7 @@ Environment=BORG_ARCHIVE_DIR=/var/lib/deltaforge/archive/borg-raw
 Environment=BORG_WAL_MIN_FREE_GB=20
 Environment=BORG_CODE_VERSION=dublin-runtime-v3
 Environment=FLOW_REALTIME_MARKETS=4
+Environment=FLOW_CLOB_ENABLED=false
 Environment=FLOW_CLOB_SHARDS=4
 Environment=FLOW_CLOB_PATHS_PER_ASSET=2
 Environment=FLOW_CLOB_CONNECT_STAGGER_MS=3000

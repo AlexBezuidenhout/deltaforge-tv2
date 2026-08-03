@@ -451,7 +451,9 @@ async function assessEvidenceEpoch(pool, options = {}) {
   } else if (expectedRtdsAssets <= 0 || coveredRtdsAssets < expectedRtdsAssets) {
     critical.push(`primary redundant RTDS coverage is ${coveredRtdsAssets}/${expectedRtdsAssets} assets`);
   }
-  if (flowHeartbeat.routingMode === 'redundant-explicit') {
+  if (flowHeartbeat.clobCaptureEnabled === true
+      && flowHeartbeat.strategy_signals_enabled === true
+      && flowHeartbeat.routingMode === 'redundant-explicit') {
     const expectedFlowAssets = finite(flowHeartbeat.expectedAssets, null);
     const coveredFlowAssets = finite(flowHeartbeat.coveredAssets, null);
     if (expectedFlowAssets == null || coveredFlowAssets == null) {
@@ -459,7 +461,8 @@ async function assessEvidenceEpoch(pool, options = {}) {
     } else if (expectedFlowAssets <= 0 || coveredFlowAssets < expectedFlowAssets) {
       critical.push(`public-flow redundant CLOB coverage is ${coveredFlowAssets}/${expectedFlowAssets} token assets`);
     }
-  } else {
+  } else if (flowHeartbeat.clobCaptureEnabled === true
+      && flowHeartbeat.strategy_signals_enabled === true) {
     const activeFlowSockets = finite(flowHeartbeat.activeSockets, null);
     const expectedFlowSockets = finite(flowHeartbeat.expectedSockets, null);
     if (activeFlowSockets == null || expectedFlowSockets == null) {
@@ -504,8 +507,19 @@ async function assessEvidenceEpoch(pool, options = {}) {
   const sequenceCounters = [];
   const errorCounters = [];
   for (const row of [...componentRows, ...eventHeartbeatRows]) {
-    findCounters(row.meta || row.data, isGapCounter, [], sequenceCounters);
-    findCounters(row.meta || row.data, isErrorCounter, [], errorCounters);
+    let counters = row.meta || row.data;
+    if (row.source === 'flow_heartbeat'
+        && row.data?.strategy_signals_enabled !== true) {
+      const {
+        clob, realtimeCoverageGaps, realtimeConnectionGaps,
+        realtimeTransportReconnects, lastRealtimeCoverageGapAt,
+        realtimeSnapshotRefreshes, realtimeSnapshotRefreshAssets,
+        ...broadCaptureCounters
+      } = row.data || {};
+      counters = broadCaptureCounters;
+    }
+    findCounters(counters, isGapCounter, [], sequenceCounters);
+    findCounters(counters, isErrorCounter, [], errorCounters);
   }
   if (sequenceCounters.length) {
     critical.push(`non-zero sequence-gap counters: ${sequenceCounters

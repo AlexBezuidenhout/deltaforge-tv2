@@ -43,6 +43,7 @@ const DATA_API = 'https://data-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
 const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const REALTIME_MARKETS = Math.max(2, Math.min(12, Number(process.env.FLOW_REALTIME_MARKETS || 4)));
+const CLOB_CAPTURE_ENABLED = process.env.FLOW_CLOB_ENABLED !== 'false';
 // Keep each default four-market panel on one logical shard per market. The
 // prior two-shard layout put four high-throughput tokens on each connection;
 // Polymarket reset every redundant copy of one overloaded shard together.
@@ -590,11 +591,12 @@ class FlowCollector {
       boundary: new RawWal('polymarket-flow-boundary-intents', walOptions),
       metadata: new RawWal('polymarket-flow-market-metadata', walOptions),
     };
-    this.sockets = Array.from({ length: SOCKET_SHARDS * SOCKET_PATHS }, (_, route) => new FlowSocket(
-      route, this.wal.clob,
-      (event, provenance) => this.onClobEvent(event, provenance),
-      (socket, event, detail) => this.onConnection(socket, event, detail),
-    ));
+    this.sockets = CLOB_CAPTURE_ENABLED
+      ? Array.from({ length: SOCKET_SHARDS * SOCKET_PATHS }, (_, route) => new FlowSocket(
+        route, this.wal.clob,
+        (event, provenance) => this.onClobEvent(event, provenance),
+        (socket, event, detail) => this.onConnection(socket, event, detail),
+      )) : [];
     this.markets = new Map();
     this.tokenMarkets = new Map();
     this.assetRoutes = new Map();
@@ -641,10 +643,12 @@ class FlowCollector {
   async start() {
     await migrateFlow();
     await this.refreshUniverse();
-    for (let index = 0; index < this.sockets.length; index += 1) {
-      this.sockets[index].connect();
-      if (SOCKET_CONNECT_STAGGER_MS && index + 1 < this.sockets.length) {
-        await wait(SOCKET_CONNECT_STAGGER_MS);
+    if (CLOB_CAPTURE_ENABLED) {
+      for (let index = 0; index < this.sockets.length; index += 1) {
+        this.sockets[index].connect();
+        if (SOCKET_CONNECT_STAGGER_MS && index + 1 < this.sockets.length) {
+          await wait(SOCKET_CONNECT_STAGGER_MS);
+        }
       }
     }
     this.running = true;
@@ -663,7 +667,8 @@ class FlowCollector {
     await logEvent('INFO', 'flow', 'public-flow paper collector started', {
       paper_only: true, live_order_path: 'absent', strategy_version: CHALLENGER_STRATEGY_VERSION,
       retired_control_version: STRATEGY_VERSION, v1_control_enabled: FLOW_V1_CONTROL_ENABLED,
-      strategy_signals_enabled: STRATEGY_SIGNALS_ENABLED,
+      clob_capture_enabled: CLOB_CAPTURE_ENABLED,
+      strategy_signals_enabled: CLOB_CAPTURE_ENABLED && STRATEGY_SIGNALS_ENABLED,
       realtime_markets: REALTIME_MARKETS, logical_shards: SOCKET_SHARDS,
       paths_per_asset: SOCKET_PATHS, physical_sockets: this.sockets.length,
       connect_stagger_ms: SOCKET_CONNECT_STAGGER_MS,
@@ -908,7 +913,7 @@ class FlowCollector {
       return [assetId, { routes: routes.length, freshRoutes: this._coveredRoutes(assetId, now).length }];
     }));
     return {
-      routingMode: 'redundant-explicit',
+      routingMode: CLOB_CAPTURE_ENABLED ? 'redundant-explicit' : 'disabled-capture-only',
       expectedSockets: this.sockets.length,
       activeSockets: this.sockets.filter((socket) => socket.ws?.readyState === WebSocket.OPEN).length,
       expectedAssets: assets.length,
@@ -1643,6 +1648,7 @@ class FlowCollector {
       processStartedAt: this.counters.startedAt,
       uptimeMin: Math.round((Date.now() - new Date(this.counters.startedAt).getTime()) / 60000),
       selectedMarkets: this.markets.size,
+      clobCaptureEnabled: CLOB_CAPTURE_ENABLED,
       routingMode: clob.routingMode,
       activeSockets: clob.activeSockets,
       expectedSockets: clob.expectedSockets,
@@ -1665,7 +1671,7 @@ class FlowCollector {
         boundary: this.wal.boundary.health(), metadata: this.wal.metadata.health(),
       },
       paper_only: true,
-      strategy_signals_enabled: STRATEGY_SIGNALS_ENABLED,
+      strategy_signals_enabled: CLOB_CAPTURE_ENABLED && STRATEGY_SIGNALS_ENABLED,
     });
   }
 

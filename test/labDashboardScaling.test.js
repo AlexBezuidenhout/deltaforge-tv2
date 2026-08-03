@@ -22,6 +22,7 @@ test('Flow status remains a constant-time heartbeat report', () => {
   assert.doesNotMatch(status, /FROM\s+pm_flow_trades/i);
   assert.doesNotMatch(status, /FROM\s+pm_flow_signals/i);
   assert.match(status, /source='flow_heartbeat'/);
+  assert.match(status, /BROAD_CAPTURE_ONLY_CLOB_STRATEGY_PAUSED/);
   assert.match(status, /counter_window:\s*'collector_run'/);
 });
 
