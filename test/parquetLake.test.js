@@ -8,8 +8,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const zlib = require('node:zlib');
 const {
+  assertDiskReserve,
   batchHash,
   compactStagedBatch,
+  diskFreeBytes,
   envelopeFor,
   selectVerifiedRawObjects,
   sourceFromRelative,
@@ -80,6 +82,13 @@ test('unsafe segment paths are rejected', () => {
   assert.equal(sourceFromRelative('binance/2026-08-03/a.ndjson.gz').source, 'binance');
   assert.throws(() => sourceFromRelative('../secrets/2026-08-03/a.ndjson.gz'));
   assert.throws(() => sourceFromRelative('bad/source/a.ndjson.gz'));
+});
+
+test('compaction refuses to consume the configured disk reserve', () => {
+  const free = diskFreeBytes(os.tmpdir());
+  assert.ok(free > 0);
+  assert.throws(() => assertDiskReserve(os.tmpdir(), Number.MAX_SAFE_INTEGER),
+    /below the .* byte reserve/);
 });
 
 test('staging uses one bounded files-from transfer before per-file SHA verification', async (t) => {

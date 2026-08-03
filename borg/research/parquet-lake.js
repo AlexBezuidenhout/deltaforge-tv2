@@ -30,6 +30,8 @@ const DEFAULT_PREFIX = 'VPS Data';
 const DEFAULT_MAX_FILES = 250;
 const DEFAULT_MAX_BYTES = 2 * 1024 ** 3;
 const DEFAULT_HOT_BYTES = 10 * 1024 ** 3;
+const DEFAULT_MIN_FREE_BYTES = 15 * 1024 ** 3;
+const DEFAULT_EXPANSION_RESERVE_MULTIPLIER = 24;
 
 const SOURCE_TIME_FIELDS = Object.freeze([
   'source_timestamp_ms', 'source_timestamp', 'source_ts', 'exchange_timestamp',
@@ -59,6 +61,20 @@ const TYPE_FIELDS = Object.freeze(['event_type', 'type', 'kind', 'channel', 'eve
 function positiveInt(value, fallback) {
   const parsed = parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function diskFreeBytes(root) {
+  const stat = fs.statfsSync(root);
+  return Number(stat.bavail) * Number(stat.bsize);
+}
+
+function assertDiskReserve(root, minFreeBytes, context = 'Parquet compaction') {
+  const free = diskFreeBytes(root);
+  const required = positiveInt(minFreeBytes, DEFAULT_MIN_FREE_BYTES);
+  if (free < required) {
+    throw new Error(`${context}: ${free} free bytes is below the ${required} byte reserve`);
+  }
+  return free;
 }
 
 function firstPresent(object, fields) {
@@ -321,6 +337,7 @@ async function compactStagedBatch(records, options = {}) {
   const stageRoot = path.resolve(options.stageRoot || fs.mkdtempSync(path.join(os.tmpdir(), 'df-parquet-stage-')));
   const hash = options.batchHash || batchHash(records);
   const databaseFile = path.join(stageRoot, `${hash}.duckdb`);
+  const minFreeBytes = positiveInt(options.minFreeBytes, DEFAULT_MIN_FREE_BYTES);
   await fs.promises.mkdir(stageRoot, { recursive: true });
   await fs.promises.mkdir(hotRoot, { recursive: true });
   const instance = await DuckDBInstance.create(databaseFile, { threads: String(positiveInt(options.threads, 1)) });
@@ -356,6 +373,7 @@ async function compactStagedBatch(records, options = {}) {
     const appender = await connection.createAppender('events');
     try {
       for (const record of [...records].sort((a, b) => a.relative.localeCompare(b.relative))) {
+        assertDiskReserve(stageRoot, minFreeBytes, `before ${record.relative}`);
         const result = await streamSegment(record, async (row) => {
           appendEnvelope(appender, row);
           partitions.add(`${row.source}\t${row.eventDate}\t${row.eventHour}`);
@@ -377,6 +395,7 @@ async function compactStagedBatch(records, options = {}) {
 
     const outputs = [];
     for (const key of [...partitions].sort()) {
+      assertDiskReserve(stageRoot, minFreeBytes, `before Parquet partition ${key}`);
       const [source, date, rawHour] = key.split('\t');
       const hour = Number(rawHour);
       const relative = outputRelative(source, date, hour, hash);
@@ -633,6 +652,16 @@ async function compactFromGoogle(options = {}) {
     writeAtomic(path.join(stateRoot, 'last-report.json'), `${JSON.stringify(report, null, 2)}\n`, 0o600);
     return report;
   }
+  const minFreeBytes = positiveInt(env.PARQUET_MIN_FREE_BYTES, DEFAULT_MIN_FREE_BYTES);
+  const expansionMultiplier = positiveInt(
+    env.PARQUET_EXPANSION_RESERVE_MULTIPLIER,
+    DEFAULT_EXPANSION_RESERVE_MULTIPLIER,
+  );
+  const freeBefore = assertDiskReserve(stageBase, minFreeBytes, 'before raw staging');
+  const projectedWorkingBytes = selection.bytes * expansionMultiplier;
+  if (freeBefore - projectedWorkingBytes < minFreeBytes) {
+    throw new Error(`Parquet batch preflight: ${selection.bytes} compressed bytes require a ${projectedWorkingBytes} byte expansion reserve, leaving less than ${minFreeBytes} bytes free`);
+  }
   const hash = batchHash(selection.records);
   const workRoot = fs.mkdtempSync(path.join(stageBase, `${hash}-`));
   const runRclone = options.rclone || ((args) => runCommand(rcloneBinary, args, { env }));
@@ -643,6 +672,7 @@ async function compactFromGoogle(options = {}) {
     const batch = await compactStagedBatch(staged, {
       hotRoot, stageRoot: workRoot, batchHash: hash,
       threads: env.PARQUET_DUCKDB_THREADS || 1,
+      minFreeBytes,
     });
     const remoteResult = await uploadBatch(batch, {
       hotRoot, remote, prefix, configFile, rclone: runRclone, env, workRoot,
@@ -749,12 +779,16 @@ async function hydrateParquet(options = {}) {
 
 module.exports = {
   DATASET_VERSION,
+  DEFAULT_EXPANSION_RESERVE_MULTIPLIER,
   DEFAULT_HOT_ROOT,
+  DEFAULT_MIN_FREE_BYTES,
   STATE_FORMAT,
+  assertDiskReserve,
   batchHash,
   compactFromGoogle,
   compactStagedBatch,
   dateRange,
+  diskFreeBytes,
   envelopeFor,
   hydrateParquet,
   loadLakeState,
