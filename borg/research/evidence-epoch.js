@@ -72,6 +72,42 @@ function isGapCounter(key) {
   return /(?:sequence.?gaps?|discardedsequence|coveragegaps?)$/i.test(String(key));
 }
 
+function latestContinuousHealthySuffix(rows, options = {}) {
+  const maxGapSec = finite(options.maxGapSec, FAST_COMPONENT_MAX_AGE_SEC);
+  const ordered = [...(Array.isArray(rows) ? rows : [])]
+    .filter((row) => Number.isFinite(new Date(row?.checked_at).getTime()))
+    .sort((left, right) => new Date(left.checked_at) - new Date(right.checked_at));
+  let suffix = [];
+  let previousMs = null;
+  let lastFailedAt = null;
+  let lastContinuityBreakAt = null;
+  for (const row of ordered) {
+    const checkedMs = new Date(row.checked_at).getTime();
+    const gapSec = previousMs == null ? null : (checkedMs - previousMs) / 1000;
+    if (gapSec != null && gapSec > maxGapSec) {
+      suffix = [];
+      lastContinuityBreakAt = row.checked_at;
+    }
+    if (row.healthy !== true) {
+      suffix = [];
+      lastFailedAt = row.checked_at;
+      lastContinuityBreakAt = row.checked_at;
+    } else {
+      suffix.push({ ...row, gapSec: suffix.length ? gapSec : null });
+    }
+    previousMs = checkedMs;
+  }
+  return {
+    samples: suffix.length,
+    first_sample_at: suffix[0]?.checked_at || null,
+    last_sample_at: suffix.at(-1)?.checked_at || null,
+    max_gap_seconds: suffix.reduce((maximum, row) =>
+      Math.max(maximum, finite(row.gapSec, 0)), 0),
+    last_failed_at: lastFailedAt,
+    last_continuity_break_at: lastContinuityBreakAt,
+  };
+}
+
 function diskSnapshot(root = '/var/lib/deltaforge') {
   try {
     const stat = fs.statfsSync(root);
@@ -450,27 +486,21 @@ async function assessEvidenceEpoch(pool, options = {}) {
     && lastAgeSec != null && lastAgeSec <= 120
     && finite(coverage.max_gap_seconds, 0) <= 120
     && coverage.failed_samples === 0;
+  // Pull a bounded window and identify the latest uninterrupted healthy suffix.
+  // A monitor pause longer than the allowed cadence resets burn-in at the first
+  // returning sample; it must not poison all future epochs forever.
+  const parquetLookbackHours = Math.max(48, parquetMinHours * 2);
+  const parquetLookbackStart = new Date(nowMs - parquetLookbackHours * 3_600_000);
   const { rows: parquetCoverageRows } = await pool.query(`
-    WITH instrumented AS (
-      SELECT checked_at,
-             COALESCE((metrics->'parquet'->>'healthy')::boolean,false) healthy
-        FROM borg_evidence_health_samples
-       WHERE checked_at <= $1 AND metrics ? 'parquet'
-    ), last_failure AS (
-      SELECT max(checked_at) failed_at FROM instrumented WHERE NOT healthy
-    ), clean AS (
-      SELECT checked_at,
-             checked_at-lag(checked_at) OVER (ORDER BY checked_at) AS gap
-        FROM instrumented,last_failure
-       WHERE healthy AND (failed_at IS NULL OR checked_at > failed_at)
-    )
-    SELECT count(*)::int samples,min(checked_at) first_sample_at,
-           max(checked_at) last_sample_at,
-           max(EXTRACT(EPOCH FROM gap))::float8 max_gap_seconds,
-           (SELECT failed_at FROM last_failure) last_failed_at
-      FROM clean
-  `, [now]);
-  const parquetCoverage = parquetCoverageRows[0];
+    SELECT checked_at,
+           COALESCE((metrics->'parquet'->>'healthy')::boolean,false) healthy
+      FROM borg_evidence_health_samples
+     WHERE checked_at >= $1 AND checked_at <= $2 AND metrics ? 'parquet'
+     ORDER BY checked_at
+  `, [parquetLookbackStart, now]);
+  const parquetCoverage = latestContinuousHealthySuffix(parquetCoverageRows, {
+    maxGapSec: FAST_COMPONENT_MAX_AGE_SEC,
+  });
   const parquetFirstMs = parquetCoverage.first_sample_at
     ? new Date(parquetCoverage.first_sample_at).getTime() : NaN;
   const parquetCleanHours = Number.isFinite(parquetFirstMs)
@@ -529,6 +559,7 @@ async function assessEvidenceEpoch(pool, options = {}) {
       firstSampleAt: parquetCoverage.first_sample_at,
       lastSampleAt: parquetCoverage.last_sample_at,
       lastFailedAt: parquetCoverage.last_failed_at,
+      lastContinuityBreakAt: parquetCoverage.last_continuity_break_at,
       maxGapSeconds: finite(parquetCoverage.max_gap_seconds),
       continuous: parquetCoverageContinuous,
       complete: parquetBurnInComplete,
@@ -570,5 +601,6 @@ module.exports = {
   isAtOrAfter,
   isErrorCounter,
   isGapCounter,
+  latestContinuousHealthySuffix,
   readReceipt,
 };

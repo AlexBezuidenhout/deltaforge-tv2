@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
   ageSeconds, assessParquetLake, findCounters, isAtOrAfter, isErrorCounter,
-  isGapCounter, readReceipt,
+  isGapCounter, latestContinuousHealthySuffix, readReceipt,
 } = require('../borg/research/evidence-epoch');
 
 test('evidence health finds nested sequence and collector error counters', () => {
@@ -50,6 +50,37 @@ test('freshness cannot reuse a heartbeat from the previous evidence epoch', () =
   assert.equal(isAtOrAfter(epochStart, epochStart), true);
   assert.equal(isAtOrAfter('2026-07-21T12:00:00.001Z', epochStart), true);
   assert.equal(isAtOrAfter(null, epochStart), false);
+});
+
+test('Parquet burn-in restarts at the latest failed sample or cadence gap', () => {
+  const rows = [
+    { checked_at: '2026-08-03T10:00:00Z', healthy: true },
+    { checked_at: '2026-08-03T10:01:00Z', healthy: true },
+    { checked_at: '2026-08-03T10:10:00Z', healthy: true },
+    { checked_at: '2026-08-03T10:11:00Z', healthy: false },
+    { checked_at: '2026-08-03T10:12:00Z', healthy: true },
+    { checked_at: '2026-08-03T10:13:00Z', healthy: true },
+  ];
+  const suffix = latestContinuousHealthySuffix(rows, { maxGapSec: 120 });
+  assert.equal(suffix.samples, 2);
+  assert.equal(suffix.first_sample_at, '2026-08-03T10:12:00Z');
+  assert.equal(suffix.last_sample_at, '2026-08-03T10:13:00Z');
+  assert.equal(suffix.last_failed_at, '2026-08-03T10:11:00Z');
+  assert.equal(suffix.last_continuity_break_at, '2026-08-03T10:11:00Z');
+  assert.equal(suffix.max_gap_seconds, 60);
+});
+
+test('Parquet burn-in can recover from a cadence gap without inventing a failure', () => {
+  const suffix = latestContinuousHealthySuffix([
+    { checked_at: '2026-08-03T10:00:00Z', healthy: true },
+    { checked_at: '2026-08-03T10:20:00Z', healthy: true },
+    { checked_at: '2026-08-03T10:21:00Z', healthy: true },
+  ], { maxGapSec: 120 });
+  assert.equal(suffix.samples, 2);
+  assert.equal(suffix.first_sample_at, '2026-08-03T10:20:00Z');
+  assert.equal(suffix.last_failed_at, null);
+  assert.equal(suffix.last_continuity_break_at, '2026-08-03T10:20:00Z');
+  assert.equal(suffix.max_gap_seconds, 60);
 });
 
 test('off-host receipt parser preserves values containing equals signs', () => {
