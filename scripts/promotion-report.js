@@ -3,7 +3,7 @@
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const { Pool } = require('pg');
+const { createResearchPool } = require('./lib/research-pool');
 const {
   clusterSignFlipPValue,
   clusteredBootstrap,
@@ -134,7 +134,7 @@ function summarizeTrial(trial, rows, latencyRows = []) {
 }
 
 async function main() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 2 });
+  const pool = createResearchPool({ applicationName: 'promotion-report' });
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');

@@ -8,7 +8,7 @@ const serviceEnv = process.env.TV2_ENV_FILE || '/etc/deltaforge/tv2.env';
 if (!process.env.DATABASE_URL && fs.existsSync(serviceEnv)) {
   require('dotenv').config({ path: serviceEnv });
 }
-const { Pool } = require('pg');
+const { createResearchPool } = require('./lib/research-pool');
 const {
   EXACT_RULE_FORWARD_PROTOCOL,
 } = require('../borg/crossvenue/experiment');
@@ -278,12 +278,7 @@ async function main() {
   }
   const rawDays = process.argv.find((value) => value.startsWith('--days='))?.split('=')[1];
   const days = Math.max(1, Math.min(365, parseInt(rawDays || '30', 10) || 30));
-  const local = /(?:localhost|127\.0\.0\.1|\/deltaforge)/i.test(process.env.DATABASE_URL);
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: local ? false : { rejectUnauthorized: false },
-    max: 2,
-  });
+  const pool = createResearchPool({ applicationName: 'crossvenue-exact-forward' });
   try {
     const [rows, depth] = await Promise.all([
       queryForward(pool, days),

@@ -8,7 +8,7 @@ const serviceEnv = process.env.TV2_ENV_FILE || '/etc/deltaforge/tv2.env';
 if (!process.env.DATABASE_URL && fs.existsSync(serviceEnv)) {
   require('dotenv').config({ path: serviceEnv });
 }
-const { Pool } = require('pg');
+const { createResearchPool } = require('./lib/research-pool');
 const {
   TERMINAL_CARRY_EXPERIMENT_ID,
   TERMINAL_CARRY_V1_EXPERIMENT_ID,
@@ -89,12 +89,7 @@ async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error(`DATABASE_URL is missing; set it in .env or ${serviceEnv}`);
   }
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes('localhost')
-      ? false : { rejectUnauthorized: false },
-    max: 1,
-  });
+  const pool = createResearchPool({ applicationName: 'crossvenue-terminal-report' });
   try {
     const [{ rows }, excludedV1Result] = await Promise.all([pool.query(`
       SELECT t.observed_at,t.entry_day,t.match_id,t.direction,

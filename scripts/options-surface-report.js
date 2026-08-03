@@ -3,7 +3,7 @@
 
 const path = require('node:path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const { Pool } = require('pg');
+const { createResearchPool } = require('./lib/research-pool');
 
 const OPTIONS_EXPERIMENT_ID = 'options-daily-threshold-surface-residual-v3';
 const OPTIONS_STRATEGY = 'options_daily_threshold_surface_residual_v3';
@@ -182,12 +182,7 @@ async function buildReport(pool) {
 }
 
 async function main() {
-  const local = /(?:localhost|127\.0\.0\.1|\/deltaforge)/i.test(process.env.DATABASE_URL || '');
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: local ? false : { rejectUnauthorized: false },
-    max: 2,
-  });
+  const pool = createResearchPool({ applicationName: 'options-surface-report' });
   try {
     const report = await buildReport(pool);
     if (process.argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
