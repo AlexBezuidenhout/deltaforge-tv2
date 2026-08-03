@@ -25,6 +25,7 @@ const {
   STARTING_BANKROLL_USD,
   TARGET_STAKE_USD,
 } = require('../../borg/research/capital-policy');
+const { lifecycleFor } = require('../../borg/research/strategy-dossiers');
 
 // Pre-registered experiment targets. Key = strategy/bot id.
 // BORG core reads exclude hype by registration (judged separately).
@@ -601,13 +602,19 @@ router.get('/', authMiddleware, async (req, res) => {
             : null,
         }];
       }));
-      // Runtime registration, not recent historical activity, defines whether
-      // a shadow strategy is running. Quiet strategies can go >2h without a
-      // valid signal; retired Vasili/A/A2 rows can remain recent after removal.
-      const registeredNow = runtime
-        ? runtime.age_sec != null && runtime.age_sec < 130
-        : (isGla || isPortfolioArm || isResearchPilot);
-      const active = registeredNow && collectorAlive;
+      // Runtime registration in the active collector run—not historical
+      // registration or a known strategy name—defines TESTING. The old
+      // fallback labelled every research pilot active whenever the collector
+      // was alive, even when BORG_ACTIVE_STRATEGIES had parked it.
+      const lifecycle = lifecycleFor({
+        trialStatus: trial?.status || null,
+        trialStatusReason: trial?.status_reason || null,
+        runtimePresent: runtime != null,
+        runtimeUpdatedAt: runtime?.updated_at || null,
+        evaluations: runtime?.evaluations || 0,
+        actions: runtime?.actions || 0,
+      });
+      const active = isGla ? glaAlive : collectorAlive && lifecycle.active;
       const glaMode = glaLive ? 'live'
         : glaPaper ? 'paper'
         : (st.live_gla_enabled === true && glaStamp) ? 'live-down'
