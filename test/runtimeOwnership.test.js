@@ -20,5 +20,6 @@ test('deployable TV2 web process is loopback-only and cannot own the bot runner'
   assert.match(unit, /Environment=HOST=127\.0\.0\.1/);
   assert.match(unit, /Environment=PORT=3014/);
   assert.match(unit, /Environment=BOT_RUNNER_ENABLED=false/);
-  assert.doesNotMatch(unit, /BOT_RUNNER_ENABLED=true/);
+  assert.match(unit, /ExecStart=\/usr\/bin\/env[^\n]*PORT=3014[^\n]*BOT_RUNNER_ENABLED=false/);
+  assert.doesNotMatch(unit, /^Environment=BOT_RUNNER_ENABLED=true$/m);
 });

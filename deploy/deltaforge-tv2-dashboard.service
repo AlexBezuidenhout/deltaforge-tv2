@@ -16,7 +16,10 @@ Environment=HOST=127.0.0.1
 Environment=PORT=3014
 Environment=DELTAFORGE_INSTANCE_ID=tv2-dashboard
 Environment=BOT_RUNNER_ENABLED=false
-ExecStart=/usr/local/bin/node src/index.js
+# EnvironmentFile values are intentionally overridden at exec time: the
+# shared TV2 file contains PORT=3004 and BOT_RUNNER_ENABLED=true for the
+# untouched runner process.
+ExecStart=/usr/bin/env NODE_ENV=production HOST=127.0.0.1 PORT=3014 DELTAFORGE_INSTANCE_ID=tv2-dashboard BOT_RUNNER_ENABLED=false /usr/local/bin/node src/index.js
 Restart=always
 RestartSec=5
 TimeoutStopSec=30
