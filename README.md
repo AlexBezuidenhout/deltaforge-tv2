@@ -16,6 +16,9 @@ in [`INFRASTRUCTURE_CUTOVER.md`](INFRASTRUCTURE_CUTOVER.md).
 The exact-rule cross-venue, orphan-reserved payoff graph, Kalshi fee/depth and
 daily-threshold Deribit implementations are recorded in
 [`RESEARCH_BACKLOG_IMPLEMENTATION_2026-07-27.md`](RESEARCH_BACKLOG_IMPLEMENTATION_2026-07-27.md).
+The Parquet burn-in gate, public-flow coverage repair, options gold-tier
+suppression and lane readiness contract are documented in
+[`RESEARCH_PRIORITY_IMPLEMENTATION_2026-08-03.md`](RESEARCH_PRIORITY_IMPLEMENTATION_2026-08-03.md).
 
 Drop-in successor to **Printer CLOB v2**. Same Polymarket BTC 5-min binary scope,
 but every layer is upgraded:
