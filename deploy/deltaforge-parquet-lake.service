@@ -21,6 +21,10 @@ Environment=PARQUET_HOT_ROOT=/var/lib/deltaforge/parquet-hot
 Environment=PARQUET_STAGE_ROOT=/var/lib/deltaforge/parquet-stage
 Environment=PARQUET_MAX_FILES=25
 Environment=PARQUET_MAX_BYTES=134217728
+# Keep the continuously materialized layer focused on compact decisions,
+# proofs and terminal intents. Multi-gigabyte raw books remain immutable
+# bronze authority and are materialized by explicit source/date hypothesis.
+Environment=PARQUET_SOURCES=strategy-decisions,pyth-boundary-decisions,crossvenue-decisions,options-decisions,structural-scanner,allmarket-decisions,polymarket-flow-boundary-intents,research-control
 Environment=PARQUET_HOT_MAX_BYTES=10737418240
 Environment=PARQUET_MIN_FREE_BYTES=16106127360
 Environment=PARQUET_EXPANSION_RESERVE_MULTIPLIER=24
