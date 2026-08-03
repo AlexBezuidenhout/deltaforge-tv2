@@ -13,6 +13,7 @@ const {
   makeNonOverlappingTask,
   marketMetadataRecord,
   paperArrivalState,
+  rotatingRescueLimit,
   sourceCursorCutoff,
 } = require('../borg/flow/collector');
 
@@ -84,6 +85,14 @@ test('universe activity is anchored to latest API source time, not wall time', (
 test('global cursor advances only in API source time', () => {
   assert.equal(sourceCursorCutoff(0), 0);
   assert.equal(sourceCursorCutoff('1784381000'), 1784380998);
+});
+
+test('rescue page size rotates deterministically across five-minute cache buckets', () => {
+  assert.equal(rotatingRescueLimit(0, 9999, 100, 1001), 9999);
+  assert.equal(rotatingRescueLimit(5 * 60 * 1000, 9999, 100, 1001), 9998);
+  assert.equal(rotatingRescueLimit(99 * 5 * 60 * 1000, 9999, 100, 1001), 9900);
+  assert.equal(rotatingRescueLimit(100 * 5 * 60 * 1000, 9999, 100, 1001), 9999);
+  assert.equal(rotatingRescueLimit(99 * 5 * 60 * 1000, 1050, 100, 1001), 1001);
 });
 
 test('bounded initial history is distinct from a live cursor coverage gap', () => {

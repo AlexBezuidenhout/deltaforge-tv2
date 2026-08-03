@@ -91,8 +91,10 @@ The service has two capture planes:
    time. Offset pagination is not used for live coverage because concurrent
    inserts shift later pages. When the ordinary snapshot cannot reach the prior
    cursor, the sampler requests two concurrent documented offset pages with a
-   1,000-row overlap (9,999 rows per page). Polymarket caches each exact Data API
-   URL for 300 seconds, so one page can be shorter than a busy cache generation.
+   1,000-row overlap. Their common page size rotates deterministically from
+   9,900 to 9,999 once per five-minute cache bucket. Polymarket caches each exact
+   Data API URL for 300 seconds and may briefly serve an older generation, so the
+   rotation makes both rescue URLs origin-fresh together.
    The collector accepts the joined rescue only when at least 100 immutable trade
    identities overlap and the tail reaches the prior source cursor. Cache skew,
    offset drift, or insufficient depth increments `globalCoverageGaps`; those rows

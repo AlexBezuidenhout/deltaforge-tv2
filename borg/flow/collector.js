@@ -61,16 +61,19 @@ const DATA_TRADE_PAGE_SIZE = Math.max(100, Math.min(1000,
 // page cannot reach the prior source cursor. The documented endpoint limit is
 // 10,000 rows.
 const DATA_TRADE_MAX_PAGES = 1;
-// Use a deliberately uncommon documented limit for both rescue URLs. The Data
-// API caches each exact URL for 300 seconds; keeping the two URLs private to
-// this collector lets their cache generations start together. The overlapping
-// pages are accepted as contiguous only when they share enough exact rows.
+// The Data API caches each exact URL for 300 seconds. Rotate a deliberately
+// uncommon documented limit once per cache bucket so both overlap pages start
+// the same cache generation. They are accepted as contiguous only when they
+// share enough exact rows.
 const DATA_TRADE_RESCUE_LIMIT = Math.max(DATA_TRADE_PAGE_SIZE, Math.min(10_000,
   Number(process.env.FLOW_DATA_TRADE_RESCUE_LIMIT || 9_999)));
 const DATA_TRADE_RESCUE_OVERLAP = Math.max(1, Math.min(DATA_TRADE_RESCUE_LIMIT - 1,
   Number(process.env.FLOW_DATA_TRADE_RESCUE_OVERLAP || 1_000)));
 const DATA_TRADE_RESCUE_MIN_OVERLAP = Math.max(1, Math.min(DATA_TRADE_RESCUE_OVERLAP,
   Number(process.env.FLOW_DATA_TRADE_RESCUE_MIN_OVERLAP || 100)));
+const DATA_TRADE_CACHE_BUCKET_MS = 5 * 60 * 1000;
+const DATA_TRADE_RESCUE_VARIANTS = Math.max(1, Math.min(100,
+  Number(process.env.FLOW_DATA_TRADE_RESCUE_VARIANTS || 100)));
 const REST_MAX_ATTEMPTS = Math.max(1, Math.min(6,
   Number(process.env.FLOW_REST_MAX_ATTEMPTS || 4)));
 const DATA_API_TIMEOUT_MS = Math.max(5_000,
@@ -125,6 +128,15 @@ function globalTradeKey(trade) {
     trade?.transactionHash, trade?.asset, trade?.proxyWallet, trade?.side,
     trade?.price, trade?.size, trade?.timestamp,
   ]);
+}
+
+function rotatingRescueLimit(nowMs, upperLimit, variantCount, floorLimit) {
+  const upper = Math.max(1, Math.trunc(Number(upperLimit) || 1));
+  const floor = Math.max(1, Math.min(upper, Math.trunc(Number(floorLimit) || 1)));
+  const available = upper - floor + 1;
+  const variants = Math.max(1, Math.min(available, Math.trunc(Number(variantCount) || 1)));
+  const bucket = Math.max(0, Math.floor((Number(nowMs) || 0) / DATA_TRADE_CACHE_BUCKET_MS));
+  return upper - (bucket % variants);
 }
 
 function marketMetadataRecord(market, observedAt = Date.now()) {
@@ -202,7 +214,10 @@ async function collectStableTradeSnapshot(fetchPage, {
   });
   const hasLiveCursor = Number.isFinite(Number(sinceSec)) && Number(sinceSec) > 0;
   if (!primary.saturated || !hasLiveCursor || rescueLimit <= pageSize) {
-    return { ...primary, rescueSnapshot: false, primaryOldestSec: primary.oldestSec };
+    return {
+      ...primary, rescueSnapshot: false, primaryOldestSec: primary.oldestSec,
+      rescueLimit,
+    };
   }
 
   const overlap = Math.max(1, Math.min(rescueLimit - 1, Number(rescueOverlap) || 1));
@@ -254,6 +269,7 @@ async function collectStableTradeSnapshot(fetchPage, {
     oldestSec,
     saturated: !coverageProved,
     rescueSnapshot: true,
+    rescueLimit,
     primaryOldestSec: primary.oldestSec,
     rescueOffset,
     overlapRows,
@@ -599,6 +615,7 @@ class FlowCollector {
       data_trade_rescue_limit: DATA_TRADE_RESCUE_LIMIT,
       data_trade_rescue_overlap: DATA_TRADE_RESCUE_OVERLAP,
       data_trade_rescue_min_overlap: DATA_TRADE_RESCUE_MIN_OVERLAP,
+      data_trade_rescue_variants: DATA_TRADE_RESCUE_VARIANTS,
       boundary_intent_stream: BOUNDARY_EXPERIMENT_ID,
     });
     await this.heartbeat();
@@ -614,6 +631,14 @@ class FlowCollector {
   }
 
   async fetchRecentTrades(sinceSec) {
+    // Cloudflare caches each exact Data API URL for five minutes and can serve
+    // stale-while-revalidate. Rotate through semantically equivalent,
+    // documented page sizes by cache bucket so both concurrent rescue pages
+    // are first requested together from the same origin generation.
+    const rescueLimit = rotatingRescueLimit(
+      Date.now(), DATA_TRADE_RESCUE_LIMIT, DATA_TRADE_RESCUE_VARIANTS,
+      Math.max(DATA_TRADE_PAGE_SIZE + 1, DATA_TRADE_RESCUE_OVERLAP + 1),
+    );
     const result = await collectStableTradeSnapshot(
       (offset, limit) => fetchJson(dataTradesUrl(limit, offset), DATA_API_TIMEOUT_MS, {
         maxAttempts: REST_MAX_ATTEMPTS,
@@ -625,7 +650,7 @@ class FlowCollector {
       {
         sinceSec,
         pageSize: DATA_TRADE_PAGE_SIZE,
-        rescueLimit: DATA_TRADE_RESCUE_LIMIT,
+        rescueLimit,
       },
     );
     if (result.rescueSnapshot) this.counters.globalRescueSnapshots += 1;
@@ -1148,7 +1173,7 @@ class FlowCollector {
           start, end, received_at_ms: receivedAt, returned: trades.length,
           pages: recent.pages, page_size: DATA_TRADE_PAGE_SIZE, saturated: recent.saturated,
           rescue_snapshot: recent.rescueSnapshot,
-          rescue_limit: DATA_TRADE_RESCUE_LIMIT,
+          rescue_limit: recent.rescueLimit,
           rescue_offset: recent.rescueOffset,
           overlap_rows: recent.overlapRows,
           overlap_required: recent.overlapRequired,
@@ -1179,7 +1204,7 @@ class FlowCollector {
         this.lastGlobalSaturationLogAt = receivedAt;
         await logEvent('WARN', 'flow', 'bounded global trade sample did not reach the prior cursor', {
           start, end, pages: recent.pages, page_size: DATA_TRADE_PAGE_SIZE,
-          rescue_snapshot: recent.rescueSnapshot, rescue_limit: DATA_TRADE_RESCUE_LIMIT,
+          rescue_snapshot: recent.rescueSnapshot, rescue_limit: recent.rescueLimit,
           rescue_offset: recent.rescueOffset, overlap_rows: recent.overlapRows,
           overlap_required: recent.overlapRequired, coverage_proof: recent.coverageProof,
           oldest_sec: recent.oldestSec,
@@ -1494,6 +1519,7 @@ module.exports = {
   normLevels,
   paperArrivalState,
   parseArray,
+  rotatingRescueLimit,
   sourceCursorCutoff,
   takeMapBatch,
 };
