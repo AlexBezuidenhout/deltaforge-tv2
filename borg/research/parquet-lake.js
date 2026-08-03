@@ -8,6 +8,7 @@ const zlib = require('node:zlib');
 const { spawn } = require('node:child_process');
 const { DuckDBInstance } = require('@duckdb/node-api');
 const { sha256, stableStringify } = require('./contracts');
+const { lfDelimitedLines } = require('./strict-ndjson');
 const {
   parseCombinedReport,
   remoteTarget,
@@ -279,35 +280,6 @@ function invalidWalSegmentError(record, reason, details = {}) {
   error.sourceSha256 = record.sha256;
   for (const [key, value] of Object.entries(details)) error[key] = value;
   return error;
-}
-
-/**
- * WAL is NDJSON, so only the LF byte terminates a record. Node's readline
- * also treats Unicode U+2028/U+2029 as line separators; those code points are
- * legal inside JSON strings and previously split valid structural-rule rows.
- */
-async function* lfDelimitedLines(readable) {
-  let pending = Buffer.alloc(0);
-  for await (const rawChunk of readable) {
-    const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk);
-    let start = 0;
-    let end = chunk.indexOf(0x0a, start);
-    while (end !== -1) {
-      let line = pending.length
-        ? Buffer.concat([pending, chunk.subarray(start, end)])
-        : chunk.subarray(start, end);
-      if (line.length && line[line.length - 1] === 0x0d) line = line.subarray(0, -1);
-      yield line.toString('utf8');
-      pending = Buffer.alloc(0);
-      start = end + 1;
-      end = chunk.indexOf(0x0a, start);
-    }
-    if (start < chunk.length) {
-      const tail = chunk.subarray(start);
-      pending = pending.length ? Buffer.concat([pending, tail]) : Buffer.from(tail);
-    }
-  }
-  if (pending.length) yield pending.toString('utf8');
 }
 
 async function streamSegment(record, onRow) {

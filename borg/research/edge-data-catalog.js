@@ -4,8 +4,8 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const readline = require('node:readline');
 const zlib = require('node:zlib');
+const { lfDelimitedLines } = require('./strict-ndjson');
 
 const CLOCK_FIELD_GROUPS = Object.freeze({
   sourceTime: [
@@ -533,19 +533,15 @@ async function walkFiles(root, options = {}) {
 async function firstNdjsonRecords(file, maximum = 64) {
   const input = fs.createReadStream(file);
   const gunzip = zlib.createGunzip();
-  const lines = readline.createInterface({
-    input: input.pipe(gunzip),
-    crlfDelay: Infinity,
-  });
+  const stream = input.pipe(gunzip);
   const records = [];
   try {
-    for await (const line of lines) {
+    for await (const line of lfDelimitedLines(stream)) {
       if (!line) continue;
       records.push(JSON.parse(line));
       if (records.length >= maximum + 1) break;
     }
   } finally {
-    lines.close();
     input.destroy();
     gunzip.destroy();
   }

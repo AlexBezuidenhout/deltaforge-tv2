@@ -18,10 +18,10 @@ require('dotenv').config();
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const readline = require('node:readline');
 const zlib = require('node:zlib');
 const { Pool } = require('pg');
 const makeStrategies = require('../borg/shadow/strategies');
+const { lfDelimitedLines } = require('../borg/research/strict-ndjson');
 
 const {
   CrossVenueConsensus,
@@ -79,9 +79,8 @@ async function loadArchive(markets, seen) {
   const rows = [];
   for (const file of listGzipFiles(ARCHIVE_DIR)) {
     const input = fs.createReadStream(file).pipe(zlib.createGunzip());
-    const lines = readline.createInterface({ input, crlfDelay: Infinity });
     let first = true;
-    for await (const line of lines) {
+    for await (const line of lfDelimitedLines(input)) {
       if (first) { first = false; continue; }
       if (!line) continue;
       const raw = JSON.parse(line);

@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const zlib = require('node:zlib');
-const { finalize, prepare } = require('../scripts/recover-wal-backlog');
+const { finalize, inspectSegment, prepare } = require('../scripts/recover-wal-backlog');
 
 function walHeader() {
   return JSON.stringify({
@@ -17,6 +17,18 @@ function walHeader() {
     },
   });
 }
+
+test('large WAL inspection does not split legal Unicode separators', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wal-unicode-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, 'large.ndjson');
+  const event = { event_id: 'unicode', raw: `${'x'.repeat(70 * 1024)}\u2028valid` };
+  fs.writeFileSync(file, `${walHeader()}\n${JSON.stringify(event)}\n`);
+  const inspected = await inspectSegment(file);
+  assert.equal(inspected.rows, 1);
+  assert.equal(inspected.invalidLines, 0);
+  assert.equal(inspected.truncatedTailBytes, 0);
+});
 
 test('WAL recovery bundles header-only restart debris and preserves event segments', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wal-recovery-'));

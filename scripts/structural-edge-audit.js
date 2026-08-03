@@ -31,8 +31,8 @@ require('dotenv').config();
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const readline = require('node:readline');
 const zlib = require('node:zlib');
+const { lfDelimitedLines } = require('../borg/research/strict-ndjson');
 const { Pool } = require('pg');
 
 const ARCHIVE_ROOT = process.env.BORG_ARCHIVE_DIR
@@ -471,8 +471,7 @@ class AuditAccumulator {
 async function scanArchive(files, accumulator) {
   for (let index = 0; index < files.length; index += 1) {
     const input = fs.createReadStream(files[index]).pipe(zlib.createGunzip());
-    const lines = readline.createInterface({ input, crlfDelay: Infinity });
-    for await (const line of lines) {
+    for await (const line of lfDelimitedLines(input)) {
       if (!line || line.startsWith('{"_borg_archive"')) continue;
       try { accumulator.add(JSON.parse(line)); } catch (_) { /* corrupt line excluded */ }
     }
@@ -614,4 +613,3 @@ main()
     process.exitCode = 1;
   })
   .finally(() => pool.end());
-

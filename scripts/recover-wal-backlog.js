@@ -23,6 +23,7 @@ const zlib = require('node:zlib');
 const { spawn } = require('node:child_process');
 const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
+const { lfDelimitedLines } = require('../borg/research/strict-ndjson');
 
 const fsp = fs.promises;
 const DEFAULT_ROOT = process.env.BORG_WAL_DIR || '/var/lib/deltaforge/wal/borg';
@@ -149,14 +150,13 @@ async function inspectSegment(file, stat = null) {
   const hash = crypto.createHash('sha256');
   const input = fs.createReadStream(file);
   input.on('data', (chunk) => hash.update(chunk));
-  const lines = readline.createInterface({ input, crlfDelay: Infinity });
   let header = null;
   let rows = 0;
   let invalidLines = 0;
   let invalidBytes = 0;
   let finalContentWasInvalid = false;
   let finalInvalidBytes = 0;
-  for await (const line of lines) {
+  for await (const line of lfDelimitedLines(input)) {
     if (!line.trim()) continue;
     finalContentWasInvalid = false;
     let parsed;

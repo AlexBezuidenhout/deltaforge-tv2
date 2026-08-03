@@ -23,8 +23,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const zlib = require('node:zlib');
-const readline = require('node:readline');
 const { Pool } = require('pg');
+const { lfDelimitedLines } = require('../borg/research/strict-ndjson');
 
 const LATENCIES_MS = [0, 2, 10, 25, 50, 100, 250, 500, 750, 1000, 1250, 1500, 2000, 3000];
 const BASELINE_MS = 1250;
@@ -99,8 +99,7 @@ async function loadArchiveTouches(files, byToken, wantedTokens, sourceAgeMs) {
   let touches = 0;
   for (let i = 0; i < files.length; i += 1) {
     const input = fs.createReadStream(files[i]).pipe(zlib.createGunzip());
-    const lines = readline.createInterface({ input, crlfDelay: Infinity });
-    for await (const line of lines) {
+    for await (const line of lfDelimitedLines(input)) {
       if (!line || line.startsWith('{"_borg_archive"')) continue;
       rows += 1;
       let row;
@@ -351,4 +350,3 @@ main()
     process.exitCode = 1;
   })
   .finally(() => pool.end());
-

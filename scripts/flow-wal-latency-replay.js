@@ -3,10 +3,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const readline = require('readline');
 const zlib = require('zlib');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { Pool } = require('pg');
+const { lfDelimitedLines } = require('../borg/research/strict-ndjson');
 
 const WAL_ROOT = process.env.FLOW_WAL_ROOT || '/var/lib/deltaforge/wal/borg/polymarket-flow-clob';
 const ORDER_DELAYS_MS = Object.freeze([0, 25, 50, 100, 250, 500]);
@@ -166,8 +166,7 @@ async function replayFile(file, handler) {
   const input = fs.createReadStream(file);
   const gunzip = zlib.createGunzip();
   const stream = input.pipe(gunzip);
-  const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
-  for await (const line of lines) {
+  for await (const line of lfDelimitedLines(stream)) {
     if (!line || line.length < 2) continue;
     let envelope;
     try { envelope = JSON.parse(line); } catch (_error) { continue; }
