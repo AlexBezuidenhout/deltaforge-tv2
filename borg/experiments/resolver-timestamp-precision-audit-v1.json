@@ -1,0 +1,57 @@
+{
+  "experiment_id": "resolver-timestamp-precision-audit-v1",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-03T14:41:30.000Z",
+  "frozen_at": "2026-08-03T14:41:30.000Z",
+  "evidence_started_at": "2026-08-03T14:41:30.000Z",
+  "phase": "audit",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "resolver_timestamp_precision",
+  "strategy_version": "resolver-timestamp-precision-audit-v1",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "entry_authorization": "none",
+  "hypothesis": "A small deterministic stale-quote opportunity may exist after an authoritative resolver observation is causally known but while an outcome token remains executable; no opportunity is statewise proved unless the immutable rule explicitly defines source timestamp precision, cutoff inclusion and terminal report selection.",
+  "rule_certification": {
+    "required": [
+      "one authoritative resolver source",
+      "exact observation instant and timezone",
+      "explicit source timestamp precision",
+      "explicit terminal report selection policy",
+      "explicit inclusive or exclusive cutoff semantics"
+    ],
+    "automatic_veto": [
+      "generic price-at-end language",
+      "generic closing-price language",
+      "ambiguous or fallback resolver",
+      "conflicting precision or terminal-tick policy",
+      "missing source timestamp or receive-time provenance"
+    ]
+  },
+  "causal_replay": {
+    "tick_available_only_after_local_receive_time": true,
+    "required_tick_fields": [
+      "source_ts",
+      "received_at",
+      "receive_monotonic_ns",
+      "connection_epoch",
+      "event_sequence"
+    ],
+    "statewise_proof": "Resolver outcome known under the certified tick policy before the quote decision; executable payout-token ask plus doubled fees, slippage and failure reserve is below one dollar.",
+    "latency_profiles_ms": [100, 250, 500]
+  },
+  "evaluation": {
+    "bounded_scan_days": 30,
+    "independent_unit": "one unique rule/cutoff/source combination",
+    "primary_metric": "count_and_capacity_of_statewise_proved_precision_dislocations",
+    "minimum_fresh_independent_units_for_any_promotion": 300,
+    "minimum_calendar_days": 30,
+    "positive_doubled_cost_pnl_in_both_chronological_halves": true,
+    "market_and_day_clustered_lower_bounds_above_zero": true,
+    "multiple_testing_correction": true,
+    "null_outcome": "Published rules may not specify terminal source-clock semantics precisely enough to support a deterministic strategy, or executable quotes may disappear before the result is causally known."
+  },
+  "no_optional_stopping": true
+}

@@ -50,6 +50,7 @@
     "research:data-catalog": "node scripts/edge-data-catalog.js",
     "research:mechanism-map": "node scripts/edge-mechanism-map.js",
     "research:experiment-slate": "node scripts/edge-experiment-slate.js",
+    "research:resolver-precision": "node scripts/resolver-timestamp-precision-audit.js",
     "replay:flow-order-latency": "node scripts/flow-wal-latency-replay.js",
     "research:check": "node scripts/research-platform-check.js",
     "research:evidence-epoch": "node scripts/evidence-epoch-status.js",
