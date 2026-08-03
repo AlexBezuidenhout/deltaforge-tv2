@@ -1,0 +1,43 @@
+{
+  "manifest_format": "borg-experiment-v1",
+  "experiment_id": "main-longshot-0-20-v1",
+  "status": "FROZEN_FORWARD_EVAL",
+  "phase": "eval",
+  "family": "main_video_exact_longshot_successor",
+  "strategy_version": "main-longshot-0-20-v1",
+  "frozen_at_utc": "2026-08-03T12:40:00.000Z",
+  "evidence_started_at": "2026-08-03T12:40:00.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "supersedes": "main-video-parity-v1",
+  "research_capital_version": "500usd-v1",
+  "starting_bankroll_usd": 500,
+  "target_notional_usd": 10,
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "strategy_bindings": [
+    {
+      "strategy": "MAIN_LONGSHOT_0_20_V1",
+      "family": "main_video_exact_longshot_successor",
+      "arm": "taker250_price_lte_20c",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "hypothesis": "The exact first-intent MAIN video-parity taker rule may have a distinct longshot payoff regime when its executable token price is at most $0.20.",
+  "frozen_mechanics": {
+    "source_strategy": "MAIN_VIDEO_PARITY_V1__taker250",
+    "source_thresholds_changed": false,
+    "source_sizing_changed": false,
+    "source_execution_changed": false,
+    "filter": "retain the source rule's first and only intent for a market iff executable intent price is between $0.01 and $0.20 inclusive",
+    "important_state_rule": "an excluded first intent still consumes the source strategy's one-intent-per-market state; the successor may not search later quotes for a qualifying price",
+    "execution": "250ms event-tape quote survival; <=20% displayed touch; 2x fees plus one tick; max $10"
+  },
+  "selection_disclosure": "The <=$0.20 filter was selected after inspecting historical results (+$95.62 over 29 fills in the discovery subset). That estimate is selection-biased and is not evidence for this fresh experiment.",
+  "decision_rule": "After at least 300 fresh independent markets and 14 calendar days, require positive doubled-cost PnL in both chronological halves, market/day-clustered lower confidence bounds above zero, correction across every inspected price band and MAIN variant, no dominant day, and positive 100/250/500ms replays.",
+  "zero_edge_disclosure": "Longshot win rate is not the decision metric. A high-variance positive discovery subset may regress to a negative expected value after costs.",
+  "no_optional_stopping": true
+}

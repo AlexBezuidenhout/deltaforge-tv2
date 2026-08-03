@@ -1,0 +1,48 @@
+{
+  "manifest_format": "borg-experiment-v1",
+  "experiment_id": "h43x-chainlink-tail-residual-v1",
+  "status": "FROZEN_FORWARD_EVAL",
+  "phase": "eval",
+  "family": "resolver_boundary_empirical_tail",
+  "strategy_version": "h43x-chainlink-tail-residual-v1",
+  "frozen_at_utc": "2026-08-03T12:40:00.000Z",
+  "evidence_started_at": "2026-08-03T12:40:00.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "supersedes": "research-h43-forward-v1",
+  "research_capital_version": "500usd-v1",
+  "starting_bankroll_usd": 500,
+  "target_notional_usd": 10,
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "strategy_bindings": [
+    {
+      "strategy": "H43X_chainlink_tail_residual_v1",
+      "family": "resolver_boundary_empirical_tail",
+      "arm": "chainlink_q995_lower_bound",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_clustered_by_market_day"
+    }
+  ],
+  "hypothesis": "A resolver-certified direction market may retain a small residual when the current Chainlink price is farther from the opening boundary than the frozen pre-cutoff 99.5th percentile absolute Chainlink move remaining to expiry, and the Wilson lower probability bound still exceeds the executable ask after doubled fees and one tick.",
+  "frozen_mechanics": {
+    "model_cutoff": "2026-08-03T12:37:57.000Z",
+    "model_quantile": 0.995,
+    "minimum_model_samples_per_bucket": 300,
+    "horizons_seconds": [20, 45, 75],
+    "asset_then_pooled_fallback": true,
+    "trusted_open_source": "chainlink_rtds_nearest_3s",
+    "maximum_current_chainlink_age_ms": 3000,
+    "entry_window_seconds": [20, 75],
+    "fair_value": "max(current executable quote midpoint, Wilson lower bound of the frozen empirical central-tail probability)",
+    "entry_inequality": "fair lower bound - executable ask - 2x dynamic crypto taker fees - one token tick > 0",
+    "execution": "250ms event-tape quote survival; <=20% displayed touch; max $10 notional",
+    "exit": "terminal resolution; no interim mark-price stop"
+  },
+  "selection_disclosure": "H43 was selected after a small positive discovery cohort. H43-X is a new rule and identity; every pre-manifest H43/H43-X row is excluded and the model cannot use observations after the fixed cutoff.",
+  "decision_rule": "After at least 300 fresh independent markets and 14 calendar days, require positive doubled-cost PnL in both chronological halves, market/day-clustered lower confidence bounds above zero, family-wise multiple-testing correction, no dominant asset/day, and positive latency replays at 100/250/500ms.",
+  "zero_edge_disclosure": "The strategy is allowed to produce no orders or approximately zero edge; missing model data is not permission to substitute Gaussian Phi or tune the tail.",
+  "no_optional_stopping": true
+}
