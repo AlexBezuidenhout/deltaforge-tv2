@@ -86,9 +86,12 @@ Parquet failures before it can become the default research surface.
 
 ## Deployment acceptance
 
-Release `831462a` was deployed to the collector, independent research-tools and
-dashboard release roots. `priority-forward-2026-08-03-v20` started at
-`2026-08-03T16:52:57.428Z`; v19 remains preserved as failed evidence.
+Collector and dashboard release `831462a` started the frozen cohort. Independent
+research tooling subsequently advanced to `ee6ae9c` to add source/date-bounded
+Parquet materialization, separate global/scoped backlog accounting and a compact
+decision/proof nearline policy; this did not restart or relabel the collector.
+`priority-forward-2026-08-03-v20` started at `2026-08-03T16:52:57.428Z`; v19
+remains preserved as failed evidence.
 
 Initial production acceptance:
 
