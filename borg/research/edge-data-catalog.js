@@ -838,7 +838,9 @@ function catalogWarnings(catalog) {
   }
   if (!catalog.storage?.offhost) warnings.push('Off-host archive state is unavailable.');
   if (catalog.database?.bytes > 40 * 1024 ** 3) {
-    warnings.push(`Hot PostgreSQL is ${byteText(catalog.database.bytes)}; analytics must remain bounded/read-only until Parquet or a replica is active.`);
+    warnings.push(parquetFiles > 0
+      ? `Hot PostgreSQL is ${byteText(catalog.database.bytes)}; keep analytics bounded and on the verified Parquet lake or a read replica rather than hot ingestion.`
+      : `Hot PostgreSQL is ${byteText(catalog.database.bytes)}; analytics must remain bounded/read-only until Parquet or a replica is active.`);
   }
   const disk = catalog.storage?.disk;
   if (disk && disk.freeBytes < 30 * 1024 ** 3) warnings.push('VPS free disk is below the 30 GiB evidence reserve.');
@@ -991,6 +993,7 @@ module.exports = {
   aggregateParquetLakeState,
   buildEdgeDataCatalog,
   buildStrategyCoverage,
+  catalogWarnings,
   causalReplayGrade,
   chooseTimeColumn,
   classifyTable,

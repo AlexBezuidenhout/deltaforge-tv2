@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   aggregateOffhostState,
   aggregateParquetLakeState,
+  catalogWarnings,
   causalReplayGrade,
   classifyTable,
   fieldCoverage,
@@ -98,4 +99,17 @@ test('Parquet lake aggregation counts only verified ZSTD batch outputs as valid'
 test('PostgreSQL identifier quoting rejects injected identifiers', () => {
   assert.equal(quoteIdentifier('borg_book_snaps'), '"borg_book_snaps"');
   assert.throws(() => quoteIdentifier('borg_book_snaps; DROP TABLE users'));
+});
+
+test('catalog warning routes analytics away from hot ingestion once Parquet exists', () => {
+  const warnings = catalogWarnings({
+    database: { bytes: 64 * 1024 ** 3 },
+    storage: {
+      parquetLake: { files: 10, invalidOutputs: 0 },
+      offhost: { invalidChecksums: 0 },
+      disk: { freeBytes: 40 * 1024 ** 3 },
+    },
+  });
+  assert.match(warnings[0], /verified Parquet lake/);
+  assert.doesNotMatch(warnings[0], /until Parquet/);
 });
