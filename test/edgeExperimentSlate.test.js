@@ -10,6 +10,7 @@ const {
   validateSlate,
 } = require('../borg/research/edge-experiment-slate');
 const { readExperimentManifests } = require('../borg/research/experiment-registry');
+const { renderNearMisses } = require('../scripts/edge-experiment-slate');
 
 test('frozen incubator contains exactly ten unique paper-safe lanes', () => {
   assert.equal(validateSlate(SLATE), true);
@@ -43,4 +44,13 @@ test('every frozen lane has an immutable paper-only root manifest', () => {
       `${lane.experimentId} live path must be disabled`);
     assert.match(manifest._hash, /^[a-f0-9]{64}$/);
   }
+});
+
+test('required deliverable records every non-selected mechanism disposition', () => {
+  const document = slateDocument();
+  const output = renderNearMisses(document);
+  assert.match(output, /Near-miss disposition/);
+  assert.equal((output.match(/^\| [A-Z][0-9]{2} \|/gm) || []).length, 108);
+  assert.match(output, /Rejected by existing evidence/);
+  assert.match(output, /Blocked before testing/);
 });
