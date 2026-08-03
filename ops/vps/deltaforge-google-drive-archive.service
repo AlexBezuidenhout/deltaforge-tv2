@@ -21,7 +21,7 @@ Environment=BORG_OFFHOST_ARCHIVE_RECEIPT=/var/lib/deltaforge/google-drive-archiv
 Environment=BORG_OFFHOST_SNAPSHOT_RECEIPT=/var/lib/deltaforge/google-drive-archive/receipts/offhost-snapshot.receipt
 # Share one filesystem lock with local retention. This freezes the selected
 # inode set for the duration of copy, hash and remote verification.
-ExecStart=/usr/bin/flock --exclusive --wait 7200 /var/lib/deltaforge/.archive-retention.lock /usr/local/bin/node scripts/google-drive-archive.js
+ExecStart=/usr/bin/flock --exclusive --wait 7200 /var/lib/deltaforge/google-drive-archive/archive-retention.lock /usr/local/bin/node scripts/google-drive-archive.js
 TimeoutStartSec=2h
 Nice=10
 IOSchedulingClass=idle

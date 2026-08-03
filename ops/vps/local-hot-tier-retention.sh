@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Never unlink a closed object while an off-host traversal is copying and
 # hashing it. The uploader uses the same lock in its systemd ExecStart.
-exec 9>/var/lib/deltaforge/.archive-retention.lock
+exec 9>/var/lib/deltaforge/google-drive-archive/archive-retention.lock
 flock --exclusive --wait 7200 9
 
 RECEIPT="${DELTAFORGE_OFFHOST_RECEIPT:-/var/lib/deltaforge/offhost-archive.receipt}"
