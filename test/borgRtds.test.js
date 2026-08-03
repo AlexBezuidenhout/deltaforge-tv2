@@ -76,3 +76,39 @@ test('RTDS retains and retrieves the nearest resolver opening tick causally', ()
   assert.equal(feed.getPriceAtMs('eth', base, 500), 1901);
   assert.equal(feed.getPriceAtMs('eth', base - 10000, 500), null);
 });
+
+test('RTDS established disconnect is durable, cumulative and invalidates current quotes', () => {
+  const writes = [];
+  const feed = new RtdsRecon(() => {}, {
+    assets: ['btc'],
+    wal: { append: (raw, meta) => {
+      writes.push({ raw: JSON.parse(raw), meta });
+      return {};
+    } },
+  });
+  feed.connectionEpoch = 4;
+  feed._onMessage(Buffer.from(JSON.stringify({
+    topic: 'crypto_prices_chainlink',
+    payload: { symbol: 'btc/usd', timestamp: Date.now(), value: 60000 },
+  })));
+  assert.equal(feed.getPrice('btc'), 60000);
+
+  assert.equal(feed._recordConnectionGap({ reason: 'test_close', code: 1006 }), true);
+  assert.equal(feed.getPrice('btc'), null);
+  assert.equal(feed.connectionGaps, 1);
+  assert.equal(feed.health().connectionGaps, 1);
+  assert.equal(feed.health().lastMessageAgeMs, null);
+  assert.equal(writes.at(-1).raw.type, 'connection_gap');
+  assert.equal(writes.at(-1).raw.connectionEpoch, 4);
+  assert.equal(writes.at(-1).meta.channel, 'control');
+});
+
+test('RTDS startup unavailability is not misclassified as a lost evidence interval', () => {
+  const writes = [];
+  const feed = new RtdsRecon(() => {}, {
+    wal: { append: (...args) => writes.push(args) },
+  });
+  assert.equal(feed._recordConnectionGap({ reason: 'construct_failure' }), false);
+  assert.equal(feed.connectionGaps, 0);
+  assert.equal(writes.length, 0);
+});

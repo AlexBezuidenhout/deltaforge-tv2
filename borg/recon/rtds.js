@@ -38,7 +38,12 @@ class RtdsRecon {
     this.ws = null;
     this.lastMsgAt = 0;
     this.connectionEpoch = 0;
+    this.connectionGaps = 0;
+    this.lastConnectionGapAt = null;
     this.frameSequence = 0;
+    this.frameCount = 0;
+    this.frameBytes = 0;
+    this.startedAt = Date.now();
     this.latest = new Map();
     this.history = new Map();
     this.rows = [];
@@ -84,11 +89,18 @@ class RtdsRecon {
         resolve(true);
       });
       ws.on('message', (raw) => { if (ws === this.ws) this._onMessage(raw); });
-      ws.on('close', () => {
+      ws.on('close', (code, reason) => {
         clearTimeout(timeout);
         clearInterval(this._pingTimer);
         if (this._closed || ws !== this.ws) return;
-        this.onGap('rtds', 'Chainlink socket closed — reconnecting');
+        const detail = {
+          reason: 'ws_close',
+          code,
+          closeReason: reason?.toString() || null,
+          lastMessageAgeMs: this.lastMsgAt ? Date.now() - this.lastMsgAt : null,
+        };
+        this._recordConnectionGap(detail);
+        this.onGap('rtds', `RTDS socket closed (${code}) — reconnecting`);
         this._scheduleReconnect();
       });
       ws.on('error', () => { /* close follows */ });
@@ -105,10 +117,59 @@ class RtdsRecon {
     }, delay);
   }
 
+  _recordConnectionGap(detail = {}) {
+    // Construction/open failures are startup availability failures rather
+    // than interruptions in an established evidence stream. Once OPEN has
+    // created an epoch, however, every close or forced reconnect creates an
+    // unobservable interval and must remain visible for the lifetime of this
+    // collector run.
+    if (this.connectionEpoch <= 0) return false;
+    const at = new Date().toISOString();
+    const record = {
+      type: 'connection_gap',
+      source: 'polymarket_rtds',
+      at,
+      connectionEpoch: this.connectionEpoch,
+      ...detail,
+    };
+    // Append the control event before mutating in-memory state. A WAL failure
+    // is intentionally allowed to throw: continuing without a durable record
+    // would make the research cohort look cleaner than it was.
+    this.wal?.append(JSON.stringify(record), {
+      channel: 'control',
+      connectionEpoch: this.connectionEpoch,
+    });
+    this.connectionGaps += 1;
+    this.lastConnectionGapAt = at;
+    // Never let evaluators consume a pre-disconnect quote after reconnect.
+    // Historical rows remain available for explicitly timestamped analysis;
+    // only the current-state cache is invalidated.
+    this.latest.clear();
+    this.lastMsgAt = 0;
+    return true;
+  }
+
+  health(now = Date.now()) {
+    return {
+      connected: this.ws?.readyState === WebSocket.OPEN,
+      connectionEpoch: this.connectionEpoch,
+      connectionGaps: this.connectionGaps,
+      lastConnectionGapAt: this.lastConnectionGapAt,
+      lastMessageAgeMs: this.lastMsgAt > 0 ? Math.max(0, now - this.lastMsgAt) : null,
+      frames: this.frameCount,
+      frameBytes: this.frameBytes,
+      framesPerSecond: this.startedAt < now
+        ? this.frameCount / ((now - this.startedAt) / 1000)
+        : 0,
+    };
+  }
+
   _onMessage(raw) {
     const receiveWallMs = Date.now();
     const receiveMonoNs = process.hrtime.bigint().toString();
     this.frameSequence += 1;
+    this.frameCount += 1;
+    this.frameBytes += Buffer.byteLength(raw);
     const provenance = this.wal?.append(raw, {
       channel: 'crypto_prices_rtds', receiveWallMs, receiveMonoNs,
       connectionEpoch: this.connectionEpoch,
@@ -241,6 +302,11 @@ class RtdsRecon {
   checkStale(maxAgeMs = 15000) {
     const stale = !this.lastMsgAt || Date.now() - this.lastMsgAt > maxAgeMs;
     if (stale && !this._reconnectTimer) {
+      this._recordConnectionGap({
+        reason: 'stale_timeout',
+        maxAgeMs,
+        lastMessageAgeMs: this.lastMsgAt ? Date.now() - this.lastMsgAt : null,
+      });
       this.onGap('rtds', `Chainlink socket silent >${Math.round(maxAgeMs / 1000)}s — forcing reconnect`);
       const dead = this.ws;
       this.ws = null;

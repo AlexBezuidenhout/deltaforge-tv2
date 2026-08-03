@@ -741,6 +741,7 @@ async function main() {
         },
         wal: walHealth,
         clob: clob.health(),
+        rtds: rtds.health(),
         active: evaluationMarkets().map((m) => `${m.asset}:${m.market_type || 'direction_5m'}`).join(',') || null,
         capturePolicy: capturePolicy.describe(),
         sqlTouchMinIntervalMs,

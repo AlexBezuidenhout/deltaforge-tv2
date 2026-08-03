@@ -125,6 +125,18 @@ function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) { return null; }
 }
 
+function archiveReportFailure(report) {
+  if (!report) return null;
+  if (report.format !== 'deltaforge-google-drive-archive-v1') {
+    return 'Google Drive archive report format is invalid';
+  }
+  if (report.status === 'failed') {
+    return `Google Drive archive failed${report.failedAt ? ` at ${report.failedAt}` : ''}: ${
+      String(report.error || 'unknown failure').slice(0, 240)}`;
+  }
+  return null;
+}
+
 function readReceipt(file) {
   try {
     return Object.fromEntries(fs.readFileSync(file, 'utf8').split(/\r?\n/)
@@ -332,7 +344,7 @@ async function assessEvidenceEpoch(pool, options = {}) {
   }
 
   const { rows: eventHeartbeatRows } = await pool.query(`
-    SELECT DISTINCT ON (source) source,ts,data
+    SELECT DISTINCT ON (source) source,ts,message,data
       FROM borg_events
      WHERE source=ANY($1::text[])
      ORDER BY source,ts DESC
@@ -345,6 +357,21 @@ async function assessEvidenceEpoch(pool, options = {}) {
     } else if (age == null || age > FAST_COMPONENT_MAX_AGE_SEC) {
       critical.push(`${source} is ${age == null ? 'missing' : `${Math.round(age)}s old`}`);
     }
+  }
+  // Latest-state health alone is insufficient: a feed may go stale, reconnect,
+  // and emit a later green heartbeat before the evidence recorder samples it.
+  // Persisted stale heartbeats therefore invalidate the whole immutable epoch.
+  const { rows: staleHeartbeatRows } = await pool.query(`
+    SELECT count(*)::int n,min(ts) first_at,max(ts) last_at
+      FROM borg_events
+     WHERE ts >= $1
+       AND source IN ('heartbeat','flow_heartbeat')
+       AND upper(COALESCE(level,''))='WARN'
+       AND message LIKE 'STALE:%'
+  `, [epochStart]);
+  const staleHeartbeats = staleHeartbeatRows[0] || { n: 0 };
+  if (finite(staleHeartbeats.n, 0) > 0) {
+    critical.push(`${staleHeartbeats.n} transient stale-feed heartbeat(s) in epoch`);
   }
   const flowHeartbeat = eventHeartbeats.flow_heartbeat?.data || {};
   const primaryClob = eventHeartbeats.heartbeat?.data?.clob || null;
@@ -434,6 +461,11 @@ async function assessEvidenceEpoch(pool, options = {}) {
 
   const offhostReceiptFile = options.offhostReceiptFile
     || '/var/lib/deltaforge/offhost-archive.receipt';
+  const offhostReportFile = options.offhostReportFile
+    || '/var/lib/deltaforge/google-drive-archive/last-report.json';
+  const offhostReport = readJson(offhostReportFile);
+  const offhostFailure = archiveReportFailure(offhostReport);
+  if (offhostFailure) critical.push(offhostFailure);
   const offhostReceipt = readReceipt(offhostReceiptFile);
   const maxOffhostAgeSec = finite(options.maxOffhostAgeSec, 3 * 60 * 60);
   const offhostAgeSec = ageSeconds(offhostReceipt?.completed_at, nowMs);
@@ -466,12 +498,12 @@ async function assessEvidenceEpoch(pool, options = {}) {
         (epoch_id,checked_at,status,critical,warnings,metrics)
       VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)
     `, [run.epoch_id, now, currentStatus, JSON.stringify(critical), JSON.stringify(warnings),
-      JSON.stringify({ requirementsVersion: 'evidence-health-v2-parquet', runId: run.run_id,
+      JSON.stringify({ requirementsVersion: 'evidence-health-v3-feed-gaps', runId: run.run_id,
         components: Object.fromEntries(
         Object.entries(components).map(([key, row]) => [key, {
           beatAt: row.beat_at, ageSeconds: ageSeconds(row.beat_at, nowMs),
         }]),
-      ), disk, parquet, sequenceCounters, errorCounters })]);
+      ), disk, parquet, staleHeartbeats, sequenceCounters, errorCounters })]);
   }
 
   const { rows: coverageRows } = await pool.query(`
@@ -589,8 +621,11 @@ async function assessEvidenceEpoch(pool, options = {}) {
         completedAt: offhostReceipt?.completed_at || null,
         ageSeconds: offhostAgeSec,
         latestFile: offhostReceipt?.latest_file || null,
+        reportStatus: offhostReport?.status || null,
+        reportFailedAt: offhostReport?.failedAt || null,
       },
       parquet,
+      staleHeartbeats,
       sequenceCounters,
       errorCounters,
     },
@@ -607,6 +642,7 @@ module.exports = {
   ageSeconds,
   assessParquetLake,
   assessEvidenceEpoch,
+  archiveReportFailure,
   findCounters,
   isAtOrAfter,
   isErrorCounter,

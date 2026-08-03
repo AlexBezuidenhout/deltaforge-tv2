@@ -1,10 +1,12 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const {
   ageSeconds, assessParquetLake, findCounters, isAtOrAfter, isErrorCounter,
-  isGapCounter, latestContinuousHealthySuffix, readReceipt,
+  isGapCounter, latestContinuousHealthySuffix, readReceipt, archiveReportFailure,
 } = require('../borg/research/evidence-epoch');
 
 test('evidence health finds nested sequence and collector error counters', () => {
@@ -37,6 +39,7 @@ test('feed-specific coverage and sequence gaps fail closed', () => {
   assert.equal(isGapCounter('globalCoverageGaps'), true);
   assert.equal(isGapCounter('realtimeConnectionGaps'), true);
   assert.equal(isGapCounter('bookStateGaps'), true);
+  assert.equal(isGapCounter('connectionGaps'), true);
   assert.equal(isGapCounter('globalBootstrapTruncations'), false);
 });
 
@@ -98,6 +101,19 @@ test('off-host receipt parser preserves values containing equals signs', () => {
     latest_file: '/archive/a=b.ndjson.gz',
   });
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('a current Google Drive failure report invalidates an older success receipt', () => {
+  assert.equal(archiveReportFailure({
+    format: 'deltaforge-google-drive-archive-v1',
+    status: 'verified',
+  }), null);
+  assert.match(archiveReportFailure({
+    format: 'deltaforge-google-drive-archive-v1',
+    status: 'failed',
+    failedAt: '2026-08-03T18:49:27.000Z',
+    error: 'rateLimitExceeded',
+  }), /rateLimitExceeded/);
 });
 
 test('Parquet evidence requires recurrent remotely verified queryable batches', () => {
@@ -200,6 +216,10 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
     /deltaforge-google-drive-archive\.timer deltaforge-google-drive-archive\.service/);
   assert.match(launcher, /deltaforge-parquet-lake\.timer deltaforge-parquet-lake\.service/);
   assert.match(launcher, /systemctl disable --now[\s\S]*eth-g-late-canary\.service/);
+  assert.match(launcher, /require\.resolve\('\@duckdb\/node-api'\)/);
+  assert.match(launcher, /refusing to start evidence epoch: release dependencies are incomplete/);
+  assert.match(launcher, /systemctl is-failed --quiet/);
+  assert.match(launcher, /failed maintenance report/);
   const maintenanceRestart = launcher.indexOf('deltaforge-google-drive-archive.timer \\\n  deltaforge-parquet-lake.timer');
   const warmupComplete = launcher.lastIndexOf('rm -f "${preflight_report}"');
   assert.ok(maintenanceRestart > warmupComplete,
@@ -215,6 +235,16 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
   assert.match(launcher, /exact-rule-structural-options-forward-after-runtime-repair/);
 });
 
+test('release dependency installer keys native modules to the immutable lockfile', () => {
+  const installer = fs.readFileSync(path.join(
+    __dirname, '..', 'ops', 'vps', 'install-release-deps.sh',
+  ), 'utf8');
+  assert.match(installer, /sha256sum "\$\{app\}\/package-lock\.json"/);
+  assert.match(installer, /npm ci --omit=dev --no-audit --no-fund/);
+  assert.match(installer, /require\.resolve\('\@duckdb\/node-api'\)/);
+  assert.match(installer, /ln -sfn "\$\{dependency_root\}\/node_modules"/);
+});
+
 test('evidence report distinguishes the immutable release from the collector family label', () => {
   const fs = require('node:fs');
   const path = require('node:path');
@@ -224,6 +254,8 @@ test('evidence report distinguishes the immutable release from the collector fam
   assert.match(source, /r\.code_version run_code_version/);
   assert.match(source, /codeVersion: run\.epoch_code_version/);
   assert.match(source, /collectorCodeVersion: run\.run_code_version/);
+  assert.match(source, /transient stale-feed heartbeat\(s\) in epoch/);
+  assert.match(source, /requirementsVersion: 'evidence-health-v3-feed-gaps'/);
 });
 
 test('partition heartbeat cadence stays inside the evidence freshness window', () => {
