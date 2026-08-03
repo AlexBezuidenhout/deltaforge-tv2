@@ -1640,7 +1640,10 @@ ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_score_at_app
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS paper_eval_threshold NUMERIC;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS exact_rule_key TEXT;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS exact_rule_eligible BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS hard_mismatch BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS rule_comparison_status TEXT NOT NULL DEFAULT 'UNKNOWN';
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS unknown_rule_reasons JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS hard_mismatch BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cv_contract_matches ALTER COLUMN hard_mismatch SET DEFAULT false;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS hard_mismatch_reasons JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS exact_rule_audit JSONB;
 ALTER TABLE cv_contract_matches ADD COLUMN IF NOT EXISTS kalshi_fee_type TEXT;
@@ -1652,12 +1655,29 @@ CREATE INDEX IF NOT EXISTS cv_contract_matches_rank
   ON cv_contract_matches (identity_approved DESC, match_score DESC, refreshed_at DESC);
 CREATE INDEX IF NOT EXISTS cv_contract_matches_exact_rule
   ON cv_contract_matches (exact_rule_eligible DESC, exact_rule_key, refreshed_at DESC);
+CREATE INDEX IF NOT EXISTS cv_contract_matches_rule_status
+  ON cv_contract_matches (rule_comparison_status, refreshed_at DESC);
 CREATE INDEX IF NOT EXISTS cv_contract_matches_relation_rank
   ON cv_contract_matches (relation_approved DESC, identity_approved DESC, match_score DESC, refreshed_at DESC);
 CREATE INDEX IF NOT EXISTS cv_contract_matches_poly
   ON cv_contract_matches (poly_condition_id);
 CREATE INDEX IF NOT EXISTS cv_contract_matches_kalshi
   ON cv_contract_matches (kalshi_ticker);
+-- V1 used hard_mismatch=true for both proven differences and missing fields.
+-- Preserve the fail-closed block while migrating those legacy rows to UNKNOWN;
+-- the next discovery pass will reclassify proven differences under V2.
+UPDATE cv_contract_matches
+   SET rule_comparison_status='CERTIFIED_EQUAL',hard_mismatch=false
+ WHERE exact_rule_eligible=true AND rule_comparison_status='UNKNOWN';
+UPDATE cv_contract_matches
+   SET hard_mismatch=false,
+       unknown_rule_reasons=CASE
+         WHEN jsonb_array_length(unknown_rule_reasons)=0 THEN hard_mismatch_reasons
+         ELSE unknown_rule_reasons END
+ WHERE exact_rule_eligible=false AND rule_comparison_status='UNKNOWN'
+   AND hard_mismatch=true;
+-- The predicate above is a one-time V1 migration: after hard_mismatch is
+-- cleared, future boots must not rewrite every UNKNOWN review row.
 
 CREATE TABLE IF NOT EXISTS cv_maker_episodes (
   episode_id TEXT PRIMARY KEY,

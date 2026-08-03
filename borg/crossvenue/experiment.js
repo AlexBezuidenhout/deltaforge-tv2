@@ -4,7 +4,7 @@
 // variable from silently appending new observations to an old evidence cohort.
 // Historical reads remain available through the replay CLI's --experiment
 // argument; runtime writers and dashboard defaults always use this value.
-const CURRENT_CROSSVENUE_EXPERIMENT_ID = 'crossvenue-exact-rule-convergence-v6';
+const CURRENT_CROSSVENUE_EXPERIMENT_ID = 'crossvenue-exact-rule-convergence-v7';
 
 const EXACT_RULE_FORWARD_PROTOCOL = Object.freeze({
   experimentId: CURRENT_CROSSVENUE_EXPERIMENT_ID,

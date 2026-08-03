@@ -10,7 +10,8 @@ const {
 
 const H43_EXPERIMENT_ID = 'research-h43-forward-v1';
 const STRUCTURAL_UNIVERSE_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
-const CROSSVENUE_EXPERIMENT_ID = 'crossvenue-exact-rule-convergence-v6';
+const { CURRENT_CROSSVENUE_EXPERIMENT_ID: CROSSVENUE_EXPERIMENT_ID } =
+  require('../crossvenue/experiment');
 const OPTIONS_EXPERIMENT_ID = 'options-daily-threshold-surface-residual-v3';
 const OPTIONS_EVIDENCE_START = '2026-07-27T13:05:00Z';
 

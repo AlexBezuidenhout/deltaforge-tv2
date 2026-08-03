@@ -108,8 +108,8 @@ const MATCH_COLUMNS = [
   'relation_proof', 'relation_resolution_audit', 'state_evidence',
   'paper_eval_approved', 'paper_eval_status', 'paper_eval_source',
   'paper_eval_approved_at', 'paper_eval_score_at_approval', 'paper_eval_threshold',
-  'exact_rule_key', 'exact_rule_eligible', 'hard_mismatch',
-  'hard_mismatch_reasons', 'exact_rule_audit',
+  'exact_rule_key', 'exact_rule_eligible', 'rule_comparison_status',
+  'unknown_rule_reasons', 'hard_mismatch', 'hard_mismatch_reasons', 'exact_rule_audit',
   'kalshi_fee_type', 'kalshi_fee_multiplier', 'kalshi_fee_source',
   'kalshi_fee_observed_at', 'kalshi_fee_schedule',
   'approval_source', 'resolution_audit', 'mismatch_reasons',
@@ -327,7 +327,8 @@ class CrossVenueLab {
     this.metrics = {
       polyMarkets: 0, polyEvents: 0, polyUniverseTruncated: false,
       kalshiMarkets: 0, kalshiEvents: 0, kalshiUniverseTruncated: false,
-      candidates: 0, approvedMatches: 0, exactRuleMatches: 0, hardMismatchMatches: 0,
+      candidates: 0, approvedMatches: 0, exactRuleMatches: 0,
+      unknownRuleMatches: 0, hardMismatchMatches: 0,
       paperApprovedMatches: 0, paperMonitoredMatches: 0, paperApprovalOverflow: 0,
       pendingCandidates: 0, reviewedRejected: 0, monitoredMatches: 0,
       snapshots: 0, evaluations: 0, economicLeads: 0,
@@ -876,7 +877,9 @@ class CrossVenueLab {
         stateEvidence: row.state_evidence || null,
         exactRuleKey: row.exact_rule_key || null,
         exactRuleEligible: row.exact_rule_eligible === true,
-        hardMismatch: row.hard_mismatch !== false,
+        ruleComparisonStatus: row.rule_comparison_status || 'UNKNOWN',
+        unknownRuleReasons: row.unknown_rule_reasons || [],
+        hardMismatch: row.hard_mismatch === true,
         hardMismatchReasons: row.hard_mismatch_reasons || [],
         exactRuleAudit: row.exact_rule_audit || null,
         endDeltaHours: finite(row.end_delta_hours), ...(metadata.audit || {}),
@@ -939,6 +942,8 @@ class CrossVenueLab {
     this.metrics.reviewedRejected = candidates.filter(isRejectedIdentity).length;
     this.metrics.approvedMatches = candidates.filter((row) => row.relationApproved).length;
     this.metrics.exactRuleMatches = candidates.filter((row) => row.exactRuleEligible).length;
+    this.metrics.unknownRuleMatches = candidates
+      .filter((row) => row.ruleComparisonStatus === 'UNKNOWN').length;
     this.metrics.hardMismatchMatches = candidates.filter((row) => row.hardMismatch).length;
     this.metrics.paperApprovedMatches = candidates.filter((row) => row.paperEvalApproved).length;
     this.metrics.paperMonitoredMatches = selection.monitored
@@ -1042,7 +1047,9 @@ class CrossVenueLab {
         match.stateEvidence ? json(match.stateEvidence) : null,
         match.paperEvalApproved, match.paperEvalStatus, match.paperEvalSource,
         match.paperEvalApprovedAt, match.paperEvalScoreAtApproval, match.paperEvalThreshold,
-        match.exactRuleKey, match.exactRuleEligible === true, match.hardMismatch !== false,
+        match.exactRuleKey, match.exactRuleEligible === true,
+        match.ruleComparisonStatus || 'UNKNOWN', json(match.unknownRuleReasons || []),
+        match.hardMismatch === true,
         json(match.hardMismatchReasons || []),
         match.exactRuleAudit ? json(match.exactRuleAudit) : null,
         match.kalshi.feeSchedule?.feeType || null,
@@ -1104,6 +1111,8 @@ class CrossVenueLab {
         paper_eval_threshold=EXCLUDED.paper_eval_threshold,
         exact_rule_key=EXCLUDED.exact_rule_key,
         exact_rule_eligible=EXCLUDED.exact_rule_eligible,
+        rule_comparison_status=EXCLUDED.rule_comparison_status,
+        unknown_rule_reasons=EXCLUDED.unknown_rule_reasons,
         hard_mismatch=EXCLUDED.hard_mismatch,
         hard_mismatch_reasons=EXCLUDED.hard_mismatch_reasons,
         exact_rule_audit=EXCLUDED.exact_rule_audit,
@@ -1133,6 +1142,8 @@ class CrossVenueLab {
       this.metrics.approvedMatches = universe.candidates.filter((match) => match.relationApproved).length;
       this.metrics.exactRuleMatches = universe.candidates
         .filter((match) => match.exactRuleEligible).length;
+      this.metrics.unknownRuleMatches = universe.candidates
+        .filter((match) => match.ruleComparisonStatus === 'UNKNOWN').length;
       this.metrics.hardMismatchMatches = universe.candidates
         .filter((match) => match.hardMismatch).length;
       this.metrics.paperApprovedMatches = universe.candidates
@@ -1320,7 +1331,9 @@ class CrossVenueLab {
           || match.identityCertification?.snapshotHash || null,
         exactRuleKey: match.exactRuleKey,
         exactRuleEligible: match.exactRuleEligible === true,
-        hardMismatch: match.hardMismatch !== false,
+        ruleComparisonStatus: match.ruleComparisonStatus || 'UNKNOWN',
+        unknownRuleReasons: match.unknownRuleReasons || [],
+        hardMismatch: match.hardMismatch === true,
         kalshiFeeSchedule: match.kalshi.feeSchedule }),
     ]);
     this.metrics.snapshots += 1;
@@ -1358,7 +1371,7 @@ class CrossVenueLab {
         match.paperEvalApproved, basis.paperEntryEligible, match.identityApproved,
         basis.relationType, basis.relationApproved, basis.guaranteedMinPayoutPerShare,
         basis.payoffProofHash, match.exactRuleKey,
-        match.exactRuleEligible === true, match.hardMismatch !== false,
+        match.exactRuleEligible === true, match.hardMismatch === true,
         booksFresh, basis.fullEntryDepth, basis.fullExitDepth,
         quality, fidelity, bookSignature, EXPERIMENT_ID, synchronized.synchronized,
         json({ triggerVenue, kalshiTransport: kalshiState.transport || 'public_batch_rest',
@@ -1375,7 +1388,9 @@ class CrossVenueLab {
           identitySnapshotHash: match.identityCertification?.snapshotHash || null,
           exactRuleKey: match.exactRuleKey,
           exactRuleEligible: match.exactRuleEligible === true,
-          hardMismatch: match.hardMismatch !== false,
+          ruleComparisonStatus: match.ruleComparisonStatus || 'UNKNOWN',
+          unknownRuleReasons: match.unknownRuleReasons || [],
+          hardMismatch: match.hardMismatch === true,
           hardMismatchReasons: match.hardMismatchReasons,
           kalshiFeeSchedule: match.kalshi.feeSchedule,
           polyTick: match.poly.tickSize,
@@ -1388,7 +1403,7 @@ class CrossVenueLab {
       this.metrics.basisSamples += 1;
     }
 
-    // Capacity is a typed outcome, including failures. Only a clean V6 rule
+    // Capacity is a typed outcome, including failures. Only a clean V7 rule
     // key produces the 5/10/25-share tape; legacy manual approvals cannot
     // override a hard mismatch or support a current scaling claim.
     if (match.exactRuleEligible && !match.hardMismatch) {
@@ -1432,7 +1447,9 @@ class CrossVenueLab {
             quantity,
             exactRuleKey: match.exactRuleKey,
             exactRuleEligible: match.exactRuleEligible === true,
-            hardMismatch: match.hardMismatch !== false,
+            ruleComparisonStatus: match.ruleComparisonStatus || 'UNKNOWN',
+            unknownRuleReasons: match.unknownRuleReasons || [],
+            hardMismatch: match.hardMismatch === true,
             feeScheduleKnown,
             feeSchedule,
             reason,
@@ -1450,7 +1467,7 @@ class CrossVenueLab {
           this.buffers.depthReplays.push([
             replayId, iso(now), matchId, direction, quantity,
             match.exactRuleKey, match.exactRuleEligible === true,
-            match.hardMismatch !== false, feeScheduleKnown,
+            match.hardMismatch === true, feeScheduleKnown,
             feeSchedule?.feeType || null, feeSchedule?.feeMultiplier ?? null,
             feeSchedule?.observedAt || null,
             row?.polyEntryVwap ?? null, row?.kalshiEntryVwap ?? null,
@@ -1467,6 +1484,8 @@ class CrossVenueLab {
               triggerVenue,
               pairSkewMs,
               hardMismatchReasons: match.hardMismatchReasons,
+              ruleComparisonStatus: match.ruleComparisonStatus || 'UNKNOWN',
+              unknownRuleReasons: match.unknownRuleReasons || [],
               protocolQuantities: DEPTH_REPLAY_QUANTITIES,
               interpretation: 'Executable two-ask entry and two-bid liquidation; all four observed fees included.',
             }),
@@ -1519,7 +1538,7 @@ class CrossVenueLab {
         match.paperEvalApproved, row.paperTradeEligible, match.identityApproved,
         row.relationType, row.relationApproved, row.guaranteedMinPayoutPerShare,
         row.payoffProofHash, match.exactRuleKey,
-        match.exactRuleEligible === true, match.hardMismatch !== false,
+        match.exactRuleEligible === true, match.hardMismatch === true,
         booksFresh, true,
         false, row.lockableAfterBothFills, row.status, quality, fidelity,
         EXPERIMENT_ID, synchronized.synchronized,
@@ -1555,7 +1574,9 @@ class CrossVenueLab {
           } : null,
           exactRuleKey: match.exactRuleKey,
           exactRuleEligible: match.exactRuleEligible === true,
-          hardMismatch: match.hardMismatch !== false,
+          ruleComparisonStatus: match.ruleComparisonStatus || 'UNKNOWN',
+          unknownRuleReasons: match.unknownRuleReasons || [],
+          hardMismatch: match.hardMismatch === true,
           hardMismatchReasons: match.hardMismatchReasons || [],
           kalshiFeeSchedule: match.kalshi.feeSchedule,
           diagnosticControl: ['REJECTED', 'MANUALLY_REJECTED'].includes(match.identityStatus),

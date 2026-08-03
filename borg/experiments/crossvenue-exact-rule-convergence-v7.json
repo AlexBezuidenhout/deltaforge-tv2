@@ -1,0 +1,70 @@
+{
+  "experiment_id": "crossvenue-exact-rule-convergence-v7",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-03T12:40:00.000Z",
+  "frozen_at": "2026-08-03T12:40:00.000Z",
+  "evidence_started_at": "2026-08-03T12:40:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "rule_aware_crossvenue",
+  "supersedes": "crossvenue-exact-rule-convergence-v6",
+  "strategy_version": "crossvenue-exact-rule-convergence-v7",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "hypothesis": "Contracts whose every outcome-defining rule dimension is certified equal may exhibit executable cross-venue convergence after all four taker fees; incomplete contracts are an unknown review queue, not evidence of either equality or difference.",
+  "eligibility": {
+    "rule_key_version": "crossvenue-exact-rule-key-v2",
+    "field_states": ["CERTIFIED_EQUAL", "CERTIFIED_DIFFERENT", "UNKNOWN"],
+    "required_dimensions": [
+      "subject",
+      "predicate",
+      "comparator",
+      "strike",
+      "resolver",
+      "observationAt",
+      "timezone",
+      "fallback",
+      "settlementPrecision"
+    ],
+    "certified_different": "automatic hard veto regardless of text score",
+    "unknown": "retain in the rule-review/collection queue but prohibit exact-rule paper entry",
+    "certified_equal": "all dimensions complete and equal; content-addressed exact rule key required",
+    "books": "synchronized A/B-grade executable L2 with no stale leg",
+    "kalshi_fee_metadata": "supported per-market fee schedule required and persisted",
+    "depth_replays_shares": [5, 10, 25],
+    "entry_quantity_shares": 5
+  },
+  "exit_rule": {
+    "target_net_roi": 0.01,
+    "maximum_hold_seconds": 3600,
+    "timeout": "first executable two-venue bid VWAP at or immediately after one hour",
+    "terminal_fallback": "only for independently hash-certified identical settlement rules"
+  },
+  "independent_unit": "first eligible entry per match_id, direction and UTC day",
+  "promotion": {
+    "minimum_fresh_pair_direction_days": 300,
+    "minimum_calendar_days": 30,
+    "positive_2x_cost_pnl_in_both_chronological_halves": true,
+    "market_and_day_clustered_lower_bound_above_zero": true,
+    "multiple_testing_correction": true,
+    "positive_latency_profiles_ms": [100, 250, 500],
+    "shared_bankroll_usd": 500,
+    "no_dominant_pair_or_day": true
+  },
+  "provisional": [
+    "The 1% target was inspected in an earlier contaminated grid and remains provisional.",
+    "No v6 or earlier observation may be pooled with this trial.",
+    "Unknown rule fields may improve discovery coverage but cannot be counted as trades or terminal identities."
+  ],
+  "strategy_bindings": [{
+    "strategy": "crossvenue_exact_rule_convergence_v7",
+    "family": "rule_aware_crossvenue",
+    "arm": "five_share_one_percent_one_hour",
+    "phase": "eval",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "net_convergence_pnl_2x_cost_one_tick"
+  }]
+}

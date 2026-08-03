@@ -437,9 +437,10 @@ function applyPaperEvaluationPolicy(candidate, options = {}) {
     paperEvalStatus: approved ? exactRuleApproval
       ? 'EXACT_RULE_KEY_APPROVED_PAPER_ONLY' : 'OPERATOR_APPROVED_PAPER_ONLY'
       : candidate.hardMismatch === true ? 'HARD_RULE_MISMATCH_VETO'
+        : candidate.ruleComparisonStatus === 'UNKNOWN' ? 'RULE_FIELDS_UNKNOWN_REVIEW_REQUIRED'
         : isRejectedIdentity(candidate) ? 'IDENTITY_REJECTED' : 'NOT_APPROVED',
     paperEvalSource: approved ? exactRuleApproval
-      ? 'frozen_exact_rule_key_v1' : 'exact_rule_key_and_operator_score_threshold'
+      ? 'frozen_exact_rule_key_v2' : 'exact_rule_key_v2_and_operator_score_threshold'
       : null,
     paperEvalApprovedAt: approved ? approvedAt : null,
     paperEvalScoreAtApproval: approved ? finite(candidate.score, 0) : null,
@@ -686,8 +687,11 @@ function buildCandidates(polyMarkets, kalshiMarkets, options = {}) {
       ...candidate,
       exactRuleKey: audit.candidateKey,
       exactRuleEligible: audit.exactRuleEligible,
+      ruleComparisonStatus: audit.comparisonStatus,
       hardMismatch: audit.hardMismatch,
       hardMismatchReasons: audit.hardMismatchReasons,
+      unknownRuleReasons: audit.unknownRuleReasons,
+      exactRuleReviewKey: audit.reviewKey,
       exactRuleAudit: audit,
     };
   }).sort((left, right) =>

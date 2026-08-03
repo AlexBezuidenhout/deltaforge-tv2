@@ -8,7 +8,7 @@ wallet, signer or live-order path.
 |---:|---|---|---|---|
 | 1 | Resolver-boundary transfer | H43 runs unchanged inside the BORG shadow engine | `research-h43-forward-v1` | first order per independent market |
 | 2 | Certified payoff graph | deterministic rule snapshots, finite-state payoff proof, synchronized executable depth, full orphan reserve and a queue-aware passive arm | `structural-certified-payoff-graph-v5-orphan-reserve` | certified event/candidate |
-| 3 | Rule-aware Polymarket/Kalshi | complete exact-rule keys only; any missing/conflicting rule dimension is a hard veto | `crossvenue-exact-rule-convergence-v6` | first pair/direction/UTC day |
+| 3 | Rule-aware Polymarket/Kalshi | complete exact-rule keys only; proven conflicts are hard vetoes and missing fields remain non-trading review items | `crossvenue-exact-rule-convergence-v7` | first pair/direction/UTC day |
 | 4 | Deribit options-implied residual | exact-expiry or bounded total-variance surfaces only; unsupported extrapolation fails closed | `options-daily-threshold-surface-residual-v3` | first market/side observation |
 | 5 | Fair-bound passive making | **capture only** on a frozen, PnL-independent neglected-market panel; quote signals are disabled | `fair-bound-passive-overlay-v1` (staged) | no evidence until a certified bound exists |
 

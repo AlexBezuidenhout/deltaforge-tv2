@@ -14,6 +14,11 @@ const {
 } = require('./strategy');
 
 const NOT_APPLICABLE = 'n/a';
+const RULE_FIELD_STATUS = Object.freeze({
+  CERTIFIED_EQUAL: 'CERTIFIED_EQUAL',
+  CERTIFIED_DIFFERENT: 'CERTIFIED_DIFFERENT',
+  UNKNOWN: 'UNKNOWN',
+});
 
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
@@ -243,15 +248,25 @@ function compareExactRuleKeys(poly, kalshi, structuredEvidence = null) {
   const polyRule = buildVenueRuleKey(poly, 'poly', structuredEvidence);
   const kalshiRule = buildVenueRuleKey(kalshi, 'kalshi', structuredEvidence);
   const hardMismatchReasons = [];
-  for (const field of polyRule.missing) hardMismatchReasons.push(`POLY_MISSING_${field.toUpperCase()}`);
-  for (const field of kalshiRule.missing) hardMismatchReasons.push(`KALSHI_MISSING_${field.toUpperCase()}`);
+  const unknownRuleReasons = [];
+  const fieldComparisons = {};
 
   const dimensions = Object.keys(polyRule.key);
   for (const field of dimensions) {
     const left = polyRule.key[field];
     const right = kalshiRule.key[field];
-    if (left == null || right == null) continue;
-    if (!equalValue(left, right)) hardMismatchReasons.push(`${field.toUpperCase()}_MISMATCH`);
+    let status;
+    if (left == null || left === '' || right == null || right === '') {
+      status = RULE_FIELD_STATUS.UNKNOWN;
+      if (left == null || left === '') unknownRuleReasons.push(`POLY_MISSING_${field.toUpperCase()}`);
+      if (right == null || right === '') unknownRuleReasons.push(`KALSHI_MISSING_${field.toUpperCase()}`);
+    } else if (equalValue(left, right)) {
+      status = RULE_FIELD_STATUS.CERTIFIED_EQUAL;
+    } else {
+      status = RULE_FIELD_STATUS.CERTIFIED_DIFFERENT;
+      hardMismatchReasons.push(`${field.toUpperCase()}_MISMATCH`);
+    }
+    fieldComparisons[field] = { status, polyValue: left, kalshiValue: right };
   }
 
   // Website/name aliases are canonicalized before this comparison. Exactly
@@ -264,28 +279,67 @@ function compareExactRuleKeys(poly, kalshi, structuredEvidence = null) {
     && resolverOverlap.length === 1) {
     polyRule.key.resolver = resolverOverlap[0];
     kalshiRule.key.resolver = resolverOverlap[0];
-    const missingResolver = /_MISSING_RESOLVER$/;
+    fieldComparisons.resolver = {
+      status: RULE_FIELD_STATUS.CERTIFIED_EQUAL,
+      polyValue: resolverOverlap[0],
+      kalshiValue: resolverOverlap[0],
+    };
+    for (let index = unknownRuleReasons.length - 1; index >= 0; index -= 1) {
+      if (/_MISSING_RESOLVER$/.test(unknownRuleReasons[index])) unknownRuleReasons.splice(index, 1);
+    }
     for (let index = hardMismatchReasons.length - 1; index >= 0; index -= 1) {
-      if (missingResolver.test(hardMismatchReasons[index])) hardMismatchReasons.splice(index, 1);
+      if (hardMismatchReasons[index] === 'RESOLVER_MISMATCH') hardMismatchReasons.splice(index, 1);
     }
   } else if (!resolverOverlap.length
     && polyRule.resolverCandidates.length && kalshiRule.resolverCandidates.length) {
+    fieldComparisons.resolver = {
+      status: RULE_FIELD_STATUS.CERTIFIED_DIFFERENT,
+      polyValue: polyRule.resolverCandidates,
+      kalshiValue: kalshiRule.resolverCandidates,
+    };
     hardMismatchReasons.push('RESOLVER_MISMATCH');
   } else if (polyRule.resolverCandidates.length > 1
     || kalshiRule.resolverCandidates.length > 1) {
-    hardMismatchReasons.push('RESOLVER_AMBIGUOUS');
+    fieldComparisons.resolver = {
+      status: RULE_FIELD_STATUS.UNKNOWN,
+      polyValue: polyRule.resolverCandidates,
+      kalshiValue: kalshiRule.resolverCandidates,
+    };
+    unknownRuleReasons.push('RESOLVER_AMBIGUOUS');
+  } else {
+    fieldComparisons.resolver = {
+      status: RULE_FIELD_STATUS.UNKNOWN,
+      polyValue: polyRule.resolverCandidates,
+      kalshiValue: kalshiRule.resolverCandidates,
+    };
   }
 
   const uniqueReasons = [...new Set(hardMismatchReasons)].sort();
-  const exactRuleEligible = uniqueReasons.length === 0
+  const uniqueUnknownReasons = [...new Set(unknownRuleReasons)].sort();
+  const comparisonStatuses = Object.values(fieldComparisons).map((row) => row.status);
+  const comparisonStatus = comparisonStatuses.includes(RULE_FIELD_STATUS.CERTIFIED_DIFFERENT)
+    ? RULE_FIELD_STATUS.CERTIFIED_DIFFERENT
+    : comparisonStatuses.includes(RULE_FIELD_STATUS.UNKNOWN)
+      ? RULE_FIELD_STATUS.UNKNOWN
+      : RULE_FIELD_STATUS.CERTIFIED_EQUAL;
+  const exactRuleEligible = comparisonStatus === RULE_FIELD_STATUS.CERTIFIED_EQUAL
     && canonicalJson(polyRule.key) === canonicalJson(kalshiRule.key);
   const candidateKey = exactRuleEligible ? `cv-rule:${hash(polyRule.key)}` : null;
+  const reviewKey = exactRuleEligible ? candidateKey : `cv-review:${hash({
+    fieldComparisons,
+    polyResolverCandidates: polyRule.resolverCandidates,
+    kalshiResolverCandidates: kalshiRule.resolverCandidates,
+  })}`;
   return {
-    version: 'crossvenue-exact-rule-key-v1',
+    version: 'crossvenue-exact-rule-key-v2',
     exactRuleEligible,
-    hardMismatch: !exactRuleEligible,
+    comparisonStatus,
+    hardMismatch: comparisonStatus === RULE_FIELD_STATUS.CERTIFIED_DIFFERENT,
     hardMismatchReasons: uniqueReasons,
+    unknownRuleReasons: uniqueUnknownReasons,
+    fieldComparisons,
     candidateKey,
+    reviewKey,
     polyRule,
     kalshiRule,
   };
@@ -293,6 +347,7 @@ function compareExactRuleKeys(poly, kalshi, structuredEvidence = null) {
 
 module.exports = {
   NOT_APPLICABLE,
+  RULE_FIELD_STATUS,
   buildVenueRuleKey,
   canonicalSubject,
   canonicalJson,

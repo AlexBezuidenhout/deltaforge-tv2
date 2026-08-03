@@ -1598,6 +1598,7 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
                            AND COALESCE((kalshi_fee_schedule->>'supported')::boolean,false)
                          )::int paper_eligible_exact,
                          count(*) FILTER (WHERE active AND hard_mismatch)::int hard_vetoes,
+                         count(*) FILTER (WHERE active AND rule_comparison_status='UNKNOWN')::int unknown_rules,
                          count(*) FILTER (WHERE active AND kalshi_fee_schedule IS NOT NULL
                            AND COALESCE((kalshi_fee_schedule->>'supported')::boolean,false))::int fee_supported
                     FROM cv_contract_matches`),
@@ -1618,13 +1619,13 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
       evidenceBlocker: paperEligibleExact > 0 ? null
         : exactRulePairs > 0
           ? 'EXACT_RULE_KEYS_NOT_EXECUTION_ELIGIBLE: no exact pair is both monitored, enrolled and backed by a supported Kalshi fee schedule'
-          : 'ZERO_COMPLETE_EXACT_RULE_KEYS: all current cross-venue candidates are vetoed or incomplete; no V6 convergence entry is admissible',
+          : 'ZERO_COMPLETE_EXACT_RULE_KEYS: all current cross-venue candidates are vetoed or incomplete; no V7 convergence entry is admissible',
       contract: {
         mode: 'PAPER_ONLY_LIVE_DATA', walletLoaded: false, liveOrderPath: 'absent',
         atomicAcrossVenues: false, startingBankrollUsd: STARTING_BANKROLL_USD,
         capitalPerVenueUsd: STARTING_BANKROLL_USD / 2,
         sizingMode: 'equal payout shares, optimized over executable depth and the $250-per-venue bankroll',
-        identityRule: 'V6 requires a complete equal subject/predicate/comparator/strike/resolver/time/timezone/fallback/precision key; any missing or conflicting dimension is an automatic veto.',
+        identityRule: 'V7 requires every subject/predicate/comparator/strike/resolver/time/timezone/fallback/precision field to be CERTIFIED_EQUAL. CERTIFIED_DIFFERENT is a hard veto; UNKNOWN stays review-only and cannot trade.',
         paperScorePolicy: hb?.meta?.paperEvaluationPolicy || null,
         experimentId: CROSSVENUE_EXPERIMENT_ID,
         kalshiTransport: hb?.meta?.kalshiTransport || 'public_batch_rest',
@@ -1637,6 +1638,7 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
         exactRulePairs,
         paperEligibleExact,
         hardVetoes: parseInt(exact.hard_vetoes, 10) || 0,
+        unknownRules: parseInt(exact.unknown_rules, 10) || 0,
         feeSupported: parseInt(exact.fee_supported, 10) || 0,
         legacyRelationApproved: approvedMatches,
       },
@@ -1652,8 +1654,8 @@ router.get('/crossvenue/matches', authMiddleware, async (req, res) => {
       SELECT match_id,poly_condition_id,poly_question,kalshi_ticker,kalshi_title,
              match_score::float,title_similarity::float,identity_status,identity_approved,
              identity_snapshot_hash,identity_certification,
-             exact_rule_key,exact_rule_eligible,hard_mismatch,
-             hard_mismatch_reasons,exact_rule_audit,
+             exact_rule_key,exact_rule_eligible,rule_comparison_status,
+             unknown_rule_reasons,hard_mismatch,hard_mismatch_reasons,exact_rule_audit,
              kalshi_fee_type,kalshi_fee_multiplier::float,kalshi_fee_source,
              kalshi_fee_observed_at,kalshi_fee_schedule,
              relation_type,relation_approved,relation_status,relation_proof,
@@ -1673,7 +1675,7 @@ router.get('/crossvenue/matches', authMiddleware, async (req, res) => {
         FROM cv_contract_matches
        WHERE active=true OR relation_approved=true`)]);
     res.json({
-      warning: 'A title score or manual review cannot override V6. Paper convergence requires a complete equal rule key and no hard mismatch; a terminal lock additionally requires deterministic state-payoff certification.',
+      warning: 'A title score or manual review cannot override V7. Exact-rule paper convergence requires every typed rule field to be certified equal; unknown fields remain review-only, while proven differences are hard vetoes. A terminal lock additionally requires deterministic state-payoff certification.',
       total: total.rows[0]?.total || 0,
       returned: matches.rows.length,
       rows: matches.rows,

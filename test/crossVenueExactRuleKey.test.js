@@ -4,7 +4,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   compareExactRuleKeys,
+  RULE_FIELD_STATUS,
 } = require('../borg/crossvenue/exact-rule-key');
+const { applyPaperEvaluationPolicy } = require('../borg/crossvenue/universe');
 
 function poly(overrides = {}) {
   return {
@@ -38,6 +40,7 @@ test('complete equal rule dimensions produce a content-addressed candidate key',
   const result = compareExactRuleKeys(poly(), kalshi());
   assert.equal(result.exactRuleEligible, true);
   assert.equal(result.hardMismatch, false);
+  assert.equal(result.comparisonStatus, RULE_FIELD_STATUS.CERTIFIED_EQUAL);
   assert.match(result.candidateKey, /^cv-rule:[a-f0-9]{64}$/);
   assert.deepEqual(result.hardMismatchReasons, []);
   assert.deepEqual(result.kalshiRule.resolverCandidates, ['exchange:binance']);
@@ -50,6 +53,8 @@ test('a strike, resolver, time, or fallback conflict is an automatic veto', () =
     floorStrike: 110000,
   }));
   assert.equal(strike.exactRuleEligible, false);
+  assert.equal(strike.hardMismatch, true);
+  assert.equal(strike.comparisonStatus, RULE_FIELD_STATUS.CERTIFIED_DIFFERENT);
   assert.ok(strike.hardMismatchReasons.includes('SUBJECT_MISMATCH'));
   assert.ok(strike.hardMismatchReasons.includes('STRIKE_MISMATCH'));
 
@@ -126,7 +131,9 @@ test('an additional fallback resolver cannot hide behind one shared source', () 
     ].join(' '),
   }));
   assert.equal(result.exactRuleEligible, false);
-  assert.ok(result.hardMismatchReasons.includes('RESOLVER_AMBIGUOUS'));
+  assert.equal(result.hardMismatch, false);
+  assert.equal(result.comparisonStatus, RULE_FIELD_STATUS.UNKNOWN);
+  assert.ok(result.unknownRuleReasons.includes('RESOLVER_AMBIGUOUS'));
 });
 
 test('missing rule dimensions fail closed instead of inheriting title similarity', () => {
@@ -138,7 +145,20 @@ test('missing rule dimensions fail closed instead of inheriting title similarity
     expectedExpirationTime: '2026-08-01T00:00:00Z',
   });
   assert.equal(result.exactRuleEligible, false);
-  assert.ok(result.hardMismatchReasons.some((reason) => reason.includes('MISSING_RESOLVER')));
-  assert.ok(result.hardMismatchReasons.some((reason) => reason.includes('MISSING_TIMEZONE')));
-  assert.ok(result.hardMismatchReasons.some((reason) => reason.includes('MISSING_FALLBACK')));
+  assert.equal(result.hardMismatch, false);
+  assert.equal(result.comparisonStatus, RULE_FIELD_STATUS.UNKNOWN);
+  assert.deepEqual(result.hardMismatchReasons, []);
+  assert.ok(result.unknownRuleReasons.some((reason) => reason.includes('MISSING_RESOLVER')));
+  assert.ok(result.unknownRuleReasons.some((reason) => reason.includes('MISSING_TIMEZONE')));
+  assert.ok(result.unknownRuleReasons.some((reason) => reason.includes('MISSING_FALLBACK')));
+  assert.match(result.reviewKey, /^cv-review:[a-f0-9]{64}$/);
+
+  const policy = applyPaperEvaluationPolicy({
+    ...result,
+    ruleComparisonStatus: result.comparisonStatus,
+    score: 0.99,
+    identityStatus: 'CANDIDATE',
+  }, { exactRuleApproval: true, paperScoreApproval: true, paperScoreFloor: 0.8 });
+  assert.equal(policy.paperEvalApproved, false);
+  assert.equal(policy.paperEvalStatus, 'RULE_FIELDS_UNKNOWN_REVIEW_REQUIRED');
 });
