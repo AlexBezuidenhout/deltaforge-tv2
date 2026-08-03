@@ -12,4 +12,8 @@ WorkingDirectory=/opt/deltaforge/tv2/current
 EnvironmentFile=/etc/deltaforge/tv2.env
 Environment=NODE_ENV=production
 ExecStart=/usr/local/bin/node scripts/cv-settle.js
+# Evidence-epoch cutovers deliberately drain this bounded poller. Treat that
+# operator-initiated SIGTERM as a clean stop; the next explicit run still has
+# to exit zero, so genuine settlement failures remain visible.
+SuccessExitStatus=SIGTERM
 Nice=10
