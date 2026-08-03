@@ -2,12 +2,15 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const WebSocket = require('ws');
 const {
+  FlowCollector,
   FlowSocket,
   collectRecentTradePages,
   collectStableTradeSnapshot,
   dataTradesUrl,
   fetchText,
+  flowRouteIndexes,
   globalCoverageState,
   latestSourceWindow,
   makeNonOverlappingTask,
@@ -61,6 +64,54 @@ test('closed Flow socket drops a queued frame after WAL shutdown', () => {
   socket.closed = true;
   socket._message(ws, Buffer.from('{}'));
   assert.equal(appends, 0);
+});
+
+test('flow market sockets assign every logical shard to two independent paths', () => {
+  assert.deepEqual(flowRouteIndexes(0, 2, 2), [0, 2]);
+  assert.deepEqual(flowRouteIndexes(1, 2, 2), [1, 3]);
+  assert.deepEqual(flowRouteIndexes(3, 2, 2), [1, 3]);
+});
+
+test('flow CLOB health remains covered after one physical route disconnects', () => {
+  const now = Date.now();
+  const collector = Object.create(FlowCollector.prototype);
+  collector.assetRoutes = new Map([['token-a', [0, 1]]]);
+  collector.routeBooks = new Map([
+    [0, new Map([['token-a', { at: now, connectionEpoch: 1 }]])],
+    [1, new Map([['token-a', { at: now, connectionEpoch: 1 }]])],
+  ]);
+  collector.sockets = [0, 1].map(() => ({
+    ws: { readyState: WebSocket.OPEN },
+    active: new Set(['token-a']),
+    lastMessageAt: now,
+    connectionEpoch: 1,
+  }));
+  collector.counters = {
+    realtimeTransportReconnects: 0,
+    realtimeCoverageGaps: 0,
+    lastRealtimeCoverageGapAt: null,
+  };
+
+  let health = collector.clobHealth(now);
+  assert.equal(health.coveredAssets, 1);
+  assert.equal(health.assetCoverage['token-a'].freshRoutes, 2);
+  assert.equal(collector._authorityRoute('token-a', now), 0);
+
+  collector.sockets[0].ws.readyState = WebSocket.CLOSED;
+  health = collector.clobHealth(now);
+  assert.equal(health.coveredAssets, 1);
+  assert.equal(health.assetCoverage['token-a'].freshRoutes, 1);
+  assert.equal(collector._authorityRoute('token-a', now), 1);
+
+  collector.sockets[1].ws.readyState = WebSocket.CLOSED;
+  health = collector.clobHealth(now);
+  assert.equal(health.coveredAssets, 0);
+  assert.equal(collector._authorityRoute('token-a', now), null);
+
+  collector.sockets[1].ws.readyState = WebSocket.OPEN;
+  collector.sockets[1].connectionEpoch = 2;
+  health = collector.clobHealth(now);
+  assert.equal(health.coveredAssets, 0, 'a prior-connection book cannot cover a reconnect');
 });
 
 test('global trade discovery uses only documented limit/offset parameters', () => {

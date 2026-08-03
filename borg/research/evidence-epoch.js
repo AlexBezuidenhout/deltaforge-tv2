@@ -402,12 +402,22 @@ async function assessEvidenceEpoch(pool, options = {}) {
   } else if (expectedRtdsAssets <= 0 || coveredRtdsAssets < expectedRtdsAssets) {
     critical.push(`primary redundant RTDS coverage is ${coveredRtdsAssets}/${expectedRtdsAssets} assets`);
   }
-  const activeFlowSockets = finite(flowHeartbeat.activeSockets, null);
-  const expectedFlowSockets = finite(flowHeartbeat.expectedSockets, null);
-  if (activeFlowSockets == null || expectedFlowSockets == null) {
-    critical.push('public-flow CLOB socket coverage telemetry is missing');
-  } else if (expectedFlowSockets <= 0 || activeFlowSockets < expectedFlowSockets) {
-    critical.push(`public-flow CLOB socket coverage is ${activeFlowSockets}/${expectedFlowSockets}`);
+  if (flowHeartbeat.routingMode === 'redundant-explicit') {
+    const expectedFlowAssets = finite(flowHeartbeat.expectedAssets, null);
+    const coveredFlowAssets = finite(flowHeartbeat.coveredAssets, null);
+    if (expectedFlowAssets == null || coveredFlowAssets == null) {
+      critical.push('public-flow redundant CLOB asset-coverage telemetry is missing');
+    } else if (expectedFlowAssets <= 0 || coveredFlowAssets < expectedFlowAssets) {
+      critical.push(`public-flow redundant CLOB coverage is ${coveredFlowAssets}/${expectedFlowAssets} token assets`);
+    }
+  } else {
+    const activeFlowSockets = finite(flowHeartbeat.activeSockets, null);
+    const expectedFlowSockets = finite(flowHeartbeat.expectedSockets, null);
+    if (activeFlowSockets == null || expectedFlowSockets == null) {
+      critical.push('public-flow CLOB socket coverage telemetry is missing');
+    } else if (expectedFlowSockets <= 0 || activeFlowSockets < expectedFlowSockets) {
+      critical.push(`public-flow CLOB socket coverage is ${activeFlowSockets}/${expectedFlowSockets}`);
+    }
   }
   const globalDbQueue = finite(flowHeartbeat.globalDbQueue, null);
   const globalDbQueueOldestAgeMs = finite(flowHeartbeat.globalDbQueueOldestAgeMs, null);

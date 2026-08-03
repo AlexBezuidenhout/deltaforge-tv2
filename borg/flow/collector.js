@@ -44,6 +44,18 @@ const CLOB_API = 'https://clob.polymarket.com';
 const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const REALTIME_MARKETS = Math.max(2, Math.min(12, Number(process.env.FLOW_REALTIME_MARKETS || 4)));
 const SOCKET_SHARDS = Math.max(1, Math.min(4, Number(process.env.FLOW_CLOB_SHARDS || 2)));
+// Each selected token is captured on independent physical market-channel
+// paths. A transport reconnect is therefore diagnostic; it becomes an
+// evidence-breaking gap only when every subscribed path for a token is gone.
+// Both copies remain in the immutable WAL, while one deterministic authority
+// drives the derived strategy/SQL state so duplicate frames cannot manufacture
+// signals.
+const SOCKET_PATHS = Math.max(2, Math.min(3,
+  Number(process.env.FLOW_CLOB_PATHS_PER_ASSET || 2)));
+const SOCKET_CONNECT_STAGGER_MS = Math.max(0,
+  Number(process.env.FLOW_CLOB_CONNECT_STAGGER_MS || 250));
+const SOCKET_COVERAGE_MAX_AGE_MS = Math.max(10_000,
+  Number(process.env.FLOW_CLOB_COVERAGE_MAX_AGE_MS || 45_000));
 // Data API trades have second-resolution source timestamps. Polling this
 // discovery-only plane faster than two seconds adds no causal information and
 // previously allowed slow 10,000-row requests to overlap until Cloudflare
@@ -346,6 +358,13 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function flowRouteIndexes(logicalShard, shardCount = SOCKET_SHARDS, pathCount = SOCKET_PATHS) {
+  const shards = Math.max(1, Math.trunc(Number(shardCount)) || 1);
+  const paths = Math.max(1, Math.trunc(Number(pathCount)) || 1);
+  const shard = ((Math.trunc(Number(logicalShard)) || 0) % shards + shards) % shards;
+  return Array.from({ length: paths }, (_, path) => path * shards + shard);
+}
+
 async function fetchText(url, timeoutMs = 10000, options = {}) {
   const fetchImpl = options.fetchImpl || fetch;
   const sleep = options.sleep || wait;
@@ -544,13 +563,15 @@ class FlowCollector {
       boundary: new RawWal('polymarket-flow-boundary-intents', walOptions),
       metadata: new RawWal('polymarket-flow-market-metadata', walOptions),
     };
-    this.sockets = Array.from({ length: SOCKET_SHARDS }, (_, shard) => new FlowSocket(
-      shard, this.wal.clob,
+    this.sockets = Array.from({ length: SOCKET_SHARDS * SOCKET_PATHS }, (_, route) => new FlowSocket(
+      route, this.wal.clob,
       (event, provenance) => this.onClobEvent(event, provenance),
       (socket, event, detail) => this.onConnection(socket, event, detail),
     ));
     this.markets = new Map();
     this.tokenMarkets = new Map();
+    this.assetRoutes = new Map();
+    this.routeBooks = new Map(this.sockets.map((socket) => [socket.shard, new Map()]));
     this.books = new Map();
     this.touchHistory = new Map();
     this.connectionEvents = [];
@@ -580,7 +601,8 @@ class FlowCollector {
       globalTrades: 0, realtimeTrades: 0, eligibleSweeps: 0, signals: 0,
       scored: 0, filled: 0, errors: 0, scheduledSkips: 0, globalCoverageGaps: 0,
       globalBootstrapTruncations: 0, globalRescueSnapshots: 0,
-      realtimeConnectionGaps: 0,
+      realtimeTransportReconnects: 0, realtimeCoverageGaps: 0,
+      lastRealtimeCoverageGapAt: null,
       globalDbPersisted: 0, globalDbQueueHighWater: 0,
       restRetries: 0, lastRestRetryAt: null,
       boundarySourceArmed: 0, boundaryReady: 0, boundaryRejected: 0,
@@ -591,7 +613,12 @@ class FlowCollector {
   async start() {
     await migrateFlow();
     await this.refreshUniverse();
-    for (const socket of this.sockets) socket.connect();
+    for (let index = 0; index < this.sockets.length; index += 1) {
+      this.sockets[index].connect();
+      if (SOCKET_CONNECT_STAGGER_MS && index + 1 < this.sockets.length) {
+        await wait(SOCKET_CONNECT_STAGGER_MS);
+      }
+    }
     this.running = true;
     // Complete the initial REST pass before arming its timer. Previously the
     // first interval could overlap this call while a large response was still
@@ -609,7 +636,9 @@ class FlowCollector {
       paper_only: true, live_order_path: 'absent', strategy_version: CHALLENGER_STRATEGY_VERSION,
       retired_control_version: STRATEGY_VERSION, v1_control_enabled: FLOW_V1_CONTROL_ENABLED,
       strategy_signals_enabled: STRATEGY_SIGNALS_ENABLED,
-      realtime_markets: REALTIME_MARKETS, shards: SOCKET_SHARDS,
+      realtime_markets: REALTIME_MARKETS, logical_shards: SOCKET_SHARDS,
+      paths_per_asset: SOCKET_PATHS, physical_sockets: this.sockets.length,
+      connect_stagger_ms: SOCKET_CONNECT_STAGGER_MS,
       global_poll_ms: GLOBAL_POLL_MS, data_trade_page_size: DATA_TRADE_PAGE_SIZE,
       data_trade_max_pages: DATA_TRADE_MAX_PAGES,
       data_trade_rescue_limit: DATA_TRADE_RESCUE_LIMIT,
@@ -778,13 +807,33 @@ class FlowCollector {
 
     this.markets = new Map(usable.map((market) => [market.conditionId, market]));
     this.tokenMarkets.clear();
+    this.assetRoutes.clear();
     usable.forEach((market, index) => {
-      market.tokenIds.forEach((tokenId) => this.tokenMarkets.set(tokenId, market));
-      market.shard = index % SOCKET_SHARDS;
+      market.logicalShard = index % SOCKET_SHARDS;
+      market.routes = flowRouteIndexes(market.logicalShard);
+      market.tokenIds.forEach((tokenId) => {
+        this.tokenMarkets.set(tokenId, market);
+        this.assetRoutes.set(tokenId, market.routes);
+      });
     });
-    for (let shard = 0; shard < this.sockets.length; shard += 1) {
-      const ids = usable.filter((market) => market.shard === shard).flatMap((market) => market.tokenIds);
-      this.sockets[shard].setAssets(ids);
+    for (let route = 0; route < this.sockets.length; route += 1) {
+      const ids = usable.filter((market) => market.routes.includes(route))
+        .flatMap((market) => market.tokenIds);
+      const wanted = new Set(ids);
+      const routeBooks = this.routeBooks.get(route);
+      for (const existing of routeBooks.keys()) {
+        if (!wanted.has(existing) || !this.sockets[route].desired.has(existing)) {
+          routeBooks.delete(existing);
+        }
+      }
+      this.sockets[route].setAssets(ids);
+    }
+    for (const assetId of [...this.books.keys()]) {
+      if (this.assetRoutes.has(assetId)) continue;
+      this.books.delete(assetId);
+      this.touchHistory.delete(assetId);
+      this.lastTouchKey.delete(assetId);
+      this.lastPeriodicTouch.delete(assetId);
     }
     await logEvent('INFO', 'flow', `realtime panel refreshed (${usable.length} markets, ${usable.length * 2} tokens)`, {
       selection: 'top active binary order-book markets in the bounded latest-trade sample, client-filtered to 90 seconds',
@@ -796,23 +845,115 @@ class FlowCollector {
     });
   }
 
+  _routeIsFresh(route, assetId, now = Date.now()) {
+    const socket = this.sockets[route];
+    const routeBook = this.routeBooks.get(route)?.get(assetId);
+    return Boolean(socket
+      && socket.ws?.readyState === WebSocket.OPEN
+      && socket.active.has(assetId)
+      && routeBook
+      && routeBook.connectionEpoch === socket.connectionEpoch
+      && socket.lastMessageAt
+      && now - socket.lastMessageAt <= SOCKET_COVERAGE_MAX_AGE_MS);
+  }
+
+  _coveredRoutes(assetId, now = Date.now(), excludedRoute = null) {
+    return (this.assetRoutes.get(assetId) || [])
+      .filter((route) => route !== excludedRoute && this._routeIsFresh(route, assetId, now));
+  }
+
+  _authorityRoute(assetId, now = Date.now()) {
+    return this._coveredRoutes(assetId, now)[0] ?? null;
+  }
+
+  _publishRouteBook(assetId, route) {
+    const book = this.routeBooks.get(route)?.get(assetId);
+    if (!book) return false;
+    this.books.set(assetId, book);
+    return true;
+  }
+
+  clobHealth(now = Date.now()) {
+    const assets = [...this.assetRoutes.keys()];
+    const assetCoverage = Object.fromEntries(assets.map((assetId) => {
+      const routes = this.assetRoutes.get(assetId) || [];
+      return [assetId, { routes: routes.length, freshRoutes: this._coveredRoutes(assetId, now).length }];
+    }));
+    return {
+      routingMode: 'redundant-explicit',
+      expectedSockets: this.sockets.length,
+      activeSockets: this.sockets.filter((socket) => socket.ws?.readyState === WebSocket.OPEN).length,
+      expectedAssets: assets.length,
+      coveredAssets: Object.values(assetCoverage).filter((row) => row.freshRoutes > 0).length,
+      transportReconnects: this.counters.realtimeTransportReconnects,
+      coverageGaps: this.counters.realtimeCoverageGaps,
+      lastCoverageGapAt: this.counters.lastRealtimeCoverageGapAt,
+      coverageMaxAgeMs: SOCKET_COVERAGE_MAX_AGE_MS,
+      assetCoverage,
+      lastSocketMessageAt: this.sockets.map((socket) => socket.lastMessageAt || null),
+    };
+  }
+
+  _recordCoverageGap(socket, assetIds, observedAt, detail = {}) {
+    if (!assetIds.length) return;
+    this.counters.realtimeCoverageGaps += 1;
+    this.counters.lastRealtimeCoverageGapAt = new Date(observedAt).toISOString();
+    const control = {
+      type: 'flow_realtime_coverage_gap',
+      at: this.counters.lastRealtimeCoverageGapAt,
+      failedRoute: socket.shard,
+      assetIds,
+      detail,
+    };
+    this.wal.clob.append(JSON.stringify(control), {
+      channel: 'control', receiveWallMs: observedAt, connectionShard: socket.shard,
+    });
+    for (const assetId of assetIds) {
+      for (const route of this.assetRoutes.get(assetId) || [socket.shard]) {
+        this.connectionEvents.push({
+          at: observedAt, shard: route, epoch: socket.connectionEpoch,
+          event: 'close', assetId, aggregateCoverageGap: true,
+        });
+      }
+    }
+  }
+
   onConnection(socket, event, detail) {
     const level = event === 'open' ? 'INFO' : 'WARN';
     const observedAt = Date.now();
-    // A close while the collector is running means at least one interval is
-    // not replay-complete. Planned shutdown sets socket.closed before close.
-    if (event === 'close' && !socket.closed) this.counters.realtimeConnectionGaps += 1;
-    this.connectionEvents.push({ at: observedAt, shard: socket.shard, epoch: socket.connectionEpoch, event });
+    const affectedAssets = [...socket.desired];
+    let uncoveredAssets = [];
+    // Every connection epoch starts from a venue snapshot. Never let a book
+    // from the previous TCP session make a newly opened path look covered.
+    if (event === 'open') this.routeBooks.get(socket.shard)?.clear();
+    if (event === 'close' && !socket.closed) {
+      this.counters.realtimeTransportReconnects += 1;
+      uncoveredAssets = affectedAssets.filter((assetId) =>
+        this._coveredRoutes(assetId, observedAt, socket.shard).length === 0);
+      this._recordCoverageGap(socket, uncoveredAssets, observedAt, detail);
+      // Move derived state to the surviving path immediately. Raw frames from
+      // every path were already retained independently in the WAL.
+      for (const assetId of affectedAssets) {
+        const alternate = this._coveredRoutes(assetId, observedAt, socket.shard)[0];
+        if (alternate != null) this._publishRouteBook(assetId, alternate);
+      }
+    }
     const cutoff = observedAt - 30_000;
     while (this.connectionEvents.length && this.connectionEvents[0].at < cutoff) {
       this.connectionEvents.shift();
     }
+    const eventDetail = {
+      ...(detail || {}), route: socket.shard,
+      transportReconnect: event === 'close' && !socket.closed,
+      aggregateCoverageGap: uncoveredAssets.length > 0,
+      uncoveredAssets,
+    };
     pool.query(`INSERT INTO pm_flow_connection_events
       (observed_at,connection_shard,connection_epoch,event,detail)
       VALUES ($1,$2,$3,$4,$5::jsonb)`,
     [new Date(observedAt), socket.shard, socket.connectionEpoch, event,
-      JSON.stringify(detail || {})]).catch((error) => this.error(error));
-    logEvent(level, 'flow', `CLOB shard ${socket.shard} ${event}`, detail);
+      JSON.stringify(eventDetail)]).catch((error) => this.error(error));
+    logEvent(level, 'flow', `CLOB route ${socket.shard} ${event}`, eventDetail);
   }
 
   onClobEvent(event, provenance) {
@@ -820,14 +961,19 @@ class FlowCollector {
     const type = event.event_type || event.type || 'unknown';
     const assetId = String(event.asset_id || '');
     if (!assetId || !this.tokenMarkets.has(assetId)) return;
+    const route = Number(provenance.shard);
+    const routeBooks = this.routeBooks.get(route);
+    if (!routeBooks) return;
     if (type === 'book') {
       const bids = normLevels(event.bids || event.buys).sort((a, b) => b[0] - a[0]);
       const asks = normLevels(event.asks || event.sells).sort((a, b) => a[0] - b[0]);
-      this.books.set(assetId, {
+      routeBooks.set(assetId, {
         bids, asks, at: provenance.receive_wall_timestamp_ms, sourceAt: epochMs(event.timestamp),
-        hash: event.hash || null, shard: provenance.shard,
+        hash: event.hash || null, shard: route,
         connectionEpoch: provenance.connection_epoch,
       });
+      if (this._authorityRoute(assetId) !== route) return;
+      this._publishRouteBook(assetId, route);
       this.recordTouch(assetId, type, provenance, event);
       return;
     }
@@ -837,17 +983,23 @@ class FlowCollector {
       const touched = new Set();
       for (const change of changes) {
         const changedAsset = String(change.asset_id || assetId);
-        this.applyDelta(changedAsset, change, provenance, event);
+        this.applyDelta(changedAsset, change, provenance, event, routeBooks);
         touched.add(changedAsset);
       }
-      for (const changedAsset of touched) this.recordTouch(changedAsset, type, provenance, event);
+      for (const changedAsset of touched) {
+        if (this._authorityRoute(changedAsset) !== route) continue;
+        this._publishRouteBook(changedAsset, route);
+        this.recordTouch(changedAsset, type, provenance, event);
+      }
       return;
     }
-    if (type === 'last_trade_price') this.onRealtimeTrade(event, provenance);
+    if (type === 'last_trade_price' && this._authorityRoute(assetId) === route) {
+      this.onRealtimeTrade(event, provenance);
+    }
   }
 
-  applyDelta(assetId, change, provenance, parent) {
-    const book = this.books.get(assetId);
+  applyDelta(assetId, change, provenance, parent, books = this.books) {
+    const book = books.get(assetId);
     if (!book) return;
     const price = finite(change.price);
     const size = finite(change.size);
@@ -1431,15 +1583,22 @@ class FlowCollector {
   async heartbeat() {
     const oldestGlobalDbRow = this.globalDbQueue.values().next().value;
     const oldestGlobalDbAt = oldestGlobalDbRow?.[2] || null;
+    const clob = this.clobHealth();
     await logEvent('INFO', 'flow_heartbeat', 'public-flow paper collector alive', {
       ...this.counters,
       runId: RUN_ID,
       collectionEpochId: process.env.BORG_COLLECTION_EPOCH_ID || 'flow-unmarked',
       uptimeMin: Math.round((Date.now() - new Date(this.counters.startedAt).getTime()) / 60000),
       selectedMarkets: this.markets.size,
-      activeSockets: this.sockets.filter((socket) => socket.ws?.readyState === WebSocket.OPEN).length,
-      expectedSockets: this.sockets.length,
-      lastSocketMessageAt: this.sockets.map((socket) => socket.lastMessageAt || null),
+      routingMode: clob.routingMode,
+      activeSockets: clob.activeSockets,
+      expectedSockets: clob.expectedSockets,
+      expectedAssets: clob.expectedAssets,
+      coveredAssets: clob.coveredAssets,
+      assetCoverage: clob.assetCoverage,
+      coverageMaxAgeMs: clob.coverageMaxAgeMs,
+      lastSocketMessageAt: clob.lastSocketMessageAt,
+      clob,
       lastGlobalResponseAt: this.lastGlobalResponseAt || null,
       globalDbQueue: this.globalDbQueue.size,
       globalDbQueueOldestAgeMs: oldestGlobalDbAt
@@ -1510,6 +1669,7 @@ module.exports = {
   epochMs,
   fetchJson,
   fetchText,
+  flowRouteIndexes,
   globalCoverageState,
   globalTradeKey,
   latestSourceWindow,
