@@ -52,6 +52,11 @@ class ClobRecon {
     this.resolveMarketId = resolveMarketId; // (assetId) -> borg market id | null
     this.wal = options.wal || null;
     this.onMarketEvent = options.onMarketEvent || (() => {});
+    this.onConnectionGap = options.onConnectionGap || (() => {});
+    this.onBookStateGap = options.onBookStateGap || (() => {});
+    this.acceptDerivedAsset = typeof options.acceptDerivedAsset === 'function'
+      ? options.acceptDerivedAsset
+      : () => true;
     // Dedicated research processes may keep their own namespaced derived
     // tables while still sharing this hardened public WebSocket adapter and
     // raw WAL contract. Defaults preserve every legacy collector behavior.
@@ -184,6 +189,12 @@ class ClobRecon {
     this.books.clear();
     this._lastTouch?.clear();
     this._pendingSqlTouch.clear();
+    this.onConnectionGap({
+      connectionShard: this.connectionShard,
+      subscribedAssets: [...this.subscribed],
+      at: this.lastConnectionGapAt,
+      detail,
+    });
     return true;
   }
 
@@ -416,6 +427,7 @@ class ClobRecon {
   }
 
   _emitMarketEvent(assetId, eventType, provenance) {
+    if (!this.acceptDerivedAsset(assetId)) return;
     try {
       this.onMarketEvent({
         source: 'clob', assetId, marketId: this.resolveMarketId(assetId), eventType,
@@ -437,6 +449,7 @@ class ClobRecon {
   // ONLINE back-of-queue fill estimation (audit 2026-07-12: A_maker's losses
   // came from unbounded same-side inventory; capping needs live fill awareness).
   _recordPrint(assetId, price, size) {
+    if (!this.acceptDerivedAsset(assetId)) return;
     if (!Number.isFinite(price) || !Number.isFinite(size)) return;
     if (!this._prints) this._prints = new Map();
     let arr = this._prints.get(assetId);
@@ -458,6 +471,7 @@ class ClobRecon {
 
   _bufferEvent(assetId, type, price, size, side, raw, provenance = {}, sourceTimestamp = null, bookHash = null) {
     if (!this.persistDerivedEvents) return;
+    if (assetId && !this.acceptDerivedAsset(assetId) && type !== 'book_hash_repair') return;
     const receivedAt = provenance.receive_wall_timestamp_ms || Date.now();
     const book = assetId ? this.books.get(assetId) : null;
     this.eventBuf.push([
@@ -488,6 +502,7 @@ class ClobRecon {
 
   _bufferTouch(assetId, eventType, provenance = {}, sourceTimestamp = null, bookHash = null) {
     if (!this.persistDerivedEvents) return;
+    if (!this.acceptDerivedAsset(assetId)) return;
     const book = this.books.get(assetId);
     if (!book) return;
     const receivedAt = provenance.receive_wall_timestamp_ms || Date.now();
@@ -613,6 +628,12 @@ class ClobRecon {
           this._bufferEvent(assetId, 'book_hash_repair', null, null, null, {
             ws_hash: requestHash, rest_hash: snapshot.hash,
           }, {}, snapshot.timestamp, snapshot.hash);
+          this.onBookStateGap({
+            connectionShard: this.connectionShard,
+            assetId,
+            at: this.lastBookStateGapAt,
+            detail: { wsHash: requestHash, restHash: snapshot.hash },
+          });
         }
       }
     } catch (err) {

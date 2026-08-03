@@ -34,6 +34,8 @@ class RtdsRecon {
     this.onGap = onGap || (() => {});
     this.wal = options.wal || null;
     this.onMarketEvent = options.onMarketEvent || (() => {});
+    this.onConnectionGap = options.onConnectionGap || (() => {});
+    this.transportPath = Number.isInteger(options.transportPath) ? options.transportPath : 0;
     this.assets = new Set((options.assets || SUPPORTED).filter((asset) => SUPPORTED.includes(asset)));
     this.ws = null;
     this.lastMsgAt = 0;
@@ -130,6 +132,7 @@ class RtdsRecon {
       source: 'polymarket_rtds',
       at,
       connectionEpoch: this.connectionEpoch,
+      transportPath: this.transportPath,
       ...detail,
     };
     // Append the control event before mutating in-memory state. A WAL failure
@@ -138,6 +141,7 @@ class RtdsRecon {
     this.wal?.append(JSON.stringify(record), {
       channel: 'control',
       connectionEpoch: this.connectionEpoch,
+      connectionShard: this.transportPath,
     });
     this.connectionGaps += 1;
     this.lastConnectionGapAt = at;
@@ -146,12 +150,18 @@ class RtdsRecon {
     // only the current-state cache is invalidated.
     this.latest.clear();
     this.lastMsgAt = 0;
+    this.onConnectionGap({
+      transportPath: this.transportPath,
+      at,
+      detail,
+    });
     return true;
   }
 
   health(now = Date.now()) {
     return {
       connected: this.ws?.readyState === WebSocket.OPEN,
+      transportPath: this.transportPath,
       connectionEpoch: this.connectionEpoch,
       connectionGaps: this.connectionGaps,
       lastConnectionGapAt: this.lastConnectionGapAt,
@@ -173,6 +183,7 @@ class RtdsRecon {
     const provenance = this.wal?.append(raw, {
       channel: 'crypto_prices_rtds', receiveWallMs, receiveMonoNs,
       connectionEpoch: this.connectionEpoch,
+      connectionShard: this.transportPath,
     }) || {
       event_id: null, event_sequence: this.frameSequence,
       receive_wall_timestamp_ms: receiveWallMs, receive_monotonic_ns: receiveMonoNs,
@@ -200,7 +211,10 @@ class RtdsRecon {
         connectionEpoch: this.connectionEpoch,
         eventSequence: provenance.event_sequence || this.frameSequence,
         walEventId: provenance.event_id || null,
-        raw: { topic: message.topic, type: message.type, payload: tick },
+        raw: {
+          topic: message.topic, type: message.type, payload: tick,
+          transportPath: this.transportPath,
+        },
       };
       const key = `${sourceKey}:${asset}`;
       this.latest.set(key, row);

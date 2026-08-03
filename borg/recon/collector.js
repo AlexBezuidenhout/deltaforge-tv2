@@ -22,7 +22,7 @@ const Feeds = require('./feeds');
 const ChainlinkRecon = require('./chainlink');
 const MarketsRecon = require('./markets');
 const ClobMultiplex = require('./clob-multiplex');
-const RtdsRecon = require('./rtds');
+const RtdsMultiplex = require('./rtds-multiplex');
 const RawWal = require('./wal');
 const ShadowEngine = require('../shadow/engine');
 const makeStrategies = require('../shadow/strategies');
@@ -165,7 +165,7 @@ async function main() {
     onMarketEvent: (event) => enqueueEventEvaluation(event),
   });
   const chainlink = new ChainlinkRecon();
-  const rtds = new RtdsRecon((src, msg) => logEvent('WARN', src, msg), {
+  const rtds = new RtdsMultiplex((src, msg) => logEvent('WARN', src, msg), {
     wal: wals.rtds,
     assets: assets.map((a) => a.asset),
     onMarketEvent: (event) => enqueueEventEvaluation(event),
@@ -178,19 +178,28 @@ async function main() {
     }
     return null;
   };
-  const primaryShardByAsset = new Map([
-    ['btc', 0], ['eth', 1], ['sol', 2], ['xrp', 3],
+  const primaryShardsByAsset = new Map([
+    // Five physical sockets provide two independent paths per asset without
+    // putting more load on any one path than the observed stable BTC stream.
+    // BTC is isolated twice; the lower-rate assets form a three-socket ring.
+    ['btc', [0, 1]],
+    ['eth', [2, 3]],
+    ['sol', [2, 4]],
+    ['xrp', [3, 4]],
   ]);
   const sqlTouchMinIntervalMs = Math.max(0,
     Number(process.env.BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS || 0) || 0);
   const clob = new ClobMultiplex((assetId) => marketForToken(assetId)?.id || null, {
     wal: wals.clob,
     sqlTouchMinIntervalMs,
-    // One high-rate five-minute market per socket. v23 proved every primary
-    // shard carrying two markets (four outcome tokens) was closed by the venue
-    // with code 1006 while single-market shards stayed connected. Route by the
-    // stable underlying asset so window rotation cannot recreate that load.
-    shardIndexForAsset: (assetId) => primaryShardByAsset.get(marketForToken(assetId)?.asset),
+    // A physical reconnect is diagnostic, not automatically a data gap: raw
+    // frames are captured on both routes and current state is selected from
+    // the freshest path. Evidence fails only if every route for a token is
+    // absent/stale at once. Stable underlying routing survives window churn.
+    shardIndexesForAsset: (assetId) =>
+      primaryShardsByAsset.get(marketForToken(assetId)?.asset),
+    coverageMaxAgeMs: 3000,
+    connectStaggerMs: 250,
     describeAsset: (assetId) => marketForToken(assetId)?.asset || null,
     onMarketEvent: (event) => enqueueEventEvaluation(event),
   });

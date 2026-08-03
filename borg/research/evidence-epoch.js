@@ -378,13 +378,29 @@ async function assessEvidenceEpoch(pool, options = {}) {
   }
   const flowHeartbeat = eventHeartbeats.flow_heartbeat?.data || {};
   const primaryClob = eventHeartbeats.heartbeat?.data?.clob || null;
-  if (!primaryClob
+  if (primaryClob?.routingMode === 'redundant-explicit') {
+    const expectedAssets = finite(primaryClob.expectedAssets, null);
+    const coveredAssets = finite(primaryClob.coveredAssets, null);
+    if (expectedAssets == null || coveredAssets == null) {
+      critical.push('primary redundant CLOB asset-coverage telemetry is missing');
+    } else if (expectedAssets <= 0 || coveredAssets < expectedAssets) {
+      critical.push(`primary redundant CLOB coverage is ${coveredAssets}/${expectedAssets} token assets`);
+    }
+  } else if (!primaryClob
       || finite(primaryClob.expectedSockets, null) == null
       || finite(primaryClob.activeSockets, null) == null) {
     critical.push('primary CLOB socket coverage telemetry is missing');
   } else if (finite(primaryClob.expectedSockets, 0) <= 0
       || finite(primaryClob.activeSockets, 0) < finite(primaryClob.expectedSockets, 0)) {
     critical.push(`primary CLOB socket coverage is ${finite(primaryClob.activeSockets, 0)}/${finite(primaryClob.expectedSockets, 0)}`);
+  }
+  const primaryRtds = eventHeartbeats.heartbeat?.data?.rtds || null;
+  const expectedRtdsAssets = finite(primaryRtds?.expectedAssets, null);
+  const coveredRtdsAssets = finite(primaryRtds?.coveredAssets, null);
+  if (expectedRtdsAssets == null || coveredRtdsAssets == null) {
+    critical.push('primary redundant RTDS asset-coverage telemetry is missing');
+  } else if (expectedRtdsAssets <= 0 || coveredRtdsAssets < expectedRtdsAssets) {
+    critical.push(`primary redundant RTDS coverage is ${coveredRtdsAssets}/${expectedRtdsAssets} assets`);
   }
   const activeFlowSockets = finite(flowHeartbeat.activeSockets, null);
   const expectedFlowSockets = finite(flowHeartbeat.expectedSockets, null);

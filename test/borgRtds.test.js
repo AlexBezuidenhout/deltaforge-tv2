@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const RtdsRecon = require('../borg/recon/rtds');
+const RtdsMultiplex = require('../borg/recon/rtds-multiplex');
 
 test('RTDS Chainlink parser records source/receive clocks and divergence', () => {
   const order = [];
@@ -111,4 +112,44 @@ test('RTDS startup unavailability is not misclassified as a lost evidence interv
   assert.equal(feed._recordConnectionGap({ reason: 'construct_failure' }), false);
   assert.equal(feed.connectionGaps, 0);
   assert.equal(writes.length, 0);
+});
+
+test('redundant RTDS keeps coverage through one reconnect and records simultaneous loss', () => {
+  const callbacks = [];
+  const walRecords = [];
+  const feed = new RtdsMultiplex(() => {}, {
+    assets: ['btc'], pathCount: 2,
+    wal: { append: (raw, meta) => {
+      let parsed = null;
+      try { parsed = JSON.parse(raw.toString()); } catch (_) {}
+      walRecords.push({ raw: parsed, meta });
+      return {};
+    } },
+    onMarketEvent: (event) => callbacks.push(event),
+  });
+  const sourceMs = Date.now();
+  const frame = Buffer.from(JSON.stringify({
+    topic: 'crypto_prices_chainlink',
+    payload: { symbol: 'btc/usd', timestamp: sourceMs, value: 60000 },
+  }));
+  for (const path of feed.feeds) {
+    path.connectionEpoch = 1;
+    path._onMessage(frame);
+  }
+  assert.equal(callbacks.length, 1, 'duplicate transport copies produce one strategy event');
+  assert.equal(feed.getPrice('btc'), 60000);
+
+  feed.feeds[0]._recordConnectionGap({ reason: 'path_zero_close' });
+  let health = feed.health();
+  assert.equal(health.transportReconnects, 1);
+  assert.equal(health.coverageGaps, 0);
+  assert.equal(health.coveredAssets, 1);
+  assert.equal(health.paths[0].connectionGaps, undefined);
+
+  feed.feeds[1]._recordConnectionGap({ reason: 'path_one_close' });
+  health = feed.health();
+  assert.equal(health.coverageGaps, 1);
+  assert.equal(health.coveredAssets, 0);
+  assert.equal(walRecords.some((row) => row.raw?.type === 'coverage_gap'), true);
+  feed.close();
 });

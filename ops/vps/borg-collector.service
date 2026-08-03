@@ -28,12 +28,13 @@ Environment=BORG_CAPTURE_ASSETS=btc,eth,sol,xrp
 # lanes; duplicating it here overloaded the primary socket and created real
 # connection gaps without adding evidence for the frozen active strategy set.
 Environment=BORG_CAPTURE_MARKET_TYPES=direction_5m
-# v23 proved a four-token primary shard is repeatedly closed with code 1006
-# despite fresh PONGs. Deterministic asset routing keeps each high-rate
-# five-minute market's complementary pair on its own socket across rotations.
-# This is a feed-integrity mechanism change, not a trading threshold.
-Environment=BORG_CLOB_SHARDS=4
+# Public sockets reconnect in normal operation, so each token now has two raw-
+# WAL'd paths. Five staggered sockets isolate BTC twice and place ETH/SOL/XRP
+# on a lower-rate redundancy ring. Only simultaneous loss of every fresh path
+# is an evidence-breaking coverage gap; individual reconnects remain reported.
+Environment=BORG_CLOB_SHARDS=5
 Environment=BORG_CLOB_HASH_VALIDATION_GRACE_MS=750
+Environment=BORG_RTDS_PATHS=2
 # Full event fidelity remains in compressed WAL. PostgreSQL stores at most one
 # derived touch per token/250 ms, plus the trailing state, for fast queries.
 Environment=BORG_CLOB_SQL_TOUCH_MIN_INTERVAL_MS=250
