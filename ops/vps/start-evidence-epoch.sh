@@ -20,6 +20,28 @@ deployed_release="$(basename "$(readlink -f /opt/deltaforge/tv2/current)")"
 # evidence epoch with an obsolete hard-coded code version.
 code_version="${BORG_EPOCH_CODE_VERSION:-${deployed_release}}"
 epoch_reason="${BORG_EPOCH_REASON:-exact-rule-structural-options-forward-after-runtime-repair}"
+maintenance_timers_drained=false
+tmp_file=""
+preflight_report=""
+
+restore_maintenance_timers() {
+  if [[ "${maintenance_timers_drained}" == true ]]; then
+    systemctl enable --now \
+      deltaforge-google-drive-archive.timer \
+      deltaforge-parquet-lake.timer >/dev/null 2>&1 || true
+    maintenance_timers_drained=false
+  fi
+}
+
+cleanup() {
+  status=$?
+  trap - EXIT
+  [[ -z "${tmp_file}" ]] || rm -f "${tmp_file}"
+  [[ -z "${preflight_report}" ]] || rm -f "${preflight_report}"
+  if (( status != 0 )); then restore_maintenance_timers; fi
+  exit "${status}"
+}
+trap cleanup EXIT
 
 # An immutable code release is not runnable evidence unless its lockfile-
 # matched native dependency set is installed. In particular, a missing DuckDB
@@ -30,6 +52,14 @@ if ! runuser -u deltaforge -- bash -lc \
   echo "refusing to start evidence epoch: release dependencies are incomplete" >&2
   exit 1
 fi
+
+# Freeze timer dispatch before checking the oneshot services. This closes the
+# check-then-stop race where Parquet began after a green preflight and was then
+# killed by the cohort drain, leaving systemd failed but an old report green.
+maintenance_timers_drained=true
+systemctl stop \
+  deltaforge-google-drive-archive.timer \
+  deltaforge-parquet-lake.timer
 
 for maintenance_unit in \
     deltaforge-google-drive-archive.service \
@@ -68,8 +98,6 @@ systemctl stop \
   deltaforge-evidence-health.timer deltaforge-evidence-health.service \
   borg-score.timer borg-score.service \
   deltaforge-raw-archive.timer deltaforge-raw-archive.service \
-  deltaforge-google-drive-archive.timer deltaforge-google-drive-archive.service \
-  deltaforge-parquet-lake.timer deltaforge-parquet-lake.service \
   deltaforge-hot-partitions.timer deltaforge-hot-partitions.service \
   deltaforge-hot-db-prune.timer deltaforge-hot-db-prune.service \
   deltaforge-hot-retention.timer deltaforge-hot-retention.service \
@@ -88,7 +116,6 @@ systemctl stop \
 
 epoch_start="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
 tmp_file="$(mktemp /etc/deltaforge/evidence-epoch.env.XXXXXX)"
-trap 'rm -f "${tmp_file}"' EXIT
 
 {
   printf 'BORG_COLLECTION_EPOCH_ID=%s\n' "${epoch_id}"
@@ -102,7 +129,7 @@ trap 'rm -f "${tmp_file}"' EXIT
 chmod 0600 "${tmp_file}"
 chown root:root "${tmp_file}"
 mv -f "${tmp_file}" /etc/deltaforge/evidence-epoch.env
-trap - EXIT
+tmp_file=""
 
 # Seed partition and verified archive state while the high-rate writers are
 # still drained. Both jobs are receipt-gated and must fail closed before a
@@ -186,6 +213,7 @@ if [[ "${preflight_ready}" != true ]]; then
     deltaforge-google-drive-archive.timer \
     deltaforge-parquet-lake.timer \
     deltaforge-health.timer
+  maintenance_timers_drained=false
   systemctl reset-failed \
     deltaforge-health.service deltaforge-evidence-health.service >/dev/null 2>&1 || true
   systemctl start deltaforge-health.service || true
@@ -201,6 +229,7 @@ rm -f "${preflight_report}"
 systemctl enable --now \
   deltaforge-google-drive-archive.timer \
   deltaforge-parquet-lake.timer
+maintenance_timers_drained=false
 
 # The persistent generic timer may be overdue after a maintenance drain. Enable
 # it only after same-epoch collectors have passed their warmup, otherwise a

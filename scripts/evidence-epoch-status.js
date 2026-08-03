@@ -28,7 +28,12 @@ async function main() {
       parquetReportFile: process.env.PARQUET_LAKE_REPORT,
     });
     console.log(JSON.stringify(report, null, 2));
-    if (report.status === 'FAILED') process.exitCode = 1;
+    // A recorded FAILED cohort is a successful monitor execution, not a
+    // crashed systemd service. Unrecorded preflight/CLI checks retain a nonzero
+    // exit so launch automation can still fail closed.
+    if (report.status === 'FAILED' && !process.argv.includes('--record')) {
+      process.exitCode = 1;
+    }
   } finally {
     await pool.end();
   }

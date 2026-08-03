@@ -216,15 +216,17 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
   assert.ok(collectorStart >= 0, 'collector start block is present');
   assert.ok(archiveSeed < collectorStart, 'archive seed precedes the hot writers');
   assert.match(launcher,
-    /deltaforge-google-drive-archive\.timer deltaforge-google-drive-archive\.service/);
-  assert.match(launcher, /deltaforge-parquet-lake\.timer deltaforge-parquet-lake\.service/);
+    /systemctl stop \\\n+  deltaforge-google-drive-archive\.timer \\\n+  deltaforge-parquet-lake\.timer/);
   assert.match(launcher, /systemctl disable --now[\s\S]*eth-g-late-canary\.service/);
   assert.match(launcher, /require\.resolve\('\@duckdb\/node-api'\)/);
   assert.match(launcher, /refusing to start evidence epoch: release dependencies are incomplete/);
   assert.match(launcher, /systemctl is-failed --quiet/);
   assert.match(launcher, /systemctl is-active --quiet/);
   assert.match(launcher, /unverified maintenance report/);
-  const maintenanceRestart = launcher.indexOf('deltaforge-google-drive-archive.timer \\\n  deltaforge-parquet-lake.timer');
+  assert.match(launcher, /Freeze timer dispatch before checking the oneshot services/);
+  assert.match(launcher, /trap cleanup EXIT/);
+  assert.match(launcher, /restore_maintenance_timers/);
+  const maintenanceRestart = launcher.lastIndexOf('deltaforge-google-drive-archive.timer \\\n  deltaforge-parquet-lake.timer');
   const warmupComplete = launcher.lastIndexOf('rm -f "${preflight_report}"');
   assert.ok(maintenanceRestart > warmupComplete,
     'off-host and Parquet maintenance restart only after collector warmup');
@@ -264,6 +266,13 @@ test('evidence report distinguishes the immutable release from the collector fam
   assert.match(source, /requirementsVersion: 'evidence-health-v3-feed-gaps'/);
   assert.match(source, /primary redundant CLOB coverage is/);
   assert.match(source, /primary redundant RTDS coverage is/);
+});
+
+test('recorded failed evidence is data rather than a failed monitor process', () => {
+  const cli = fs.readFileSync(path.join(
+    __dirname, '..', 'scripts', 'evidence-epoch-status.js',
+  ), 'utf8');
+  assert.match(cli, /report\.status === 'FAILED' && !process\.argv\.includes\('--record'\)/);
 });
 
 test('partition heartbeat cadence stays inside the evidence freshness window', () => {
