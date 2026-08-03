@@ -21,6 +21,7 @@ const { summarizeConvergence } = require('../../borg/crossvenue/convergence');
 const { buildResolverBoundaryPortfolio } = require('../../borg/research/resolver-boundary-portfolio');
 const { buildPriorityLaneStatus } = require('../../borg/research/priority-lane-status');
 const { buildEdgeIncubatorStatus } = require('../../borg/research/edge-incubator-status');
+const { assessEvidenceEpoch } = require('../../borg/research/evidence-epoch');
 const { dossierFor } = require('../../borg/research/strategy-dossiers');
 const { createReadThroughCache } = require('../utils/readThroughCache');
 
@@ -49,6 +50,25 @@ router.get('/research/edge-incubator', authMiddleware, async (req, res) => {
   try {
     const value = await dashboardReports.get('edge-incubator-v1', 10_000,
       () => buildEdgeIncubatorStatus(pool));
+    res.json(value);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/research/evidence-epoch', authMiddleware, async (req, res) => {
+  try {
+    const value = await dashboardReports.get('evidence-epoch-v2', 30_000,
+      () => assessEvidenceEpoch(pool, {
+        minHours: Number(process.env.BORG_MIN_CLEAN_EVIDENCE_HOURS || 24),
+        minimumFreeGiB: Number(process.env.BORG_EVIDENCE_MIN_FREE_GIB || 30),
+        parquetMinHours: Number(process.env.BORG_PARQUET_MIN_CLEAN_HOURS || 24),
+        maxParquetAgeSec: Number(process.env.BORG_PARQUET_MAX_AGE_SEC || 5400),
+        minimumParquetVerifiedBatches: Number(
+          process.env.BORG_PARQUET_MIN_VERIFIED_BATCHES || 2,
+        ),
+        parquetStateFile: process.env.PARQUET_LAKE_STATE_FILE,
+        parquetReceiptFile: process.env.PARQUET_LAKE_RECEIPT,
+        parquetReportFile: process.env.PARQUET_LAKE_REPORT,
+      }));
     res.json(value);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

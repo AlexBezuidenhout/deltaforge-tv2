@@ -29,7 +29,89 @@ function strategyEvidenceMap(rows = []) {
     evaluations: finite(row.evaluations), actions: finite(row.actions), errors: finite(row.errors),
     fills: finite(row.fills), markets: finite(row.markets), days: finite(row.days),
     pnl2x: finite(row.pnl_2x), latest: row.latest || null,
+    first: row.first || null,
   }]));
+}
+
+function addDays(iso, days) {
+  const value = Date.parse(iso || '');
+  return Number.isFinite(value) ? new Date(value + days * 86_400_000).toISOString() : null;
+}
+
+function laneReadiness(lane, evidence, lifecycle, active, now = new Date()) {
+  const statistical = ['resolver-chainlink-tail-v1', 'main-longshot-successor-v1'];
+  const targetUnits = lane.mechanismId === 'N09' ? 100 : 300;
+  let units = 0;
+  let unitsLabel = lane.independentUnit;
+  let days = 0;
+  let firstEligibleAt = null;
+  if (statistical.includes(lane.laneId)) {
+    units = finite(evidence.markets);
+    days = finite(evidence.days);
+    firstEligibleAt = evidence.first || null;
+  } else if (lane.laneId.startsWith('structural-')) {
+    units = finite(evidence.qualified);
+    firstEligibleAt = lane.evidenceStartedAt;
+    if (active && firstEligibleAt) {
+      days = Math.max(0, Math.ceil((new Date(now) - new Date(firstEligibleAt)) / 86_400_000));
+    }
+  } else if (lane.laneId === 'crossvenue-certified-terminal-v1') {
+    units = finite(evidence.certifiedPairDirectionDays);
+    firstEligibleAt = evidence.firstCertifiedAt || null;
+    days = finite(evidence.certifiedCalendarDays);
+  } else if (lane.laneId === 'crossvenue-exact-convergence-v7') {
+    units = finite(evidence.pairDirectionDays);
+    firstEligibleAt = evidence.firstEligibleAt || null;
+    days = finite(evidence.eligibleCalendarDays);
+  } else if (lane.laneId === 'options-exact-expiry-v4') {
+    units = finite(evidence.executableMarkets);
+    firstEligibleAt = evidence.firstExecutableAt || null;
+    days = finite(evidence.executableDays);
+  } else if (lane.laneId === 'resolver-timestamp-precision-v1') {
+    units = finite(evidence.certifiedUnits);
+    firstEligibleAt = evidence.firstCertifiedAt || null;
+    days = finite(evidence.certifiedDays);
+  } else if (lane.laneId === 'semantic-condition-proposer-v1') {
+    units = finite(evidence.reviewedProposals);
+    unitsLabel = 'one human-reviewed proposal';
+    firstEligibleAt = evidence.firstReviewedAt || null;
+    days = finite(evidence.reviewDays);
+  } else if (lane.laneId === 'fair-bound-passive-observation-v1') {
+    units = finite(evidence.independentFills);
+    firstEligibleAt = evidence.firstEligibleAt || null;
+    days = finite(evidence.eligibleCalendarDays);
+  }
+  const minimumDays = finite(lane.minimumDays);
+  const unitGate = { id: 'independent_units', status: units >= targetUnits ? 'PASS' : 'PENDING',
+    current: units, target: targetUnits, unit: unitsLabel };
+  const dayGate = { id: 'calendar_days', status: days >= minimumDays ? 'PASS' : 'PENDING',
+    current: days, target: minimumDays, unit: 'UTC calendar days' };
+  let decisionState = 'BLOCKED_NO_ELIGIBLE_UNIT';
+  if (lifecycle === 'DEAD') decisionState = 'FALSIFIED';
+  else if (lane.mechanismId === 'N09' && units < targetUnits) decisionState = 'AWAITING_HUMAN_REVIEW';
+  else if (units > 0 && (unitGate.status !== 'PASS' || dayGate.status !== 'PASS')) {
+    decisionState = 'ACCRUING_FROZEN_EVIDENCE';
+  } else if (unitGate.status === 'PASS' && dayGate.status === 'PASS') {
+    decisionState = 'FORMAL_PROMOTION_AUDIT_REQUIRED';
+  }
+  return {
+    decisionState,
+    firstEligibleAt,
+    earliestCalendarReadAt: addDays(firstEligibleAt, minimumDays),
+    sampleProgressPct: targetUnits ? +Math.min(100, 100 * units / targetUnits).toFixed(1) : 0,
+    durationProgressPct: minimumDays ? +Math.min(100, 100 * days / minimumDays).toFixed(1) : 0,
+    gates: [
+      { id: 'paper_only', status: 'PASS', detail: 'No authenticated/live-order authority.' },
+      unitGate,
+      dayGate,
+      { id: 'positive_both_halves_2x_cost', status: 'PENDING_FORMAL_READ' },
+      { id: 'market_day_clustered_lcb_above_zero', status: 'PENDING_FORMAL_READ' },
+      { id: 'multiple_testing_correction', status: 'PENDING_FORMAL_READ' },
+      { id: 'latency_100_250_500ms', status: 'PENDING_FORMAL_READ' },
+      { id: 'shared_500_1000_bankroll_capacity', status: 'PENDING_FORMAL_READ' },
+    ],
+    warning: 'Meeting count and duration gates does not establish profitability; it only triggers the frozen formal read.',
+  };
 }
 
 function composeEdgeIncubatorStatus({ priority, strategyRows = [], now = new Date() }) {
@@ -68,6 +150,7 @@ function composeEdgeIncubatorStatus({ priority, strategyRows = [], now = new Dat
       evidence = { sourceRules: 19848, typedNodes: 18832, proposals: 998,
         crossEventProposals: 0, ruleCertified: 0, executable: 0 };
     }
+    const readiness = laneReadiness(lane, evidence, lifecycle, active, now);
     return {
       priority: lane.rank,
       laneId: lane.laneId,
@@ -80,6 +163,7 @@ function composeEdgeIncubatorStatus({ priority, strategyRows = [], now = new Dat
       active,
       status,
       evidence,
+      readiness,
       premise: lane.note,
       nextTest: lane.killRule,
       paperOnly: true,
@@ -129,6 +213,8 @@ async function loadStrategyRows(pool) {
                  AND s.execution_fidelity_grade IN ('A','B'))::int days,
              COALESCE(sum(s.pnl_2x) FILTER (WHERE s.filled AND s.data_quality_grade IN ('A','B')
                                                 AND s.execution_fidelity_grade IN ('A','B')),0)::float8 pnl_2x,
+             min(o.available_at) FILTER (WHERE s.filled AND s.data_quality_grade IN ('A','B')
+                                                AND s.execution_fidelity_grade IN ('A','B')) first,
              max(o.available_at) latest
         FROM borg_shadow_orders o
         JOIN latest l ON o.features->>'collection_epoch_id'=l.epoch_id
@@ -141,7 +227,7 @@ async function loadStrategyRows(pool) {
            COALESCE(r.evaluations,0) evaluations,COALESCE(r.actions,0) actions,
            COALESCE(r.errors,0) errors,COALESCE(s.fills,0) fills,
            COALESCE(s.markets,0) markets,COALESCE(s.days,0) days,
-           COALESCE(s.pnl_2x,0) pnl_2x,s.latest
+           COALESCE(s.pnl_2x,0) pnl_2x,s.first,s.latest
       FROM names
       LEFT JOIN runtime r USING(strategy)
       LEFT JOIN scored s USING(strategy,experiment_id)
@@ -163,6 +249,7 @@ module.exports = {
   STRATEGY_BY_LANE,
   buildEdgeIncubatorStatus,
   composeEdgeIncubatorStatus,
+  laneReadiness,
   loadStrategyRows,
   strategyEvidenceMap,
 };

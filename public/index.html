@@ -2011,8 +2011,8 @@
     <div style="border:1px solid var(--yellow);color:var(--yellow);font-size:10px;font-weight:700;padding:4px 8px;border-radius:4px;letter-spacing:1px;">FORWARD PILOT · PROVISIONAL</div>
   </div>
 
-  <div class="panel"><div class="panel-header"><span>FROZEN TEN-LANE EDGE INCUBATOR</span><span style="font-size:10px;color:var(--text-muted);">status is machinery/evidence state, never inferred profitability</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
-    <thead><tr><th>#</th><th>Program</th><th>Run mode</th><th>Status</th><th>Current evidence</th><th>Next falsification</th></tr></thead>
+  <div class="panel"><div class="panel-header"><span>FROZEN TEN-LANE EDGE INCUBATOR</span><span id="evidenceEpochStatus" style="font-size:10px;color:var(--text-muted);">checking evidence integrity…</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
+    <thead><tr><th>#</th><th>Program</th><th>Run mode</th><th>Status</th><th>Current evidence / frozen gate</th><th>Next falsification</th></tr></thead>
     <tbody id="priorityLanesBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;">Loading frozen research program…</td></tr></tbody>
   </table></div></div></div>
 
@@ -3333,13 +3333,14 @@
   }
 
   async function loadBookLabOnce() {
-    let status, summary, intents, structural, pairedStatus, pairedSummary, pairedCycles, priority;
+    let status, summary, intents, structural, pairedStatus, pairedSummary, pairedCycles, priority, evidenceEpoch;
     try {
-      [status, summary, intents, structural, pairedStatus, pairedSummary, pairedCycles, priority] = await Promise.all([
+      [status, summary, intents, structural, pairedStatus, pairedSummary, pairedCycles, priority, evidenceEpoch] = await Promise.all([
         labApiGet('/allmarket/status'), labApiGet('/allmarket/summary'), labApiGet('/allmarket/intents?limit=75'),
         labApiGet('/structural/summary'), labApiGet('/pairedmaker/status'), labApiGet('/pairedmaker/summary'),
         labApiGet('/pairedmaker/cycles?limit=50'),
         labApiGet('/research/edge-incubator'),
+        labApiGet('/research/evidence-epoch'),
       ]);
     } catch (error) {
       document.getElementById('bookLabStatusTitle').textContent = 'BOOK LAB: API UNAVAILABLE';
@@ -3367,6 +3368,14 @@
         + (pairedActivity.eligible_one_cent_1h ?? 0) + ' one-cent observations in 1h'
       : 'RETIRED NEGATIVE CONTROL · excluded from the priority fleet';
     document.getElementById('pairedMakerStatus').style.color = pairedStatus.alive ? 'var(--green)' : 'var(--yellow)';
+    const epochNode = document.getElementById('evidenceEpochStatus');
+    const parquetBurn = evidenceEpoch.parquetBurnIn || {};
+    epochNode.textContent = 'EVIDENCE ' + (evidenceEpoch.status || 'UNKNOWN')
+      + ' · PARQUET ' + (parquetBurn.status || 'UNKNOWN')
+      + ' (' + Number(parquetBurn.cleanHours || 0).toFixed(1) + '/'
+      + Number(parquetBurn.minCleanHours || 24).toFixed(0) + 'h)';
+    epochNode.style.color = evidenceEpoch.status === 'FAILED' ? 'var(--danger)'
+      : evidenceEpoch.promotionEligible ? 'var(--green)' : 'var(--yellow)';
 
     const laneEvidence = function (lane) {
       const e = lane.evidence || {};
@@ -3379,8 +3388,16 @@
       if (lane.program === 'options_implied_binary_residual') return (e.markets || 0) + ' targets · ' + (e.executable || 0) + ' executable marks';
       return (e.selectedMarkets || 0) + ' frozen capture markets · ' + (e.decisions || 0) + ' quote decisions';
     };
-    document.getElementById('priorityLanesBody').innerHTML = (priority.lanes || []).map((lane) =>
-      '<tr><td>' + lane.priority + '</td><td style="font-weight:700;">' + escapeHtml(lane.laneId || lane.program) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(lane.lifecycle || '') + '</div></td><td>' + escapeHtml(lane.runMode || '—') + '</td><td style="color:' + (lane.active ? 'var(--green)' : lane.lifecycle === 'DEAD' ? 'var(--danger)' : 'var(--yellow)') + ';">' + escapeHtml(lane.status) + '</td><td>' + escapeHtml(laneEvidence(lane)) + '</td><td style="max-width:420px;color:var(--text-muted);">' + escapeHtml(lane.nextTest || '') + '</td></tr>'
+    document.getElementById('priorityLanesBody').innerHTML = (priority.lanes || []).map((lane) => {
+      const ready = lane.readiness || {};
+      const unit = (ready.gates || []).find((gate) => gate.id === 'independent_units') || {};
+      const days = (ready.gates || []).find((gate) => gate.id === 'calendar_days') || {};
+      const progress = '<div style="font-size:9px;color:var(--text-muted);margin-top:3px;">'
+        + escapeHtml(ready.decisionState || 'UNMEASURED') + ' · '
+        + Number(unit.current || 0) + '/' + Number(unit.target || 0) + ' units · '
+        + Number(days.current || 0) + '/' + Number(days.target || 0) + ' days</div>';
+      return '<tr><td>' + lane.priority + '</td><td style="font-weight:700;">' + escapeHtml(lane.laneId || lane.program) + '<div style="font-size:9px;color:var(--text-muted);">' + escapeHtml(lane.lifecycle || '') + '</div></td><td>' + escapeHtml(lane.runMode || '—') + '</td><td style="color:' + (lane.active ? 'var(--green)' : lane.lifecycle === 'DEAD' ? 'var(--danger)' : 'var(--yellow)') + ';">' + escapeHtml(lane.status) + '</td><td>' + escapeHtml(laneEvidence(lane)) + progress + '</td><td style="max-width:420px;color:var(--text-muted);">' + escapeHtml(lane.nextTest || '') + '</td></tr>';
+    }
     ).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;">No lane report available.</td></tr>';
 
     document.getElementById('bookLabSummaryBody').innerHTML = summary.rows.length ? summary.rows.map((row) => {

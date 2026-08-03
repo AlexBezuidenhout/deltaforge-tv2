@@ -30,12 +30,19 @@ test('incubator exposes exactly ten honest lifecycle rows with no live authority
   assert.equal(report.lanes.find((lane) => lane.mechanismId === 'R07').lifecycle, 'DEAD');
   assert.equal(report.lanes.find((lane) => lane.mechanismId === 'N09').evidence.crossEventProposals, 0);
   assert.equal(report.lanes.find((lane) => lane.laneId === 'resolver-chainlink-tail-v1').evidence.pnl2x, -1.5);
+  const h43 = report.lanes.find((lane) => lane.laneId === 'resolver-chainlink-tail-v1');
+  assert.equal(h43.readiness.decisionState, 'ACCRUING_FROZEN_EVIDENCE');
+  assert.equal(h43.readiness.gates.find((gate) => gate.id === 'independent_units').current, 3);
+  assert.equal(h43.readiness.gates.find((gate) => gate.id === 'independent_units').target, 300);
+  assert.equal(report.lanes.find((lane) => lane.mechanismId === 'R07').readiness.decisionState,
+    'FALSIFIED');
 });
 
 test('dashboard edge-incubator route remains read-only', () => {
   const fs = require('node:fs');
   const route = fs.readFileSync(require('node:path').join(__dirname, '..', 'src/routes/borg.js'), 'utf8');
   assert.match(route, /research\/edge-incubator/);
+  assert.match(route, /research\/evidence-epoch/);
   assert.doesNotMatch(route, /edge-incubator[\s\S]{0,300}createAndPostOrder/);
 });
 
