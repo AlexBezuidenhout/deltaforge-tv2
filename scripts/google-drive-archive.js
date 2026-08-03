@@ -20,6 +20,7 @@ const {
   latestSnapshotFiles,
   safeRelative,
   sha256File,
+  statIfPresent,
   writeAtomic,
 } = require('./object-store-archive');
 
@@ -117,10 +118,11 @@ function stateMatches(entry, record, destination) {
 }
 
 function recordsFor(root, namespace, files, destination) {
-  return files.map((file) => {
-    const stat = fs.statSync(file);
+  return files.flatMap((file) => {
+    const stat = statIfPresent(file);
+    if (!stat) return [];
     const relative = safeRelative(root, file);
-    return {
+    return [{
       id: recordId(namespace, relative),
       namespace,
       root,
@@ -129,7 +131,7 @@ function recordsFor(root, namespace, files, destination) {
       remotePath: `${destination}/${namespace}/${relative}`,
       size: stat.size,
       mtimeMs: Math.floor(stat.mtimeMs),
-    };
+    }];
   });
 }
 

@@ -27,6 +27,30 @@ test('object-store archive includes only closed immutable raw objects before cut
   assert.deepEqual(eligibleRawFiles(root, Date.now() - 1000), [manifest, closed].sort());
 });
 
+test('a file removed during archive enumeration is skipped instead of killing liveness', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'df-object-race-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const closed = path.join(root, 'rotated.ndjson.gz');
+  fs.writeFileSync(closed, 'closed');
+  const old = new Date(Date.now() - 10_000);
+  fs.utimesSync(closed, old, old);
+
+  const originalStat = fs.statSync;
+  let intercepted = false;
+  fs.statSync = function racingStat(file, ...args) {
+    if (file === closed && !intercepted) {
+      intercepted = true;
+      fs.unlinkSync(closed);
+    }
+    return originalStat.call(fs, file, ...args);
+  };
+  try {
+    assert.deepEqual(eligibleRawFiles(root, Date.now() - 1000), []);
+  } finally {
+    fs.statSync = originalStat;
+  }
+});
+
 test('snapshot selection keeps only the newest eligible dump and its sidecars', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'df-snapshot-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

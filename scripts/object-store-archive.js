@@ -58,11 +58,30 @@ function objectKey(prefix, namespace, relative) {
   return parts.join('/');
 }
 
+function statIfPresent(file) {
+  try {
+    return fs.statSync(file);
+  } catch (error) {
+    // Retention can remove an already-receipted immutable object between the
+    // directory read and this stat. A traversal is re-scanned before issuing
+    // a new receipt, so a vanished source is omission, never evidence.
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
 function walkFiles(root) {
   if (!fs.existsSync(root)) return [];
   const output = [];
   const visit = (directory) => {
-    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    let entries;
+    try {
+      entries = fs.readdirSync(directory, { withFileTypes: true });
+    } catch (error) {
+      if (error?.code === 'ENOENT') return;
+      throw error;
+    }
+    for (const entry of entries) {
       const target = path.join(directory, entry.name);
       if (entry.isDirectory()) visit(target);
       else if (entry.isFile()) output.push(target);
@@ -75,22 +94,29 @@ function walkFiles(root) {
 function eligibleRawFiles(root, cutoffMs) {
   return walkFiles(root).filter((file) => {
     if (!CLOSED_RAW_SUFFIXES.some((suffix) => file.endsWith(suffix))) return false;
-    return fs.statSync(file).mtimeMs <= cutoffMs;
+    const stat = statIfPresent(file);
+    return stat != null && stat.mtimeMs <= cutoffMs;
   }).sort();
 }
 
 function latestSnapshotFiles(root, cutoffMs) {
-  const dumps = walkFiles(root).filter((file) =>
-    file.endsWith('.dump') && fs.statSync(file).mtimeMs <= cutoffMs)
-    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
-  const dump = dumps[0];
+  const dumps = walkFiles(root).flatMap((file) => {
+    if (!file.endsWith('.dump')) return [];
+    const stat = statIfPresent(file);
+    return stat && stat.mtimeMs <= cutoffMs ? [{ file, mtimeMs: stat.mtimeMs }] : [];
+  }).sort((left, right) => right.mtimeMs - left.mtimeMs);
+  const dump = dumps[0]?.file;
   if (!dump) return { dump: null, files: [] };
   const checksum = `${dump}.sha256`;
-  if (!fs.existsSync(checksum) || fs.statSync(checksum).mtimeMs > cutoffMs) {
+  const checksumStat = statIfPresent(checksum);
+  if (!checksumStat || checksumStat.mtimeMs > cutoffMs) {
     return { dump, files: [], ready: false };
   }
   const companions = [checksum, `${dump}.profile`]
-    .filter((file) => fs.existsSync(file) && fs.statSync(file).mtimeMs <= cutoffMs);
+    .filter((file) => {
+      const stat = statIfPresent(file);
+      return stat != null && stat.mtimeMs <= cutoffMs;
+    });
   return { dump, files: [dump, ...companions], ready: true };
 }
 
@@ -391,5 +417,5 @@ if (require.main === module) main().catch((error) => {
 module.exports = {
   archiveGroup, eligibleRawFiles, headMatches, latestSnapshotFiles,
   loadState, main, metadataFor, objectKey, positiveInt, receiptText,
-  safeRelative, sha256File, stateMatches, writeAtomic,
+  safeRelative, sha256File, statIfPresent, stateMatches, writeAtomic,
 };
