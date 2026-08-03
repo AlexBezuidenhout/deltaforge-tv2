@@ -15,6 +15,8 @@ test('table classifier keeps exact-rule and structural evidence distinct', () =>
   assert.equal(classifyTable('borg_structural_evaluations').family, 'structural_payoff');
   assert.equal(classifyTable('borg_option_shadow_marks').family, 'options_surface');
   assert.equal(classifyTable('borg_shadow_orders').family, 'strategy_evidence');
+  assert.equal(classifyTable('borg_clob_touch_p20260803').family, 'polymarket_clob');
+  assert.equal(classifyTable('borg_clob_touch_p20260803').partitionOf, 'borg_clob_touch');
   assert.equal(classifyTable('users').family, 'application_or_uncatalogued');
 });
 

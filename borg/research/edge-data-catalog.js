@@ -4,6 +4,8 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const readline = require('node:readline');
+const zlib = require('node:zlib');
 
 const CLOCK_FIELD_GROUPS = Object.freeze({
   sourceTime: [
@@ -237,8 +239,15 @@ function quoteIdentifier(value) {
 }
 
 function classifyTable(tableName) {
-  const profile = TABLE_PROFILES.find((candidate) => candidate.match.test(tableName));
-  if (profile) return { ...profile, match: undefined };
+  const baseTableName = String(tableName)
+    .replace(/_p\d{8}$/i, '')
+    .replace(/_(?:retained|default)$/i, '');
+  const profile = TABLE_PROFILES.find((candidate) => candidate.match.test(baseTableName));
+  if (profile) return {
+    ...profile,
+    match: undefined,
+    partitionOf: baseTableName === tableName ? null : baseTableName,
+  };
   return {
     family: 'application_or_uncatalogued',
     tier: 'application',
@@ -246,6 +255,7 @@ function classifyTable(tableName) {
     universe: 'Operational/application data; inspect before research use',
     canTest: [],
     cannotTest: ['No causal research contract is registered for this table'],
+    partitionOf: baseTableName === tableName ? null : baseTableName,
   };
 }
 
@@ -477,14 +487,19 @@ async function walkFiles(root, options = {}) {
       const current = groups.get(source) || {
         source, files: 0, bytes: 0, openFiles: 0, gzipFiles: 0,
         parquetFiles: 0, manifestFiles: 0, firstMtime: null, lastMtime: null,
+        _newestClosedWalFile: null,
       };
       current.files += 1;
       current.bytes += stat.size;
+      const mtime = stat.mtime.toISOString();
       if (entry.name.endsWith('.open')) current.openFiles += 1;
       if (entry.name.endsWith('.gz')) current.gzipFiles += 1;
+      if (entry.name.endsWith('.ndjson.gz')
+        && (!current._newestClosedWalFile || mtime > current._newestClosedWalFile.mtime)) {
+        current._newestClosedWalFile = { file: full, mtime };
+      }
       if (entry.name.endsWith('.parquet')) current.parquetFiles += 1;
       if (entry.name.endsWith('.manifest.json')) current.manifestFiles += 1;
-      const mtime = stat.mtime.toISOString();
       if (!current.firstMtime || mtime < current.firstMtime) current.firstMtime = mtime;
       if (!current.lastMtime || mtime > current.lastMtime) current.lastMtime = mtime;
       groups.set(source, current);
@@ -495,6 +510,15 @@ async function walkFiles(root, options = {}) {
     }
   }
   await visit(root, 0);
+  const outputGroups = [...groups.values()].sort((left, right) => right.bytes - left.bytes);
+  if (options.inspectWalContracts) {
+    await Promise.all(outputGroups.map(async (group) => {
+      group.contract = group._newestClosedWalFile
+        ? await inspectWalContract(group._newestClosedWalFile.file, group.source)
+        : null;
+    }));
+  }
+  for (const group of outputGroups) delete group._newestClosedWalFile;
   return {
     root,
     exists: fs.existsSync(root),
@@ -502,8 +526,74 @@ async function walkFiles(root, options = {}) {
     bytes: totalBytes,
     firstMtime,
     lastMtime,
-    groups: [...groups.values()].sort((left, right) => right.bytes - left.bytes),
+    groups: outputGroups,
   };
+}
+
+async function firstNdjsonRecords(file, maximum = 64) {
+  const input = fs.createReadStream(file);
+  const gunzip = zlib.createGunzip();
+  const lines = readline.createInterface({
+    input: input.pipe(gunzip),
+    crlfDelay: Infinity,
+  });
+  const records = [];
+  try {
+    for await (const line of lines) {
+      if (!line) continue;
+      records.push(JSON.parse(line));
+      if (records.length >= maximum + 1) break;
+    }
+  } finally {
+    lines.close();
+    input.destroy();
+    gunzip.destroy();
+  }
+  return records;
+}
+
+async function inspectWalContract(file, source) {
+  try {
+    const records = await firstNdjsonRecords(file);
+    const header = records.shift()?._borg_wal || null;
+    const events = records;
+    const fields = [...new Set(events.flatMap((event) => Object.keys(event)))].sort();
+    const coverage = Object.fromEntries(fields.map((field) => [field, round(
+      events.filter((event) => event[field] != null).length / Math.max(1, events.length), 4,
+    )]));
+    const complete = (field) => coverage[field] != null && coverage[field] >= 0.95;
+    const baseComplete = [
+      'receive_wall_timestamp_ms', 'receive_monotonic_ns', 'connection_epoch',
+      'event_sequence', 'collection_epoch_id', 'collector_run_id',
+    ].every(complete);
+    const sourceComplete = complete('source_timestamp_ms');
+    const dataGrade = baseComplete && sourceComplete ? 'A' : baseComplete ? 'B' : 'C';
+    const clobLike = /clob|kalshi|poly/i.test(source);
+    return {
+      format: header?.format || null,
+      schemaVersion: header?.schema_version ?? null,
+      sampledEvents: events.length,
+      fields,
+      estimatedNonNullFraction: coverage,
+      dataGrade,
+      executionGrade: clobLike && complete('raw') ? 'B_PUBLIC_BOOK' : 'NOT_EXECUTION_ALONE',
+      replayProfiles: dataGrade === 'A'
+        ? ['20ms', '50ms', '100ms', '250ms', '500ms', '1s', '2s']
+        : dataGrade === 'B' ? ['100ms', '250ms', '500ms', '1s', '2s'] : ['1s', '2s'],
+      caveat: sourceComplete
+        ? null
+        : 'The sampled source did not provide a non-null venue/source timestamp on at least 95% of events; local receive-time replay remains causal but cannot estimate feed transit separately.',
+    };
+  } catch (error) {
+    return {
+      format: null,
+      sampledEvents: 0,
+      dataGrade: 'UNVERIFIED',
+      executionGrade: 'UNVERIFIED',
+      replayProfiles: [],
+      error: `${error.code || error.name || 'ERROR'}:${error.message}`,
+    };
+  }
 }
 
 function aggregateOffhostState(state) {
@@ -701,7 +791,7 @@ async function buildEdgeDataCatalog(options = {}) {
   };
   const [database, wal, archive, parquet] = await Promise.all([
     options.pool ? queryDatabaseCatalog(options.pool, options) : Promise.resolve(null),
-    walkFiles(roots.wal),
+    walkFiles(roots.wal, { inspectWalContracts: true }),
     walkFiles(roots.archive),
     walkFiles(roots.parquet),
   ]);
@@ -745,7 +835,7 @@ function markdownCatalog(catalog) {
     `| \`${table.name}\` | ${table.family} | ${table.tier} | ${table.estimatedRows.toLocaleString('en-US')} est. | ${byteText(table.bytes)} | ${table.firstTimestamp || '—'} | ${table.lastTimestamp || '—'} | ${table.replay.dataGrade}/${table.replay.executionGrade} | ${table.replay.replayProfiles.join(', ') || 'none'} |`);
   const walRows = (catalog.storage?.wal?.groups || []).map((group) => {
     const tests = WAL_PROFILES[group.source] || [];
-    return `| \`${group.source}\` | ${group.files.toLocaleString('en-US')} | ${byteText(group.bytes)} | ${group.firstMtime || '—'} | ${group.lastMtime || '—'} | ${tests.join('; ') || 'unclassified—review required'} |`;
+    return `| \`${group.source}\` | ${group.files.toLocaleString('en-US')} | ${byteText(group.bytes)} | ${group.firstMtime || '—'} | ${group.lastMtime || '—'} | ${group.contract ? `${group.contract.dataGrade}/${group.contract.executionGrade}` : '—'} | ${group.contract?.replayProfiles?.join(', ') || 'none'} | ${tests.join('; ') || 'unclassified—review required'} |`;
   });
   const offhostRows = (catalog.storage?.offhost?.groups || []).map((group) =>
     `| ${group.namespace} | \`${group.source}\` | ${group.files.toLocaleString('en-US')} | ${byteText(group.bytes)} | ${group.verified.toLocaleString('en-US')} | ${group.firstMtime || '—'} | ${group.lastMtime || '—'} |`);
@@ -778,8 +868,8 @@ function markdownCatalog(catalog) {
     '',
     '## Local append-before-process WAL',
     '',
-    '| Source | Files | Compressed/on-disk size | First local object | Latest local object | Causal uses |',
-    '|---|---:|---:|---|---|---|',
+    '| Source | Files | Compressed/on-disk size | First local object | Latest local object | Sampled data/execution grade | Replay profiles | Causal uses |',
+    '|---|---:|---:|---|---|---|---|---|',
     ...walRows,
     '',
     'WAL sizes are physical bytes. Uncompressed size is deliberately left unknown unless a verified segment manifest supplies it; no compression ratio is invented.',
@@ -820,6 +910,8 @@ module.exports = {
   chooseTimeColumn,
   classifyTable,
   fieldCoverage,
+  firstNdjsonRecords,
+  inspectWalContract,
   markdownCatalog,
   quoteIdentifier,
   queryDatabaseCatalog,
