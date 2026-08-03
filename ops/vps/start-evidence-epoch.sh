@@ -178,6 +178,19 @@ if [[ "${preflight_ready}" != true ]]; then
   echo "evidence epoch preflight did not become healthy within ${warmup_timeout_sec}s" >&2
   tail -80 "${preflight_report}" >&2 || true
   rm -f "${preflight_report}"
+  # A rejected epoch is still an operational collector run. Restore every
+  # maintenance/health timer drained above and persist one terminal failed
+  # sample; otherwise a correct fail-closed launch would leave archiving and
+  # liveness monitoring silently disabled until a human noticed.
+  systemctl enable --now \
+    deltaforge-google-drive-archive.timer \
+    deltaforge-parquet-lake.timer \
+    deltaforge-health.timer
+  systemctl reset-failed \
+    deltaforge-health.service deltaforge-evidence-health.service >/dev/null 2>&1 || true
+  systemctl start deltaforge-health.service || true
+  systemctl start deltaforge-evidence-health.service || true
+  systemctl enable --now deltaforge-evidence-health.timer
   exit 1
 fi
 rm -f "${preflight_report}"

@@ -228,6 +228,8 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
   const warmupComplete = launcher.lastIndexOf('rm -f "${preflight_report}"');
   assert.ok(maintenanceRestart > warmupComplete,
     'off-host and Parquet maintenance restart only after collector warmup');
+  assert.match(launcher,
+    /A rejected epoch is still an operational collector run[\s\S]*deltaforge-evidence-health\.timer/);
   assert.match(
     launcher,
     /deployed_release="\$\(basename "\$\(readlink -f \/opt\/deltaforge\/tv2\/current\)"\)"/,
