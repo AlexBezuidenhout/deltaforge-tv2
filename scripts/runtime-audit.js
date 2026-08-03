@@ -42,6 +42,14 @@ function number(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function expectedStrategyNames(run, fallbackPolicy) {
+  const recorded = run?.metadata?.activeStrategies;
+  if (Array.isArray(recorded) && recorded.length) {
+    return [...new Set(recorded.map(String).filter(Boolean))].sort();
+  }
+  return [...new Set((fallbackPolicy?.active || []).map((strategy) => strategy.name))].sort();
+}
+
 async function main() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -89,7 +97,6 @@ async function main() {
     const policy = filterStrategiesByDisposition(makeStrategies(), dispositionRows, {
       includeParked: String(process.env.BORG_INCLUDE_PARKED_CONTROLS || 'false').toLowerCase() === 'true',
     });
-    const expected = [...new Set(policy.active.map((strategy) => strategy.name))].sort();
     checks.parkedStrategies = policy.parked;
 
     const settings = settingsRows[0];
@@ -125,6 +132,7 @@ async function main() {
 
     const run = runRows[0];
     if (!run) critical.push('no RUNNING BORG collector run is registered');
+    const expected = expectedStrategyNames(run, policy);
     const collector = collectorRows[0] || null;
     if (!collector || number(collector.age_sec, Infinity) > 130) critical.push('collector heartbeat is stale or missing');
     const flowCollector = flowRows[0] || null;
@@ -351,4 +359,4 @@ if (require.main === module) main().catch((error) => {
   process.exit(1);
 });
 
-module.exports = { ageSeconds, requiredHeartbeatComponents };
+module.exports = { ageSeconds, expectedStrategyNames, requiredHeartbeatComponents };

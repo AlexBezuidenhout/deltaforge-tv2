@@ -93,6 +93,11 @@ async function main() {
       startingBankrollUsd: 500,
     },
   });
+  // Resolve and persist the exact active strategy contract before declaring a
+  // collector run RUNNING. Health checks consume this immutable run metadata
+  // instead of reconstructing policy from a different systemd environment.
+  const experimentRegistry = await syncExperimentRegistry(pool);
+  const strategyPolicy = await loadActiveStrategies(pool, makeStrategies());
   await startCollectorRun({
     runId: collection.runId,
     epochId: collection.epochId,
@@ -100,10 +105,13 @@ async function main() {
     pid: process.pid,
     host: collection.host,
     codeVersion: collection.runCodeVersion,
-    metadata: { node: process.version, platform: `${process.platform}-${process.arch}` },
+    metadata: {
+      node: process.version,
+      platform: `${process.platform}-${process.arch}`,
+      activeStrategies: strategyPolicy.active.map((strategy) => strategy.name).sort(),
+      parkedStrategies: strategyPolicy.parked,
+    },
   });
-  const experimentRegistry = await syncExperimentRegistry(pool);
-  const strategyPolicy = await loadActiveStrategies(pool, makeStrategies());
 
   const capturePolicy = createCapturePolicy(process.env);
   const { rows: configuredAssets } = await pool.query(

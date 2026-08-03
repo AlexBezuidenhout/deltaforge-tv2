@@ -2,7 +2,9 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { ageSeconds, requiredHeartbeatComponents } = require('../scripts/runtime-audit');
+const {
+  ageSeconds, expectedStrategyNames, requiredHeartbeatComponents,
+} = require('../scripts/runtime-audit');
 
 test('runtime freshness accepts numeric and ISO heartbeat timestamps', () => {
   const now = Date.parse('2026-07-23T17:00:00.000Z');
@@ -36,4 +38,14 @@ test('runtime health requires optional executors only when their live switch is 
   assert.ok(live.includes('flow_boundary_canary'));
   assert.ok(live.includes('h53_live'));
   assert.ok(live.includes('eth_g_late_live'));
+});
+
+test('runtime health uses the collector run\'s frozen active-strategy contract', () => {
+  const expected = expectedStrategyNames({
+    metadata: { activeStrategies: ['H43X', 'H43', 'H43X'] },
+  }, { active: [{ name: 'OLD_DISCOVERY_ARM' }] });
+  assert.deepEqual(expected, ['H43', 'H43X']);
+  assert.deepEqual(expectedStrategyNames({}, {
+    active: [{ name: 'CONTROL' }, { name: 'SUCCESSOR' }],
+  }), ['CONTROL', 'SUCCESSOR']);
 });
