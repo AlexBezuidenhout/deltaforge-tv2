@@ -52,6 +52,7 @@
     "research:experiment-slate": "node scripts/edge-experiment-slate.js",
     "research:resolver-precision": "node scripts/resolver-timestamp-precision-audit.js",
     "research:edge-portfolio": "node scripts/edge-portfolio-report.js",
+    "research:semantic-proposer": "node scripts/semantic-condition-proposer.js",
     "replay:flow-order-latency": "node scripts/flow-wal-latency-replay.js",
     "research:check": "node scripts/research-platform-check.js",
     "research:evidence-epoch": "node scripts/evidence-epoch-status.js",

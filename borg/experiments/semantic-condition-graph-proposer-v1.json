@@ -1,0 +1,37 @@
+{
+  "experiment_id": "semantic-condition-graph-proposer-v1",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-03T15:04:00.000Z",
+  "frozen_at": "2026-08-03T15:04:00.000Z",
+  "evidence_started_at": "2026-08-03T15:04:00.000Z",
+  "phase": "discovery",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "semantic_condition_graph_discovery",
+  "strategy_version": "semantic-condition-graph-proposer-v1",
+  "entry_authorization": "none",
+  "hypothesis": "A semantic proposer can expand coverage of cross-event ordered predicates that the within-event structural scanner does not group, while a separate deterministic verifier prevents language-model confidence from becoming payoff proof.",
+  "inputs": {
+    "immutable_rule_hashes_only": true,
+    "supported_first_relation": "ordered threshold implication",
+    "baseline": "deterministic lexical proposal generator",
+    "optional_model_role": "supply two existing rule hashes and a proposed relation type only"
+  },
+  "hard_boundaries": {
+    "ai_may_certify": false,
+    "ai_may_trade": false,
+    "abstract_boolean_proof_is_rule_certification": false,
+    "unknown_rule_field": "automatic review blocker",
+    "economic_scoring": "performed only later by the existing synchronized depth/fee/orphan scanner"
+  },
+  "evaluation": {
+    "independent_unit": "one proposed relationship before deterministic review",
+    "first_read_reviewed_proposals": 100,
+    "minimum_calendar_days": 30,
+    "primary_metric": "novel_rule_certifier_approved_relationships_per_100_reviewed",
+    "required_false_payoff_proofs": 0,
+    "null_outcome": "Cross-event semantic proposals may add no correctly certifiable relationships beyond the existing within-event graph."
+  },
+  "no_optional_stopping": true
+}
