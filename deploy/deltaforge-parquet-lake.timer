@@ -1,0 +1,12 @@
+[Unit]
+Description=Run DeltaForge verified Parquet compaction every thirty minutes
+
+[Timer]
+OnBootSec=10min
+OnCalendar=*-*-* *:05/30:00
+AccuracySec=2min
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

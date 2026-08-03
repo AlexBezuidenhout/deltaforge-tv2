@@ -1,0 +1,37 @@
+[Unit]
+Description=Compact verified DeltaForge Google Drive WAL objects into ZSTD Parquet
+Wants=network-online.target
+After=network-online.target deltaforge-google-drive-archive.service
+ConditionPathExists=/etc/deltaforge/google-drive-archive.env
+ConditionPathExists=/var/lib/deltaforge/google-drive-archive/rclone.conf
+
+[Service]
+Type=oneshot
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=/etc/deltaforge/google-drive-archive.env
+Environment=NODE_ENV=production
+Environment=PARQUET_LAKE_STATE_ROOT=/var/lib/deltaforge/parquet-lake
+Environment=PARQUET_HOT_ROOT=/var/lib/deltaforge/parquet-hot
+Environment=PARQUET_STAGE_ROOT=/var/lib/deltaforge/parquet-stage
+Environment=PARQUET_MAX_FILES=250
+Environment=PARQUET_MAX_BYTES=2147483648
+Environment=PARQUET_HOT_MAX_BYTES=10737418240
+Environment=PARQUET_CUTOFF_SECONDS=900
+Environment=PARQUET_DUCKDB_THREADS=1
+ExecStart=/usr/bin/flock --exclusive --wait 7200 /var/lib/deltaforge/parquet-lake.lock /usr/local/bin/node scripts/parquet-lake.js compact
+TimeoutStartSec=2h
+Nice=15
+IOSchedulingClass=idle
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/deltaforge
+
+[Install]
+WantedBy=multi-user.target

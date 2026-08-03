@@ -24,6 +24,8 @@
     "replay:latency": "node scripts/borg-latency-replay.js",
     "replay:latency-sweep": "node scripts/latency-sweep.js",
     "archive:parquet": "node scripts/parquet-mirror.js",
+    "archive:parquet-lake": "node scripts/parquet-lake.js compact",
+    "research:parquet-query": "node scripts/parquet-query.js",
     "archive:gdrive": "node scripts/google-drive-archive.js",
     "recover:wal": "node scripts/recover-wal-backlog.js",
     "research:portfolio": "node scripts/portfolio-simulator.js",
@@ -75,6 +77,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",
     "@dsnp/parquetjs": "^1.8.8",
+    "@duckdb/node-api": "1.5.5-r.3",
     "@polymarket/clob-client-v2": "^1.0.5",
     "axios": "^1.6.8",
     "bcryptjs": "^2.4.3",
