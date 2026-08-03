@@ -128,3 +128,28 @@ collectors were active, the Google Drive receipt was fresh, disk reserve was
 approximately 39.5 GiB, and the three active strategies had current runtime
 registrations with zero evaluation errors. No authenticated/live executor was
 enabled or changed.
+
+## Master edge-discovery extension — 3 August 2026, 15:42 UTC
+
+The broader research mandate is now implemented as a bounded ten-lane funnel rather than another strategy zoo. `EDGE_MECHANISM_MAP.md` registers and scores 118 materially distinct mechanisms. `TOP_EDGE_EXPERIMENTS.md` freezes ten selected lanes and records a disposition and reopening gate for every one of the 108 non-selected mechanisms. Every selected experiment now has a root-level content-hashed manifest; all are paper, scanner, collection or observation only and every live-order path is disabled.
+
+Two cheap falsifications completed without manufacturing trades:
+
+- R07 resolver timestamp precision scanned 87,729 rule documents and found zero machine-certifiable terminal-tick units, zero proved episodes and $0 executable capacity under the current wording.
+- N09 semantic proposal parsed 19,848 immutable rules and produced 998 abstract within-event implications, but zero novel cross-event, rule-certified or executable relationships. AI output remains proposal-only and cannot certify a payoff or submit an order.
+
+The verified replay lake is active as an isolated research service. Batches `76ba651b576861e5dfcc0dd5be44f009` and `1485186d236e2a5712fe5c36117c2a4b` SHA-verified 50 raw WAL segments, reconstructed 2,255,941 causal envelopes, wrote 23 ZSTD Parquet partitions, uploaded them directly from the VPS to Google Drive and passed remote checksum plus DuckDB readback across 19 source families. Runs are bounded to 25 segments/128 MiB compressed, reserve 24 times input working space, preserve at least 15 GiB free and cap the local verified cache at 10 GiB. State, receipt and staging paths are service-owned; a verified checkpoint can recover its receipt after a process interruption.
+
+The second run initially exposed a replay-parser defect rather than source corruption: Node `readline` split a valid JSON string at Unicode paragraph separator `U+2028`. Byte-level decompression and SHA verification proved the 30,908-event source object intact. Research release `15c11c9` now uses strict LF-byte NDJSON framing in Parquet, WAL recovery and historical replay tools. Genuinely invalid checksum-stable objects have a content-addressed quarantine and catalog warning; the current quarantine count is zero, so no evidence was silently discarded.
+
+The web dashboard is now a separate dashboard-only process on loopback port 3014, release `1e5021f`. Caddy routes the public TV2 URL to it. `BOT_RUNNER_ENABLED=false` is enforced in `ExecStart`, after a pre-traffic test caught that the shared environment file otherwise overrides service-level values. The original TV2 runner and BORG collector remain release `98c4d02`, PIDs 408248/408247, with zero restarts since the v19 epoch began. This lets read-only research UI releases change without contaminating the collector process or evidence identity.
+
+At 16:22 UTC the final full platform acceptance check passed with no criticals or warnings: core feed freshness was below five seconds, sampled CLOB/external provenance was 100%, local database RTT median was 0.43 ms, the Google Drive receipt was fresh and disk reserve was 36.66 GiB. After the replay-framing regression work, the complete repository suite passed 612/612 tests. At 16:20 UTC the fresh shared-bankroll portfolio remained negative (-$42.64 at $500 and -$43.71 at $1,000 after doubled costs); no strategy is a promotion candidate.
+
+### Deployment and rollback record
+
+- Production collector/runner: unchanged `/opt/deltaforge/tv2/releases/98c4d02`; epoch `priority-forward-2026-08-03-v19` remains continuous.
+- Research tools: `/var/lib/deltaforge/research-tools/current` points to isolated release `15c11c9`; the Parquet timer invokes this path without restarting TV2.
+- Dashboard: `/opt/deltaforge/tv2-dashboard/current` points to release `1e5021f`; `deltaforge-tv2-dashboard.service` is enabled and Caddy proxies TV2 to `127.0.0.1:3014`.
+- Dashboard rollback: restore `/etc/caddy/Caddyfile.pre-dashboard-20260803`, validate/reload Caddy, then stop `deltaforge-tv2-dashboard.service`. The untouched port-3004 runner continues serving the prior dashboard throughout.
+- Parquet rollback: stop/disable `deltaforge-parquet-lake.timer`, point `/var/lib/deltaforge/research-tools/current` to the prior release, and leave verified Google Drive objects/state intact. Incomplete staging is disposable; verified objects and manifests are immutable.
