@@ -18,6 +18,14 @@ async function main() {
       record: process.argv.includes('--record'),
       minHours: Number(process.env.BORG_MIN_CLEAN_EVIDENCE_HOURS || 24),
       minimumFreeGiB: Number(process.env.BORG_EVIDENCE_MIN_FREE_GIB || 30),
+      parquetMinHours: Number(process.env.BORG_PARQUET_MIN_CLEAN_HOURS || 24),
+      maxParquetAgeSec: Number(process.env.BORG_PARQUET_MAX_AGE_SEC || 5400),
+      minimumParquetVerifiedBatches: Number(
+        process.env.BORG_PARQUET_MIN_VERIFIED_BATCHES || 2,
+      ),
+      parquetStateFile: process.env.PARQUET_LAKE_STATE_FILE,
+      parquetReceiptFile: process.env.PARQUET_LAKE_RECEIPT,
+      parquetReportFile: process.env.PARQUET_LAKE_REPORT,
     });
     console.log(JSON.stringify(report, null, 2));
     if (report.status === 'FAILED') process.exitCode = 1;

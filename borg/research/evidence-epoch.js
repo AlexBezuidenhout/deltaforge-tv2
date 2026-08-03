@@ -3,6 +3,13 @@
 const fs = require('node:fs');
 
 const DEFAULT_MIN_HOURS = 24;
+const DEFAULT_PARQUET_MIN_HOURS = 24;
+const DEFAULT_PARQUET_MAX_AGE_SEC = 90 * 60;
+const DEFAULT_PARQUET_MIN_VERIFIED_BATCHES = 2;
+const PARQUET_STATE_FORMAT = 'deltaforge-parquet-lake-state-v1';
+const PARQUET_RECEIPT_FORMAT = 'deltaforge-parquet-lake-receipt-v1';
+const PARQUET_REPORT_FORMAT = 'deltaforge-parquet-lake-run-v1';
+const PARQUET_DATASET = 'event-envelope-v1';
 const FAST_COMPONENT_MAX_AGE_SEC = 120;
 const SLOW_COMPONENT_MAX_AGE_SEC = 15 * 60;
 const REQUIRED_FAST_COMPONENTS = Object.freeze([
@@ -94,10 +101,120 @@ function readReceipt(file) {
   }
 }
 
+function fileMtime(file) {
+  try { return fs.statSync(file).mtime; } catch (_) { return null; }
+}
+
+function assessParquetLake(options = {}) {
+  const nowMs = options.now ? new Date(options.now).getTime() : Date.now();
+  const stateFile = options.stateFile || '/var/lib/deltaforge/parquet-lake/state.json';
+  const receiptFile = options.receiptFile || '/var/lib/deltaforge/parquet-lake/receipt';
+  const reportFile = options.reportFile || '/var/lib/deltaforge/parquet-lake/last-report.json';
+  const maxAgeSec = finite(options.maxAgeSec, DEFAULT_PARQUET_MAX_AGE_SEC);
+  const minimumVerifiedBatches = finite(
+    options.minimumVerifiedBatches,
+    DEFAULT_PARQUET_MIN_VERIFIED_BATCHES,
+  );
+  const critical = [];
+  const state = readJson(stateFile);
+  const receipt = readReceipt(receiptFile);
+  const report = readJson(reportFile);
+  const reportMtime = fileMtime(reportFile);
+  if (!state || state.format !== PARQUET_STATE_FORMAT) {
+    critical.push('verified Parquet lake state is missing or invalid');
+  }
+  const batches = Object.entries(state?.batches || {})
+    .filter(([, batch]) => batch?.verified === true)
+    .sort((left, right) => String(left[1].verifiedAt || '')
+      .localeCompare(String(right[1].verifiedAt || '')));
+  const latestEntry = batches.at(-1) || null;
+  const latestHash = latestEntry?.[0] || null;
+  const latestBatch = latestEntry?.[1] || null;
+  const parquetOutputs = batches.flatMap(([, batch]) => (batch.outputs || [])
+    .filter((output) => String(output.relative || '').endsWith('.parquet')));
+  const invalidOutputs = parquetOutputs.filter((output) => output.verified !== true
+    || !/^[a-f0-9]{64}$/i.test(String(output.sha256 || ''))
+    || output.compression !== 'ZSTD'
+    || !(finite(output.bytes, 0) > 0)
+    || !(finite(output.rows, 0) > 0));
+  const sourceFiles = Object.keys(state?.sources || {}).length;
+  const rejectedSourceFiles = Object.keys(state?.rejectedSources || {}).length;
+  const rows = parquetOutputs.reduce((sum, output) => sum + finite(output.rows, 0), 0);
+  if (batches.length < minimumVerifiedBatches) {
+    critical.push(`verified Parquet recurrence has ${batches.length} batch(es); ${minimumVerifiedBatches} required`);
+  }
+  if (!(sourceFiles > 0) || !(rows > 0) || !parquetOutputs.length) {
+    critical.push('verified Parquet lake contains no queryable source events');
+  }
+  if (invalidOutputs.length) {
+    critical.push(`${invalidOutputs.length} Parquet output(s) fail checksum/ZSTD/row validation`);
+  }
+  if (rejectedSourceFiles > 0) {
+    critical.push(`${rejectedSourceFiles} raw source object(s) are quarantined from Parquet replay`);
+  }
+  const receiptAgeSec = ageSeconds(receipt?.completed_at, nowMs);
+  if (!receipt || receipt.format !== PARQUET_RECEIPT_FORMAT) {
+    critical.push('verified Parquet lake receipt is missing or invalid');
+  } else {
+    if (receipt.dataset !== PARQUET_DATASET) {
+      critical.push(`Parquet receipt dataset is ${receipt.dataset || 'missing'}; ${PARQUET_DATASET} required`);
+    }
+    if (!latestHash || receipt.latest_batch !== latestHash) {
+      critical.push('Parquet receipt does not attest the latest verified state batch');
+    }
+    if (receipt.compression !== 'ZSTD') critical.push('Parquet receipt does not attest ZSTD compression');
+    if (receipt.remote_verification !== 'google-drive-md5-via-rclone-check') {
+      critical.push('Parquet receipt lacks remote checksum verification');
+    }
+    if (receiptAgeSec == null || receiptAgeSec > maxAgeSec) {
+      critical.push(`verified Parquet receipt is ${receiptAgeSec == null
+        ? 'undated' : `${Math.round(receiptAgeSec)}s old`}; ${maxAgeSec}s maximum`);
+    }
+  }
+  const reportAgeSec = ageSeconds(reportMtime, nowMs);
+  const allowedReportStatuses = new Set(['verified', 'verified_no_new_batch']);
+  if (!report || report.format !== PARQUET_REPORT_FORMAT) {
+    critical.push('Parquet compaction report is missing or invalid');
+  } else if (!allowedReportStatuses.has(report.status)) {
+    critical.push(`latest Parquet compaction status is ${report.status || 'missing'}`);
+  }
+  if (reportAgeSec == null || reportAgeSec > maxAgeSec) {
+    critical.push(`Parquet compaction report is ${reportAgeSec == null
+      ? 'undated' : `${Math.round(reportAgeSec)}s old`}; ${maxAgeSec}s maximum`);
+  }
+  return {
+    healthy: critical.length === 0,
+    critical,
+    checkedAt: new Date(nowMs).toISOString(),
+    stateFile,
+    receiptFile,
+    reportFile,
+    verifiedBatches: batches.length,
+    minimumVerifiedBatches,
+    firstVerifiedAt: batches[0]?.[1]?.verifiedAt || null,
+    latestVerifiedAt: latestBatch?.verifiedAt || null,
+    latestBatch: latestHash,
+    sourceFiles,
+    rows,
+    parquetFiles: parquetOutputs.length,
+    invalidOutputs: invalidOutputs.length,
+    rejectedSourceFiles,
+    receiptCompletedAt: receipt?.completed_at || null,
+    receiptAgeSec,
+    reportStatus: report?.status || null,
+    reportAgeSec,
+    pendingSourceFiles: finite(
+      receipt?.pending_source_files ?? report?.pendingSourceFiles ?? report?.pending,
+      null,
+    ),
+  };
+}
+
 async function assessEvidenceEpoch(pool, options = {}) {
   const now = options.now ? new Date(options.now) : new Date();
   const nowMs = now.getTime();
   const minHours = finite(options.minHours, DEFAULT_MIN_HOURS);
+  const parquetMinHours = finite(options.parquetMinHours, DEFAULT_PARQUET_MIN_HOURS);
   const critical = [];
   const warnings = [];
   const { rows: runRows } = await pool.query(`
@@ -192,6 +309,21 @@ async function assessEvidenceEpoch(pool, options = {}) {
       critical.push(`${source} is ${age == null ? 'missing' : `${Math.round(age)}s old`}`);
     }
   }
+  const flowHeartbeat = eventHeartbeats.flow_heartbeat?.data || {};
+  const globalDbQueue = finite(flowHeartbeat.globalDbQueue, null);
+  const globalDbQueueOldestAgeMs = finite(flowHeartbeat.globalDbQueueOldestAgeMs, null);
+  if (globalDbQueue == null || globalDbQueueOldestAgeMs == null) {
+    critical.push('public-flow derived SQL queue telemetry is missing');
+  } else if (globalDbQueue > 5000 || globalDbQueueOldestAgeMs > 120_000) {
+    critical.push(`public-flow derived SQL queue is stalled: ${globalDbQueue} rows, oldest ${Math.round(globalDbQueueOldestAgeMs)}ms`);
+  }
+  const diagnosticTransitionDwellMs = finite(
+    components.options_surface?.meta?.diagnosticTransitionDwellMs,
+    null,
+  );
+  if (diagnosticTransitionDwellMs == null || diagnosticTransitionDwellMs < 30_000) {
+    critical.push('options diagnostic SQL transition dwell is missing or below 30000ms');
+  }
 
   const { rows: runFailureRows } = await pool.query(`
     SELECT status,count(*)::int n
@@ -264,6 +396,16 @@ async function assessEvidenceEpoch(pool, options = {}) {
     }
   }
 
+  const parquet = assessParquetLake({
+    now,
+    stateFile: options.parquetStateFile,
+    receiptFile: options.parquetReceiptFile,
+    reportFile: options.parquetReportFile,
+    maxAgeSec: options.maxParquetAgeSec,
+    minimumVerifiedBatches: options.minimumParquetVerifiedBatches,
+  });
+  critical.push(...parquet.critical);
+
   const currentStatus = critical.length ? 'FAIL' : 'PASS';
   if (options.record === true) {
     await pool.query(`
@@ -271,11 +413,12 @@ async function assessEvidenceEpoch(pool, options = {}) {
         (epoch_id,checked_at,status,critical,warnings,metrics)
       VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)
     `, [run.epoch_id, now, currentStatus, JSON.stringify(critical), JSON.stringify(warnings),
-      JSON.stringify({ runId: run.run_id, components: Object.fromEntries(
+      JSON.stringify({ requirementsVersion: 'evidence-health-v2-parquet', runId: run.run_id,
+        components: Object.fromEntries(
         Object.entries(components).map(([key, row]) => [key, {
           beatAt: row.beat_at, ageSeconds: ageSeconds(row.beat_at, nowMs),
         }]),
-      ), disk, sequenceCounters, errorCounters })]);
+      ), disk, parquet, sequenceCounters, errorCounters })]);
   }
 
   const { rows: coverageRows } = await pool.query(`
@@ -300,8 +443,40 @@ async function assessEvidenceEpoch(pool, options = {}) {
     && lastAgeSec != null && lastAgeSec <= 120
     && finite(coverage.max_gap_seconds, 0) <= 120
     && coverage.failed_samples === 0;
+  const { rows: parquetCoverageRows } = await pool.query(`
+    WITH instrumented AS (
+      SELECT checked_at,
+             COALESCE((metrics->'parquet'->>'healthy')::boolean,false) healthy
+        FROM borg_evidence_health_samples
+       WHERE checked_at <= $1 AND metrics ? 'parquet'
+    ), last_failure AS (
+      SELECT max(checked_at) failed_at FROM instrumented WHERE NOT healthy
+    ), clean AS (
+      SELECT checked_at,
+             checked_at-lag(checked_at) OVER (ORDER BY checked_at) AS gap
+        FROM instrumented,last_failure
+       WHERE healthy AND (failed_at IS NULL OR checked_at > failed_at)
+    )
+    SELECT count(*)::int samples,min(checked_at) first_sample_at,
+           max(checked_at) last_sample_at,
+           max(EXTRACT(EPOCH FROM gap))::float8 max_gap_seconds,
+           (SELECT failed_at FROM last_failure) last_failed_at
+      FROM clean
+  `, [now]);
+  const parquetCoverage = parquetCoverageRows[0];
+  const parquetFirstMs = parquetCoverage.first_sample_at
+    ? new Date(parquetCoverage.first_sample_at).getTime() : NaN;
+  const parquetCleanHours = Number.isFinite(parquetFirstMs)
+    ? Math.max(0, (nowMs - parquetFirstMs) / 3_600_000) : 0;
+  const parquetLastAgeSec = ageSeconds(parquetCoverage.last_sample_at, nowMs);
+  const parquetCoverageContinuous = parquetCoverage.samples > 0
+    && parquetLastAgeSec != null && parquetLastAgeSec <= 120
+    && finite(parquetCoverage.max_gap_seconds, 0) <= 120;
+  const parquetBurnInComplete = parquet.healthy
+    && parquetCoverageContinuous && parquetCleanHours >= parquetMinHours;
   const burnInComplete = epochAgeHours >= minHours;
-  const promotionEligible = currentStatus === 'PASS' && burnInComplete && coverageComplete;
+  const promotionEligible = currentStatus === 'PASS' && burnInComplete && coverageComplete
+    && parquetBurnInComplete;
   const status = promotionEligible ? 'PASSED_24H_CLEAN'
     : currentStatus === 'FAIL' || (burnInComplete && !coverageComplete) ? 'FAILED'
       : 'PENDING_24H';
@@ -309,6 +484,9 @@ async function assessEvidenceEpoch(pool, options = {}) {
     warnings.push(`${Math.max(0, minHours - epochAgeHours).toFixed(2)} clean hour(s) remain`);
   } else if (!coverageComplete) {
     critical.push('24-hour health-sample coverage is incomplete or contains a failed sample');
+  }
+  if (parquet.healthy && !parquetBurnInComplete) {
+    warnings.push(`${Math.max(0, parquetMinHours - parquetCleanHours).toFixed(2)} verified Parquet burn-in hour(s) remain`);
   }
   return {
     format: 'borg-evidence-epoch-v1',
@@ -335,6 +513,19 @@ async function assessEvidenceEpoch(pool, options = {}) {
       maxGapSeconds: finite(coverage.max_gap_seconds),
       complete: coverageComplete,
     },
+    parquetBurnIn: {
+      status: !parquet.healthy ? 'FAILED_CURRENT'
+        : parquetBurnInComplete ? 'PASSED_24H_CLEAN' : 'PENDING_24H',
+      minCleanHours: parquetMinHours,
+      cleanHours: +parquetCleanHours.toFixed(4),
+      samples: parquetCoverage.samples,
+      firstSampleAt: parquetCoverage.first_sample_at,
+      lastSampleAt: parquetCoverage.last_sample_at,
+      lastFailedAt: parquetCoverage.last_failed_at,
+      maxGapSeconds: finite(parquetCoverage.max_gap_seconds),
+      continuous: parquetCoverageContinuous,
+      complete: parquetBurnInComplete,
+    },
     critical,
     warnings,
     metrics: {
@@ -351,6 +542,7 @@ async function assessEvidenceEpoch(pool, options = {}) {
         ageSeconds: offhostAgeSec,
         latestFile: offhostReceipt?.latest_file || null,
       },
+      parquet,
       sequenceCounters,
       errorCounters,
     },
@@ -359,9 +551,13 @@ async function assessEvidenceEpoch(pool, options = {}) {
 
 module.exports = {
   DEFAULT_MIN_HOURS,
+  DEFAULT_PARQUET_MAX_AGE_SEC,
+  DEFAULT_PARQUET_MIN_HOURS,
+  DEFAULT_PARQUET_MIN_VERIFIED_BATCHES,
   REQUIRED_FAST_COMPONENTS,
   REQUIRED_SLOW_COMPONENTS,
   ageSeconds,
+  assessParquetLake,
   assessEvidenceEpoch,
   findCounters,
   isAtOrAfter,

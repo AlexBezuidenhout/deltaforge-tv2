@@ -3,7 +3,8 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
-  ageSeconds, findCounters, isAtOrAfter, isErrorCounter, isGapCounter, readReceipt,
+  ageSeconds, assessParquetLake, findCounters, isAtOrAfter, isErrorCounter,
+  isGapCounter, readReceipt,
 } = require('../borg/research/evidence-epoch');
 
 test('evidence health finds nested sequence and collector error counters', () => {
@@ -63,6 +64,92 @@ test('off-host receipt parser preserves values containing equals signs', () => {
     completed_at: '2026-07-21T00:00:00Z',
     latest_file: '/archive/a=b.ndjson.gz',
   });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('Parquet evidence requires recurrent remotely verified queryable batches', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'borg-parquet-health-'));
+  const now = '2026-08-03T16:30:00.000Z';
+  const output = (suffix) => ({
+    relative: `event-envelope-v1/source=binance/date=2026-08-03/hour=16/${suffix}.parquet`,
+    sha256: 'a'.repeat(64), verified: true, compression: 'ZSTD', bytes: 100, rows: 10,
+  });
+  fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({
+    format: 'deltaforge-parquet-lake-state-v1',
+    sources: { one: {}, two: {} }, rejectedSources: {},
+    batches: {
+      first: { verified: true, verifiedAt: '2026-08-03T15:00:00.000Z', outputs: [output('a')] },
+      second: { verified: true, verifiedAt: '2026-08-03T16:15:00.000Z', outputs: [output('b')] },
+    },
+  }));
+  fs.writeFileSync(path.join(dir, 'receipt'), [
+    'format=deltaforge-parquet-lake-receipt-v1',
+    'completed_at=2026-08-03T16:15:00.000Z',
+    'dataset=event-envelope-v1',
+    'latest_batch=second',
+    'compression=ZSTD',
+    'remote_verification=google-drive-md5-via-rclone-check',
+  ].join('\n'));
+  fs.writeFileSync(path.join(dir, 'last-report.json'), JSON.stringify({
+    format: 'deltaforge-parquet-lake-run-v1', status: 'verified', pendingSourceFiles: 12,
+  }));
+  fs.utimesSync(path.join(dir, 'last-report.json'), new Date(now), new Date(now));
+  const report = assessParquetLake({
+    now,
+    stateFile: path.join(dir, 'state.json'),
+    receiptFile: path.join(dir, 'receipt'),
+    reportFile: path.join(dir, 'last-report.json'),
+  });
+  assert.equal(report.healthy, true);
+  assert.equal(report.verifiedBatches, 2);
+  assert.equal(report.sourceFiles, 2);
+  assert.equal(report.rows, 20);
+  assert.equal(report.latestBatch, 'second');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('Parquet evidence fails closed on quarantine, stale receipt and invalid outputs', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'borg-parquet-health-bad-'));
+  fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({
+    format: 'deltaforge-parquet-lake-state-v1', sources: { one: {} },
+    rejectedSources: { bad: {} }, batches: {
+      first: { verified: true, verifiedAt: '2026-08-03T12:00:00.000Z', outputs: [{
+        relative: 'event-envelope-v1/source=x/date=2026-08-03/hour=12/bad.parquet',
+        sha256: 'bad', verified: true, compression: 'SNAPPY', bytes: 1, rows: 0,
+      }] },
+    },
+  }));
+  fs.writeFileSync(path.join(dir, 'receipt'), [
+    'format=deltaforge-parquet-lake-receipt-v1',
+    'completed_at=2026-08-03T12:00:00.000Z',
+    'dataset=event-envelope-v1',
+    'latest_batch=first',
+    'compression=ZSTD',
+    'remote_verification=google-drive-md5-via-rclone-check',
+  ].join('\n'));
+  fs.writeFileSync(path.join(dir, 'last-report.json'), JSON.stringify({
+    format: 'deltaforge-parquet-lake-run-v1', status: 'source_rejections_only',
+  }));
+  fs.utimesSync(path.join(dir, 'last-report.json'),
+    new Date('2026-08-03T12:00:00.000Z'), new Date('2026-08-03T12:00:00.000Z'));
+  const report = assessParquetLake({
+    now: '2026-08-03T16:30:00.000Z', maxAgeSec: 3600,
+    stateFile: path.join(dir, 'state.json'),
+    receiptFile: path.join(dir, 'receipt'),
+    reportFile: path.join(dir, 'last-report.json'),
+  });
+  assert.equal(report.healthy, false);
+  assert.match(report.critical.join(' | '), /recurrence/);
+  assert.match(report.critical.join(' | '), /quarantined/);
+  assert.match(report.critical.join(' | '), /checksum\/ZSTD\/row/);
+  assert.match(report.critical.join(' | '), /receipt is 16200s old/);
+  assert.match(report.critical.join(' | '), /source_rejections_only/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

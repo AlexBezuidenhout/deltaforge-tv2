@@ -7,11 +7,19 @@ After=postgresql.service borg-collector.service
 Type=oneshot
 User=deltaforge
 Group=deltaforge
-WorkingDirectory=/opt/deltaforge/tv2/current
+# The evidence checker is independently released research tooling. This keeps
+# health-contract upgrades from restarting or relabelling the collector epoch.
+WorkingDirectory=/var/lib/deltaforge/research-tools/current
 EnvironmentFile=/etc/deltaforge/tv2.env
 Environment=NODE_ENV=production
 Environment=BORG_MIN_CLEAN_EVIDENCE_HOURS=24
 Environment=BORG_EVIDENCE_MIN_FREE_GIB=30
+Environment=BORG_PARQUET_MIN_CLEAN_HOURS=24
+Environment=BORG_PARQUET_MAX_AGE_SEC=5400
+Environment=BORG_PARQUET_MIN_VERIFIED_BATCHES=2
+Environment=PARQUET_LAKE_STATE_FILE=/var/lib/deltaforge/parquet-lake/state.json
+Environment=PARQUET_LAKE_RECEIPT=/var/lib/deltaforge/parquet-lake/receipt
+Environment=PARQUET_LAKE_REPORT=/var/lib/deltaforge/parquet-lake/last-report.json
 ExecStart=/usr/local/bin/node scripts/evidence-epoch-status.js --record
 TimeoutStartSec=45
 UMask=0077
