@@ -199,6 +199,7 @@ test('epoch launcher seeds the raw archive before starting high-rate collectors'
   assert.match(launcher,
     /deltaforge-google-drive-archive\.timer deltaforge-google-drive-archive\.service/);
   assert.match(launcher, /deltaforge-parquet-lake\.timer deltaforge-parquet-lake\.service/);
+  assert.match(launcher, /systemctl disable --now[\s\S]*eth-g-late-canary\.service/);
   const maintenanceRestart = launcher.indexOf('deltaforge-google-drive-archive.timer \\\n  deltaforge-parquet-lake.timer');
   const warmupComplete = launcher.lastIndexOf('rm -f "${preflight_report}"');
   assert.ok(maintenanceRestart > warmupComplete,

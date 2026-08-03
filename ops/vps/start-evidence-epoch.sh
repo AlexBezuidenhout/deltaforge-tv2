@@ -49,7 +49,8 @@ systemctl stop \
   borg-options-surface.service \
   borg-pyth-boundary.service \
   borg-structural-scanner.service \
-  polymarket-flow.service
+  polymarket-flow.service \
+  eth-g-late-canary.service
 
 epoch_start="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
 tmp_file="$(mktemp /etc/deltaforge/evidence-epoch.env.XXXXXX)"
@@ -80,6 +81,7 @@ systemctl disable --now \
   flow-boundary-canary.service \
   gla-paper.service \
   h53-live.service \
+  eth-g-late-canary.service \
   deltaforge-parquet.timer >/dev/null 2>&1 || true
 
 systemctl enable \
