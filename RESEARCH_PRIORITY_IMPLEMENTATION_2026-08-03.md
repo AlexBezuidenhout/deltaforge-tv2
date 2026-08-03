@@ -84,6 +84,36 @@ The fresh epoch must pass 24 uninterrupted hours with no feed gaps, collector
 errors, WAL failures, derived persistence backlog, stale archive receipts or
 Parquet failures before it can become the default research surface.
 
+## Deployment acceptance
+
+Release `831462a` was deployed to the collector, independent research-tools and
+dashboard release roots. `priority-forward-2026-08-03-v20` started at
+`2026-08-03T16:52:57.428Z`; v19 remains preserved as failed evidence.
+
+Initial production acceptance:
+
+- collector, MAIN/George runner, all-market, cross-venue, options, Pyth,
+  structural, public-flow, dashboard and maintenance timers are active;
+- collector, options and flow processes show zero restarts;
+- the first five recorded v20 health samples passed, with a 65.004-second
+  maximum sample gap, zero feed sequence gaps and zero collector errors;
+- the initial 9,571-row derived global-flow backlog drained to zero while the
+  source cursor stayed live;
+- options persisted 132 initial states, four stable transitions and 130 bounded
+  five-minute heartbeats in the first observation interval, instead of the
+  prior subsecond diagnostic churn;
+- Parquet attests three verified batches, 75 source segments, 3,374,275 events,
+  37 ZSTD files, zero invalid outputs and zero quarantined sources;
+- authenticated dashboard checks returned HTTP 200 for both evidence and
+  ten-lane incubator reports, and every lane reported paper-only/no live
+  authority.
+
+The current status is `PENDING_24H`, not passed. The earliest possible clean
+read is after 4 August 2026 16:54 UTC, and only if every subsequent sample
+continues to pass. Cross-venue V7 still has zero eligible entries and the
+options lane still has zero exact-expiry executable targets; neither is a
+profit result.
+
 ## What remains external or accrual-bound
 
 - H43-X: 300 fresh independent markets and at least 14 days, unchanged.
