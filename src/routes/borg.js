@@ -36,7 +36,7 @@ const {
 const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
 const { ORDERED_STRIKE_EVIDENCE_START, ORDERED_STRIKE_EXPERIMENT_ID } =
   require('../../borg/structural/experiment');
-const PYTH_EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v2';
+const PYTH_EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed';
 
 router.get('/research/priority-lanes', authMiddleware, async (req, res) => {
   try {
@@ -2006,7 +2006,7 @@ router.get('/crossvenue/terminal-carry', authMiddleware, async (req, res) => {
 
 router.get('/research/resolver-boundary', authMiddleware, async (req, res) => {
   try {
-    const value = await dashboardReports.get('resolver-boundary-portfolio-v2', 60_000,
+    const value = await dashboardReports.get('resolver-boundary-portfolio-v3', 60_000,
       () => buildResolverBoundaryPortfolio(pool));
     res.json(value);
   } catch (err) { res.status(500).json({ error: err.message }); }

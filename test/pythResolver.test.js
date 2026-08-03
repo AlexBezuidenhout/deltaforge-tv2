@@ -16,20 +16,20 @@ const path = require('node:path');
 
 function candidateFixture(overrides = {}) {
   const event = {
-    id: 'event-1', slug: 'wti-up-or-down-on-july-20-2026', active: true, closed: false,
-    title: 'WTI Up or Down on July 20?',
-    description: 'This market resolves using the Pyth WTI price feed and the specified close candle.',
+    id: 'event-1', slug: 'googl-up-or-down-on-july-20-2026', active: true, closed: false,
+    title: 'GOOGL Up or Down on July 20?',
+    description: 'This market resolves using the Pyth close at https://pythdata.app/explore/Equity.US.GOOGL%2FUSD.',
     startDate: '2026-07-20T13:30:00Z', endDate: '2026-07-20T21:00:00Z',
     markets: [{
-      id: 'market-1', conditionId: 'condition-1', slug: 'wti-up-or-down-on-july-20-2026',
-      question: 'WTI Up or Down on July 20?', outcomes: '["Up","Down"]',
+      id: 'market-1', conditionId: 'condition-1', slug: 'googl-up-or-down-on-july-20-2026',
+      question: 'GOOGL Up or Down on July 20?', outcomes: '["Up","Down"]',
       clobTokenIds: '["up-token","down-token"]', orderMinSize: '5',
       feesEnabled: false, acceptingOrders: true, active: true, closed: false,
     }],
     ...overrides,
   };
   const endpoint = {
-    slug: 'wti-up-or-down-on-july-20-2026', symbol: 'WTI', priceToBeat: 112.57042,
+    slug: 'googl-up-or-down-on-july-20-2026', symbol: 'GOOGL', priceToBeat: 112.57042,
     timestamp: 1775509140000, eventStartTime: '2026-07-20T13:30:00Z',
     endDate: '2026-07-20T21:00:00Z',
   };
@@ -103,7 +103,8 @@ test('Pyth universe accepts only exact, endpoint-bound, Pyth-settled Up/Down rul
   const { event, endpoint } = candidateFixture();
   const row = normalizeCandidate(event, endpoint);
   assert.equal(row.certified, true);
-  assert.equal(row.symbol, 'WTI');
+  assert.equal(row.symbol, 'GOOGL');
+  assert.equal(row.pythFeedSymbol, 'Equity.US.GOOGL/USD');
   assert.equal(row.boundary, 112.57042);
   assert.match(row.ruleHash, /^[a-f0-9]{64}$/);
 
@@ -112,6 +113,13 @@ test('Pyth universe accepts only exact, endpoint-bound, Pyth-settled Up/Down rul
   const rejected = normalizeCandidate(binance, endpoint);
   assert.equal(rejected.certified, false);
   assert.ok(rejected.failures.includes('NOT_EXPLICITLY_PYTH_RESOLVED'));
+
+  const ambiguous = structuredClone(event);
+  ambiguous.description = 'This market resolves using Pyth at https://pythdata.app/explore?search=WTI.';
+  const ambiguousEndpoint = { ...endpoint, symbol: 'WTI' };
+  const missingExactFeed = normalizeCandidate(ambiguous, ambiguousEndpoint);
+  assert.equal(missingExactFeed.certified, false);
+  assert.ok(missingExactFeed.failures.includes('MISSING_OR_MISMATCHED_EXACT_PYTH_FEED_SYMBOL'));
 });
 
 test('paper entry walks displayed ask depth and includes fees within budget', () => {

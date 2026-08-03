@@ -336,6 +336,46 @@ async function assessEvidenceEpoch(pool, options = {}) {
         critical.push(`allmarket_lab has ${consecutiveTimeouts} consecutive universe timeouts`);
       }
     }
+    if (component === 'pyth_boundary') {
+      const meta = row?.meta || {};
+      const processStartedAt = meta.processStartedAt;
+      const uptimeSec = ageSeconds(processStartedAt, nowMs);
+      if (meta.collectionEpochId !== run.epoch_id) {
+        critical.push('pyth_boundary heartbeat belongs to a different collection epoch');
+      }
+      if (!isAtOrAfter(processStartedAt, epochStart) || uptimeSec == null || uptimeSec < 60) {
+        critical.push('pyth_boundary process is warming, stale or repeatedly restarting');
+      }
+      if (meta.experimentId !== 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed') {
+        critical.push('pyth_boundary is not running the exact-feed Hermes forward arm');
+      }
+      if (meta.transportConnected !== true || finite(meta.symbols, 0) <= 0) {
+        critical.push('pyth_boundary exact-feed Hermes transport or feed set is unavailable');
+      }
+      if (finite(meta.hermes?.metrics?.unresolvedFeeds, 0) > 0) {
+        critical.push(`pyth_boundary has ${finite(meta.hermes.metrics.unresolvedFeeds, 0)} unresolved exact feed(s)`);
+      }
+      const marketsInWindow = finite(meta.marketsInWindow, 0);
+      if (marketsInWindow > 0) {
+        const expectedFeeds = finite(meta.expectedWindowFeeds, null);
+        const coveredFeeds = finite(meta.coveredWindowFeeds, null);
+        const tickAgeSec = ageSeconds(meta.lastUsableTickAt, nowMs);
+        if (meta.transportConnected !== true || meta.feedState !== 'LIVE') {
+          critical.push(`pyth_boundary exact-feed transport is ${meta.feedState || 'UNKNOWN'}`);
+        }
+        if (expectedFeeds == null || coveredFeeds == null || expectedFeeds <= 0
+            || coveredFeeds < expectedFeeds) {
+          critical.push(`pyth_boundary exact-feed coverage is ${coveredFeeds ?? 'missing'}/${expectedFeeds ?? 'missing'}`);
+        }
+        if (!isAtOrAfter(meta.lastUsableTickAt, epochStart)
+            || tickAgeSec == null || tickAgeSec > 30) {
+          critical.push(`pyth_boundary last usable exact-feed tick is ${
+            tickAgeSec == null ? 'missing' : `${Math.round(tickAgeSec)}s old`}`);
+        }
+      } else {
+        warnings.push('pyth_boundary has no exact-feed market currently inside its resolver window');
+      }
+    }
   }
   for (const component of REQUIRED_SLOW_COMPONENTS) {
     const age = ageSeconds(components[component]?.beat_at, nowMs);

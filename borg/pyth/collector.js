@@ -18,13 +18,14 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const ClobMultiplex = require('../recon/clob-multiplex');
 const RawWal = require('../recon/wal');
 const { insertRows, logEvent, migratePyth, pool } = require('../recon/db');
+const { HermesPythStream, extractExactPythFeedSymbol } = require('./hermes');
 const { PythRtds, isSupportedMarketSymbol } = require('./rtds');
 const {
   checkpointCrossings, executableMarkout, finite, resolverSide, sizePaperEntry,
 } = require('./strategy');
 const { discoverPythUniverse, fetchJson, parseArray } = require('./universe');
 
-const EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v2';
+const EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed';
 const CHECKPOINTS = Object.freeze([300, 120, 60, 30, 10]);
 const LATENCY_PROFILES_MS = Object.freeze([100, 250, 500]);
 const MARKOUT_HORIZONS_SEC = Object.freeze([1, 5, 30]);
@@ -73,6 +74,7 @@ class PythBoundaryObserver {
       collectorRunId: this.runId,
     };
     this.pythWal = new RawWal('pyth-equity-rtds', walOptions);
+    this.hermesWal = new RawWal('pyth-hermes-sse', walOptions);
     this.clobWal = new RawWal('pyth-polymarket-clob', walOptions);
     this.decisionWal = new RawWal('pyth-boundary-decisions', walOptions);
     this.markets = new Map();
@@ -90,6 +92,7 @@ class PythBoundaryObserver {
     this.lastSignalAt = 0;
     this.metrics = {
       ticks: 0, liveTicks: 0, historicalTicks: 0, carriedForward: 0,
+      diagnosticRtdsTicks: 0,
       signals: 0, arrivals: 0, executableArrivals: 0, markouts: 0,
       scoredMarkouts: 0, terminalScores: 0, refreshErrors: 0,
     };
@@ -100,8 +103,15 @@ class PythBoundaryObserver {
     });
     this.rtds = new PythRtds({
       wal: this.pythWal,
-      onTick: (tick) => this.onTick(tick),
+      onTick: (tick) => this.onTick({ ...tick, transportSource: 'polymarket-rtds' }, false),
       onStatus: (status, detail) => logEvent('INFO', 'pyth', `RTDS ${status}`, detail),
+    });
+    this.hermes = new HermesPythStream({
+      wal: this.hermesWal,
+      onTick: (tick) => this.onTick(tick, true),
+      onStatus: (status, detail) => logEvent(
+        status === 'OPEN' ? 'INFO' : 'WARN', 'pyth', `Hermes ${status}`, detail,
+      ),
     });
   }
 
@@ -183,6 +193,12 @@ class PythBoundaryObserver {
       this.markets.set(row.condition_id, {
         conditionId: row.condition_id, eventId: row.event_id, gammaId: row.gamma_id,
         slug: row.slug, question: row.question, symbol: row.symbol,
+        pythFeedSymbol: row.raw?.pythFeedSymbol || extractExactPythFeedSymbol([
+          row.raw?.event?.resolutionSource,
+          row.raw?.event?.description,
+          row.raw?.event?.markets?.[0]?.resolutionSource,
+          row.raw?.event?.markets?.[0]?.description,
+        ].filter(Boolean).join('\n')),
         boundary: finite(row.price_to_beat), startMs: new Date(row.window_start).getTime(),
         endMs: new Date(row.window_end).getTime(), upToken: row.up_token_id,
         downToken: row.down_token_id, minimumOrderSize: finite(row.minimum_order_size),
@@ -206,7 +222,7 @@ class PythBoundaryObserver {
       market.active = discovered.some((row) => row.conditionId === id) && market.endMs > now;
     }
     const active = [...this.markets.values()].filter((market) => market.active);
-    const feedActive = active.filter((market) => isSupportedMarketSymbol(market.symbol));
+    const feedActive = active.filter((market) => market.pythFeedSymbol);
     this.targetByToken = new Map(feedActive.flatMap((market) => [
       [market.upToken, market], [market.downToken, market],
     ]));
@@ -221,25 +237,42 @@ class PythBoundaryObserver {
         || left.endMs - right.endMs
         || left.symbol.localeCompare(right.symbol);
     });
-    this.rtds.setSymbols([...new Set(prioritizedFeeds.map((market) => market.symbol))]);
+    const selectedFeeds = [...new Map(prioritizedFeeds.map((market) => [market.pythFeedSymbol, {
+      symbol: market.symbol, feedSymbol: market.pythFeedSymbol,
+    }])).values()];
+    const hermesSelection = await this.hermes.setFeeds(selectedFeeds);
+    this.rtds.setSymbols([...new Set(prioritizedFeeds
+      .filter((market) => isSupportedMarketSymbol(market.symbol))
+      .map((market) => market.symbol))]);
     this.clob.subscribe([...this.targetByToken.keys()]);
-    await logEvent('INFO', 'pyth', `certified universe: ${active.length} markets, ${this.rtds.symbols.size} symbols`, {
+    await logEvent('INFO', 'pyth', `certified universe: ${active.length} markets, ${hermesSelection.resolved} exact Hermes feeds`, {
       runId: this.runId, experimentId: EXPERIMENT_ID,
-      unsupportedSymbols: [...new Set(active.filter((market) => !isSupportedMarketSymbol(market.symbol))
-        .map((market) => market.symbol))],
+      unresolvedExactFeeds: hermesSelection.unresolved,
+      diagnosticRtdsSymbols: this.rtds.symbols.size,
     });
   }
 
-  onTick(tick) {
+  onTick(tick, triggerEligible = true) {
     const tickId = `${tick.walEventId || this.runId}:${tick.symbol}:${tick.sourceMs || tick.receiveWallMs}`;
     const bucket = tick.historical ? tick.sourceMs || tick.receiveWallMs
       : Math.floor(tick.receiveWallMs / TICK_DB_SAMPLE_MS) * TICK_DB_SAMPLE_MS;
-    this.tickBuffer.set(`${tick.symbol}:${bucket}:${tick.historical}`, { ...tick, tickId });
+    const source = tick.transportSource || 'unknown';
+    this.tickBuffer.set(`${source}:${tick.symbol}:${bucket}:${tick.historical}`, { ...tick, tickId });
+    if (!triggerEligible) {
+      this.metrics.diagnosticRtdsTicks += 1;
+      return;
+    }
     this.metrics.ticks += 1;
     if (tick.historical) { this.metrics.historicalTicks += 1; return; }
     this.metrics.liveTicks += 1;
     this.lastTickAt = tick.receiveWallMs;
     if (tick.carriedForward) { this.metrics.carriedForward += 1; return; }
+    const sourceAgeMs = tick.sourceMs == null ? Infinity
+      : Math.max(0, tick.receiveWallMs - tick.sourceMs);
+    if (!Number.isFinite(sourceAgeMs) || sourceAgeMs > SOURCE_MAX_AGE_MS) {
+      this.hermes.metrics.staleSourceTicks += 1;
+      return;
+    }
     this.lastUsableTickAt = tick.receiveWallMs;
     for (const market of this.markets.values()) {
       if (!market.active || market.symbol !== tick.symbol) continue;
@@ -462,7 +495,13 @@ class PythBoundaryObserver {
       ], ticks.map((row) => [
         EXPERIMENT_ID,row.symbol,timestamp(row.sourceMs),timestamp(row.providerReceivedMs),
         new Date(row.receiveWallMs),row.receiveMonoNs,row.value,!!row.carriedForward,
-        !!row.historical,row.connectionEpoch,row.eventSequence,row.tickId,JSON.stringify(row.raw),
+        !!row.historical,row.connectionEpoch,row.eventSequence,row.tickId,JSON.stringify({
+          transportSource: row.transportSource || null,
+          feedSymbol: row.feedSymbol || null,
+          feedId: row.feedId || null,
+          confidence: row.confidence ?? null,
+          payload: row.raw,
+        }),
       ]), 'ON CONFLICT (wal_event_id) DO NOTHING');
       if (signals.length) await insertRows('borg_pyth_signals', [
         'signal_id','experiment_id','condition_id','observed_at','trigger_kind','checkpoint_sec',
@@ -516,31 +555,40 @@ class PythBoundaryObserver {
 
   async heartbeat() {
     const active = [...this.markets.values()].filter((market) => market.active);
-    const supported = active.filter((market) => isSupportedMarketSymbol(market.symbol));
+    const supported = active.filter((market) => market.pythFeedSymbol);
     const unsupportedSymbols = [...new Set(active
-      .filter((market) => !isSupportedMarketSymbol(market.symbol)).map((market) => market.symbol))];
+      .filter((market) => !market.pythFeedSymbol).map((market) => market.symbol))];
     const now = Date.now();
     const inWindow = supported.filter((market) => now >= market.startMs && now <= market.endMs);
+    const inWindowSymbols = [...new Set(inWindow.map((market) => market.symbol))];
+    const freshWindowSymbols = inWindowSymbols.filter((symbol) => {
+      const tick = this.hermes.latest.get(symbol);
+      const maxAgeMs = Math.max(10_000, SOURCE_MAX_AGE_MS * 5);
+      return tick && now - tick.receiveWallMs <= maxAgeMs
+        && tick.sourceMs != null && now - tick.sourceMs <= maxAgeMs;
+    });
     const lastExpectedTickAt = inWindow.reduce((latest, market) => {
-      const tick = this.rtds.latest.get(market.symbol);
+      const tick = this.hermes.latest.get(market.symbol);
       return !tick?.carriedForward ? Math.max(latest, tick?.receiveWallMs || 0) : latest;
     }, 0);
     const nextWindowStartAt = supported.reduce((next, market) => market.startMs > now
       ? Math.min(next, market.startMs) : next, Infinity);
-    const transport = this.rtds.health();
+    const transport = this.hermes.health(now);
+    const diagnosticRtds = this.rtds.health();
     const feedState = !transport.connected ? 'DISCONNECTED'
       : !inWindow.length ? 'AWAITING_WINDOW'
-        : lastExpectedTickAt && now - lastExpectedTickAt <= Math.max(10_000, SOURCE_MAX_AGE_MS * 5)
+        : freshWindowSymbols.length === inWindowSymbols.length
           ? 'LIVE' : 'CONNECTED_NO_RECENT_TICK';
     const metrics = {
       ...this.metrics, checkpointsSec: CHECKPOINTS, latencyProfilesMs: LATENCY_PROFILES_MS,
       markoutHorizonsSec: MARKOUT_HORIZONS_SEC, targetBudgetUsd: TARGET_BUDGET_USD,
       settlementCostUsd: SETTLEMENT_COST_USD, bookMaxAgeMs: BOOK_MAX_AGE_MS,
-      sourceMaxAgeMs: SOURCE_MAX_AGE_MS, rtds: transport,
+      sourceMaxAgeMs: SOURCE_MAX_AGE_MS, hermes: transport, diagnosticRtds,
       feedState, supportedMarkets: supported.length, marketsInWindow: inWindow.length,
+      expectedWindowFeeds: inWindowSymbols.length, coveredWindowFeeds: freshWindowSymbols.length,
       unsupportedSymbols, lastExpectedTickAt: lastExpectedTickAt || null,
       nextWindowStartAt: Number.isFinite(nextWindowStartAt) ? nextWindowStartAt : null,
-      pythWal: this.pythWal.health(), clobWal: this.clobWal.health(),
+      pythWal: this.pythWal.health(), hermesWal: this.hermesWal.health(), clobWal: this.clobWal.health(),
       decisionWal: this.decisionWal.health(),
     };
     const queue = this.tickBuffer.size + this.signalBuffer.size + this.arrivalBuffer.size
@@ -559,7 +607,7 @@ class PythBoundaryObserver {
         last_tick_at=EXCLUDED.last_tick_at,last_signal_at=EXCLUDED.last_signal_at,
         metrics=EXCLUDED.metrics,updated_at=now()
     `, [this.runId,EXPERIMENT_ID,this.startedAt,os.hostname(),process.pid,active.length,
-      this.rtds.symbols.size,this.targetByToken.size,this.rtds.metrics.rawFrames,
+      this.hermes.feedById.size,this.targetByToken.size,this.hermes.metrics.rawEvents,
       this.metrics.ticks,this.metrics.signals,this.metrics.arrivals,this.metrics.markouts,
       this.metrics.terminalScores,queue,timestamp(this.lastTickAt),timestamp(this.lastSignalAt),
       JSON.stringify(metrics)]);
@@ -567,16 +615,20 @@ class PythBoundaryObserver {
       VALUES ('pyth_boundary',now(),$1::jsonb)
       ON CONFLICT (component) DO UPDATE SET beat_at=now(),meta=EXCLUDED.meta`, [JSON.stringify({
       runId: this.runId, experimentId: EXPERIMENT_ID, paperOnly: true,
+      collectionEpochId: process.env.BORG_COLLECTION_EPOCH_ID || 'pyth-unmarked',
+      processStartedAt: this.startedAt.toISOString(),
       walletLoaded: false, liveOrderPath: false, markets: active.length,
-      symbols: this.rtds.symbols.size, polyTokens: this.targetByToken.size,
+      symbols: this.hermes.feedById.size, polyTokens: this.targetByToken.size,
       lastTickAt: this.lastTickAt || null, lastUsableTickAt: this.lastUsableTickAt || null,
       signals: this.metrics.signals, refreshErrors: this.metrics.refreshErrors,
       feedState, marketsInWindow: inWindow.length,
+      expectedWindowFeeds: inWindowSymbols.length, coveredWindowFeeds: freshWindowSymbols.length,
       nextWindowStartAt: Number.isFinite(nextWindowStartAt) ? nextWindowStartAt : null,
       unsupportedSymbols, transportConnected: transport.connected,
-      rtds: transport,
+      hermes: transport, diagnosticRtds,
       wal: {
-        pyth: this.pythWal.health(), polymarket: this.clobWal.health(),
+        pythRtds: this.pythWal.health(), pythHermes: this.hermesWal.health(),
+        polymarket: this.clobWal.health(),
         decisions: this.decisionWal.health(),
       },
     })]);
@@ -586,7 +638,10 @@ class PythBoundaryObserver {
     await migratePyth();
     await this.loadPersistedMarkets();
     await this.refreshUniverse();
-    await Promise.all([this.clob.connect(), this.rtds.connect()]);
+    const [, , hermesConnected] = await Promise.all([
+      this.clob.connect(), this.rtds.connect(), this.hermes.connect(),
+    ]);
+    if (!hermesConnected) throw new Error('exact-feed Pyth Hermes stream did not connect');
     await this.recoverPendingMarkouts();
     await this.heartbeat();
     this.timers = [
@@ -596,7 +651,14 @@ class PythBoundaryObserver {
         return logEvent('ERROR', 'pyth', `refresh: ${error.message}`);
       }), REFRESH_MS),
       setInterval(() => this.heartbeat().catch((error) => logEvent('ERROR', 'pyth', `heartbeat: ${error.message}`)), 10_000),
-      setInterval(() => { this.clob.checkStale(); this.rtds.checkStale(); }, 10_000),
+      setInterval(() => {
+        this.clob.checkStale();
+        this.rtds.checkStale();
+        const now = Date.now();
+        const expectedLive = [...this.markets.values()].some((market) =>
+          market.active && market.pythFeedSymbol && now >= market.startMs && now <= market.endMs);
+        this.hermes.checkStale(expectedLive);
+      }, 10_000),
     ];
     await logEvent('INFO', 'pyth', `paper resolver-boundary observer running as ${this.runId}`, {
       experimentId: EXPERIMENT_ID, ordersSubmitted: false,
@@ -609,11 +671,13 @@ class PythBoundaryObserver {
     (this.timers || []).forEach(clearInterval);
     this.pendingTimers.forEach(clearTimeout);
     this.pendingTimers.clear();
-    this.clob.close(); this.rtds.close();
+    this.clob.close(); this.rtds.close(); this.hermes.close();
     await this.flush().catch(() => {});
     await pool.query(`UPDATE borg_pyth_runtime SET status='STOPPED',stopped_at=now(),updated_at=now()
       WHERE run_id=$1`, [this.runId]).catch(() => {});
-    await Promise.all([this.pythWal.close(), this.clobWal.close(), this.decisionWal.close()]).catch(() => {});
+    await Promise.all([
+      this.pythWal.close(), this.hermesWal.close(), this.clobWal.close(), this.decisionWal.close(),
+    ]).catch(() => {});
     await pool.end().catch(() => {});
     console.log(`[pyth] stopped by ${signal}`);
   }

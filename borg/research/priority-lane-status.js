@@ -3,7 +3,7 @@
 const H43_STRATEGY = 'H43_resolution_boundary_buffer';
 const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
 const HEARTBEAT_COMPONENTS = Object.freeze([
-  'allmarket_lab', 'crossvenue_lab', 'options_surface', 'structural_scanner',
+  'allmarket_lab', 'crossvenue_lab', 'options_surface', 'pyth_boundary', 'structural_scanner',
 ]);
 
 function finite(value, fallback = 0) {
@@ -86,6 +86,7 @@ async function buildPriorityLaneStatus(pool, options = {}) {
   const structuralMeta = heartbeats.structural_scanner?.meta || {};
   const crossMeta = heartbeats.crossvenue_lab?.meta || {};
   const optionsMeta = heartbeats.options_surface?.meta || {};
+  const pythMeta = heartbeats.pyth_boundary?.meta || {};
   const allMarketMeta = allMarket?.meta || {};
   const h43State = collectorState(
     allMarket, now.getTime(), epochId, allMarketMeta.lastEventAt,
@@ -101,6 +102,19 @@ async function buildPriorityLaneStatus(pool, options = {}) {
   const optionsState = collectorState(
     heartbeats.options_surface, now.getTime(), epochId, optionsMeta.lastEventAt,
   );
+  const pythHasWindow = finite(pythMeta.marketsInWindow) > 0;
+  const pythState = collectorState(
+    heartbeats.pyth_boundary, now.getTime(), epochId,
+    pythHasWindow ? pythMeta.lastUsableTickAt : heartbeats.pyth_boundary?.beat_at,
+    { maxProgressAgeSec: 30 },
+  );
+  const pythExactFeedActive = pythState.active
+    && (!pythHasWindow || pythMeta.feedState === 'LIVE')
+    && pythMeta.experimentId === 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed'
+    && finite(pythMeta.hermes?.metrics?.catalogFailures) === 0
+    && finite(pythMeta.hermes?.metrics?.connectFailures) === 0
+    && finite(pythMeta.hermes?.metrics?.connectionGaps) === 0
+    && finite(pythMeta.hermes?.metrics?.parseErrors) === 0;
   const fairCaptureState = collectorState(
     allMarket, now.getTime(), epochId, allMarketMeta.lastEventAt,
   );
@@ -131,6 +145,19 @@ async function buildPriorityLaneStatus(pool, options = {}) {
         latest: h43.last_evaluated_at || null, lastActionAt: h43.last_action_at || null,
         evaluationAgeSec: h43EvaluationAgeSec,
         liveness: h43State,
+        pythExactFeedArm: {
+          experimentId: pythMeta.experimentId || null,
+          active: pythExactFeedActive,
+          feedState: pythMeta.feedState || null,
+          markets: finite(pythMeta.markets),
+          marketsInWindow: finite(pythMeta.marketsInWindow),
+          exactFeeds: finite(pythMeta.symbols),
+          signals: finite(pythMeta.signals),
+          lastUsableTickAt: pythMeta.lastUsableTickAt || null,
+          hermes: pythMeta.hermes || null,
+          diagnosticRtds: pythMeta.diagnosticRtds || null,
+          liveness: pythState,
+        },
       },
       nextTest: 'Preserve H43 unchanged; require causal A/B scoring at 100/250/500ms and the frozen 300-market promotion read.',
     },

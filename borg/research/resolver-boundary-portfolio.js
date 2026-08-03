@@ -4,7 +4,7 @@ const { clusteredBootstrap } = require('./statistics');
 
 const EXPERIMENTS = Object.freeze({
   h43: 'research-h43-forward-v1',
-  pyth: 'pyth-resolver-boundary-transfer-v2',
+  pyth: 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed',
   chainlink: 'chainlink-resolver-boundary-residual-v1',
   cf: 'cf-resolver-boundary-residual-v1',
 });
@@ -99,7 +99,7 @@ async function buildResolverBoundaryPortfolio(pool) {
     };
   });
   return {
-    format: 'resolver-boundary-portfolio-v2',
+    format: 'resolver-boundary-portfolio-v3',
     generatedAt: new Date().toISOString(),
     paperOnly: true,
     additivePortfolioPnl: null,

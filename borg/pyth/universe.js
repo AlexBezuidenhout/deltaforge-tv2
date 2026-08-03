@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { extractExactPythFeedSymbol } = require('./hermes');
 
 const GAMMA = 'https://gamma-api.polymarket.com';
 const PRICE_TO_BEAT = 'https://polymarket.com/api/equity/price-to-beat';
@@ -45,6 +46,14 @@ function sourceText(event, market) {
     market?.resolutionSource, market?.rules, market?.description].filter(Boolean).join('\n');
 }
 
+function feedSymbolMatchesEndpoint(feedSymbol, endpointSymbol) {
+  const [qualifiedBase, quote] = String(feedSymbol || '').toUpperCase().split('/');
+  const base = String(qualifiedBase || '').split('.').at(-1);
+  const endpoint = String(endpointSymbol || '').trim().toUpperCase();
+  return Boolean(base && quote && endpoint
+    && (endpoint === base || endpoint === `${base}${quote}`));
+}
+
 function feeMetadata(market) {
   const schedule = market?.feeSchedule || market?.fee_schedule || {};
   const enabled = market?.feesEnabled === true || market?.fees_enabled === true
@@ -64,6 +73,7 @@ function normalizeCandidate(event, priceToBeat) {
   const question = String(market?.question || event?.title || '');
   const slug = String(market?.slug || event?.slug || '');
   const endpointSymbol = String(priceToBeat?.symbol || '').trim().toUpperCase();
+  const pythFeedSymbol = extractExactPythFeedSymbol(source);
   const boundary = finite(priceToBeat?.priceToBeat);
   const startMs = Date.parse(priceToBeat?.eventStartTime || event?.startDate || market?.startDate);
   const endMs = Date.parse(priceToBeat?.endDate || event?.endDate || market?.endDate);
@@ -78,18 +88,23 @@ function normalizeCandidate(event, priceToBeat) {
   const fees = feeMetadata(market);
   const minimumOrderSize = finite(market?.orderMinSize ?? market?.minimum_order_size);
   const ruleDocument = {
-    experiment: 'pyth-resolver-boundary-transfer-v2', eventId: eventId == null ? null : String(eventId),
+    experiment: 'pyth-resolver-boundary-transfer-v3-hermes-exact-feed',
+    eventId: eventId == null ? null : String(eventId),
     gammaId: gammaId == null ? null : String(gammaId), conditionId: conditionId == null ? null : String(conditionId),
     slug, question, outcomes: outcomes.map(String), tokenIds: tokenIds.map(String),
     resolutionSourceText: source, endpoint: {
       slug: priceToBeat?.slug || null, symbol: endpointSymbol, priceToBeat: boundary,
       timestamp: finite(priceToBeat?.timestamp), eventStartTime: priceToBeat?.eventStartTime || null,
       endDate: priceToBeat?.endDate || null,
+      pythFeedSymbol,
     },
   };
   const failures = [];
   if (!conditionId || !gammaId || !eventId) failures.push('MISSING_EXACT_IDENTIFIERS');
   if (!explicitPyth) failures.push('NOT_EXPLICITLY_PYTH_RESOLVED');
+  if (!pythFeedSymbol || !feedSymbolMatchesEndpoint(pythFeedSymbol, endpointSymbol)) {
+    failures.push('MISSING_OR_MISMATCHED_EXACT_PYTH_FEED_SYMBOL');
+  }
   if (!titleMatches || !exactBinary || tokenIds.length !== 2 || tokenIds.some((value) => !value)) failures.push('NOT_EXACT_UP_DOWN_BINARY');
   if (!endpointSymbol || !(boundary > 0) || !endpointMatchesSlug || !timingValid) failures.push('INVALID_PRICE_TO_BEAT_CERTIFICATE');
   if (!(minimumOrderSize > 0)) failures.push('UNKNOWN_MINIMUM_ORDER_SIZE');
@@ -98,14 +113,14 @@ function normalizeCandidate(event, priceToBeat) {
     eventId: eventId == null ? null : String(eventId),
     gammaId: gammaId == null ? null : String(gammaId),
     conditionId: conditionId == null ? null : String(conditionId),
-    slug, question, symbol: endpointSymbol, boundary, startMs, endMs,
+    slug, question, symbol: endpointSymbol, pythFeedSymbol, boundary, startMs, endMs,
     upToken: tokenIds[0] == null ? null : String(tokenIds[0]),
     downToken: tokenIds[1] == null ? null : String(tokenIds[1]),
     minimumOrderSize, fees, active: event?.active !== false && market?.active !== false,
     closed: event?.closed === true || market?.closed === true,
     acceptingOrders: market?.acceptingOrders !== false && market?.accepting_orders !== false,
     ruleDocument, ruleHash: sha256(ruleDocument), certified: failures.length === 0, failures,
-    raw: { event, priceToBeat },
+    raw: { event, priceToBeat, pythFeedSymbol },
   };
 }
 
@@ -149,5 +164,5 @@ async function discoverPythUniverse(options = {}) {
 
 module.exports = {
   FINANCE_UPDOWN_TAG, GAMMA, PRICE_TO_BEAT, discoverPythUniverse, feeMetadata,
-  fetchJson, finite, normalizeCandidate, parseArray, sha256, stableJson,
+  feedSymbolMatchesEndpoint, fetchJson, finite, normalizeCandidate, parseArray, sha256, stableJson,
 };
