@@ -568,7 +568,12 @@ async function inspectWalContract(file, source) {
     ].every(complete);
     const sourceComplete = complete('source_timestamp_ms');
     const dataGrade = baseComplete && sourceComplete ? 'A' : baseComplete ? 'B' : 'C';
-    const clobLike = /clob|kalshi|poly/i.test(source);
+    const publicBookSources = new Set([
+      'polymarket-clob', 'options-polymarket-clob', 'polymarket-flow-clob',
+      'pyth-polymarket-clob', 'allmarket-clob', 'crossvenue-poly',
+      'crossvenue-kalshi',
+    ]);
+    const clobLike = publicBookSources.has(source);
     return {
       format: header?.format || null,
       schemaVersion: header?.schema_version ?? null,
