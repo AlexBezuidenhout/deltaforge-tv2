@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('node:fs');
+const { buildLaneEvidenceSnapshot, LANE_DEFINITIONS } = require('./lane-evidence');
 
 const DEFAULT_MIN_HOURS = 24;
 const DEFAULT_PARQUET_MIN_HOURS = 24;
@@ -414,14 +415,20 @@ async function assessEvidenceEpoch(pool, options = {}) {
   // and emit a later green heartbeat before the evidence recorder samples it.
   // Persisted stale heartbeats therefore invalidate the whole immutable epoch.
   const { rows: staleHeartbeatRows } = await pool.query(`
-    SELECT count(*)::int n,min(ts) first_at,max(ts) last_at
+    SELECT source,count(*)::int n,min(ts) first_at,max(ts) last_at
       FROM borg_events
      WHERE ts >= $1
        AND source IN ('heartbeat','flow_heartbeat')
        AND upper(COALESCE(level,''))='WARN'
        AND message LIKE 'STALE:%'
+     GROUP BY source
   `, [epochStart]);
-  const staleHeartbeats = staleHeartbeatRows[0] || { n: 0 };
+  const staleHeartbeats = {
+    n: staleHeartbeatRows.reduce((sum, row) => sum + finite(row.n, 0), 0),
+    first_at: staleHeartbeatRows.map((row) => row.first_at).filter(Boolean).sort()[0] || null,
+    last_at: staleHeartbeatRows.map((row) => row.last_at).filter(Boolean).sort().at(-1) || null,
+    by_source: staleHeartbeatRows,
+  };
   if (finite(staleHeartbeats.n, 0) > 0) {
     critical.push(`${staleHeartbeats.n} transient stale-feed heartbeat(s) in epoch`);
   }
@@ -507,11 +514,13 @@ async function assessEvidenceEpoch(pool, options = {}) {
   }
 
   const { rows: errorRows } = await pool.query(`
-    SELECT count(*)::int n
+    SELECT source,count(*)::int n
       FROM borg_events
      WHERE ts >= $1 AND upper(COALESCE(level,'')) IN ('ERROR','CRITICAL','FATAL')
+     GROUP BY source
   `, [epochStart]);
-  if (errorRows[0].n > 0) critical.push(`${errorRows[0].n} ERROR/CRITICAL event(s) in epoch`);
+  const errorEventCount = errorRows.reduce((sum, row) => sum + finite(row.n, 0), 0);
+  if (errorEventCount > 0) critical.push(`${errorEventCount} ERROR/CRITICAL event(s) in epoch`);
 
   const sequenceCounters = [];
   const errorCounters = [];
@@ -527,8 +536,11 @@ async function assessEvidenceEpoch(pool, options = {}) {
       } = row.data || {};
       counters = broadCaptureCounters;
     }
-    findCounters(counters, isGapCounter, [], sequenceCounters);
-    findCounters(counters, isErrorCounter, [], errorCounters);
+    const owner = row.component || row.source || 'unknown';
+    sequenceCounters.push(...findCounters(counters, isGapCounter)
+      .map((entry) => ({ ...entry, owner })));
+    errorCounters.push(...findCounters(counters, isErrorCounter)
+      .map((entry) => ({ ...entry, owner })));
   }
   if (sequenceCounters.length) {
     critical.push(`non-zero sequence-gap counters: ${sequenceCounters
@@ -592,6 +604,19 @@ async function assessEvidenceEpoch(pool, options = {}) {
   });
   critical.push(...parquet.critical);
 
+  const lanesCurrent = buildLaneEvidenceSnapshot({
+    nowMs, epochId: run.epoch_id, epochStart,
+    components, eventHeartbeats, flowHeartbeat, primaryClob, primaryRtds,
+    errorEvents: errorRows, staleHeartbeatSources: staleHeartbeatRows,
+    sequenceCounters, errorCounters, disk, minimumFreeGiB,
+    archive, offhostFailure,
+    offhostReport,
+    offhostReceiptValid: Boolean(offhostReceipt
+      && offhostReceipt.format === 'deltaforge-offhost-receipt-v1'
+      && offhostReceipt.latest_file && offhostReceipt.latest_file !== 'none'),
+    offhostAgeSec, maxOffhostAgeSec, parquet,
+  });
+
   const currentStatus = critical.length ? 'FAIL' : 'PASS';
   if (options.record === true) {
     await pool.query(`
@@ -599,12 +624,13 @@ async function assessEvidenceEpoch(pool, options = {}) {
         (epoch_id,checked_at,status,critical,warnings,metrics)
       VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)
     `, [run.epoch_id, now, currentStatus, JSON.stringify(critical), JSON.stringify(warnings),
-      JSON.stringify({ requirementsVersion: 'evidence-health-v3-feed-gaps', runId: run.run_id,
+      JSON.stringify({ requirementsVersion: 'evidence-health-v4-lane-scoped', runId: run.run_id,
         components: Object.fromEntries(
         Object.entries(components).map(([key, row]) => [key, {
           beatAt: row.beat_at, ageSeconds: ageSeconds(row.beat_at, nowMs),
         }]),
-      ), disk, parquet, staleHeartbeats, sequenceCounters, errorCounters })]);
+      ), disk, parquet, staleHeartbeats, errorEvents: errorRows,
+        sequenceCounters, errorCounters, lanes: lanesCurrent })]);
   }
 
   const { rows: coverageRows } = await pool.query(`
@@ -668,6 +694,59 @@ async function assessEvidenceEpoch(pool, options = {}) {
   if (parquet.healthy && !parquetBurnInComplete) {
     warnings.push(`${Math.max(0, parquetMinHours - parquetCleanHours).toFixed(2)} verified Parquet burn-in hour(s) remain`);
   }
+  const laneLookbackStart = new Date(Math.max(
+    epochStart.getTime(), nowMs - Math.max(48, minHours * 2) * 3_600_000,
+  ));
+  const { rows: laneSampleRows } = await pool.query(`
+    SELECT checked_at,metrics->'lanes' lanes
+      FROM borg_evidence_health_samples
+     WHERE epoch_id=$1 AND checked_at >= $2 AND checked_at <= $3
+       AND metrics ? 'lanes'
+     ORDER BY checked_at
+  `, [run.epoch_id, laneLookbackStart, now]);
+  const laneEvidence = {};
+  for (const laneId of Object.keys(LANE_DEFINITIONS)) {
+    const rows = laneSampleRows.map((row) => ({
+      checked_at: row.checked_at,
+      healthy: row.lanes?.[laneId]?.healthy === true,
+    }));
+    const lastRecordedMs = rows.at(-1)?.checked_at
+      ? new Date(rows.at(-1).checked_at).getTime() : NaN;
+    if (!Number.isFinite(lastRecordedMs) || Math.abs(lastRecordedMs - nowMs) > 1000) {
+      rows.push({ checked_at: now, healthy: lanesCurrent[laneId].healthy });
+    }
+    const suffix = latestContinuousHealthySuffix(rows, {
+      maxGapSec: FAST_COMPONENT_MAX_AGE_SEC,
+    });
+    const firstMs = suffix.first_sample_at
+      ? new Date(suffix.first_sample_at).getTime() : NaN;
+    const cleanHours = Number.isFinite(firstMs)
+      ? Math.max(0, (nowMs - firstMs) / 3_600_000) : 0;
+    const lastAge = ageSeconds(suffix.last_sample_at, nowMs);
+    const continuous = suffix.samples > 0 && lastAge != null && lastAge <= 120
+      && finite(suffix.max_gap_seconds, 0) <= 120;
+    const laneClean = lanesCurrent[laneId].healthy && continuous && cleanHours >= minHours;
+    laneEvidence[laneId] = {
+      ...lanesCurrent[laneId],
+      minCleanHours: minHours,
+      cleanHours: +cleanHours.toFixed(4),
+      samples: suffix.samples,
+      firstSampleAt: suffix.first_sample_at,
+      lastSampleAt: suffix.last_sample_at,
+      lastFailedAt: suffix.last_failed_at,
+      continuous,
+      laneClean,
+    };
+  }
+  for (const [laneId, lane] of Object.entries(laneEvidence)) {
+    const storageClean = laneId === 'storage' ? lane.laneClean : laneEvidence.storage.laneClean;
+    lane.promotionEligible = lane.laneClean && storageClean;
+    lane.status = !lane.healthy ? 'FAILED'
+      : lane.promotionEligible ? 'PASSED_24H_CLEAN' : 'PENDING_24H';
+    if (laneId !== 'storage' && !laneEvidence.storage.healthy) {
+      lane.sharedStorageBlocker = 'Storage lane is currently invalid';
+    }
+  }
   return {
     format: 'borg-evidence-epoch-v1',
     checkedAt: now.toISOString(),
@@ -709,6 +788,7 @@ async function assessEvidenceEpoch(pool, options = {}) {
     },
     critical,
     warnings,
+    lanes: laneEvidence,
     metrics: {
       components: Object.fromEntries(Object.entries(components).map(([key, row]) => [key, {
         beatAt: row.beat_at, ageSeconds: ageSeconds(row.beat_at, nowMs),
@@ -724,9 +804,11 @@ async function assessEvidenceEpoch(pool, options = {}) {
         latestFile: offhostReceipt?.latest_file || null,
         reportStatus: offhostReport?.status || null,
         reportFailedAt: offhostReport?.failedAt || null,
+        rawBacklog: offhostReport?.rawBacklog || null,
       },
       parquet,
       staleHeartbeats,
+      errorEvents: errorRows,
       sequenceCounters,
       errorCounters,
     },

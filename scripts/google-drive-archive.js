@@ -117,6 +117,21 @@ function stateMatches(entry, record, destination) {
     && /^[a-f0-9]{64}$/.test(String(entry.sha256 || ''));
 }
 
+function backlogSummary(records, state, destination, nowMs = Date.now()) {
+  const pending = records.filter((record) =>
+    !stateMatches(state.objects?.[record.id], record, destination));
+  const oldestMtimeMs = pending.reduce((oldest, record) =>
+    Math.min(oldest, Number(record.mtimeMs) || Infinity), Infinity);
+  return {
+    pendingFiles: pending.length,
+    pendingBytes: pending.reduce((sum, record) => sum + (Number(record.size) || 0), 0),
+    oldestPendingAt: Number.isFinite(oldestMtimeMs)
+      ? new Date(oldestMtimeMs).toISOString() : null,
+    oldestPendingAgeSec: Number.isFinite(oldestMtimeMs)
+      ? Math.max(0, (nowMs - oldestMtimeMs) / 1000) : 0,
+  };
+}
+
 function recordsFor(root, namespace, files, destination) {
   return files.flatMap((file) => {
     const stat = statIfPresent(file);
@@ -510,6 +525,7 @@ async function main(options = {}) {
     const rawComplete = rawRescan.length === allRecords.length
       && rawRescan.every((record) =>
         stateMatches(state.objects[record.id], record, destination));
+    report.rawBacklog = backlogSummary(rawRescan, state, destination);
     report.rawComplete = rawComplete;
     if (rawComplete && rawRescan.length) {
       const document = manifestDocument({
@@ -585,6 +601,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  backlogSummary,
   archiveReportFile,
   loadState,
   main,

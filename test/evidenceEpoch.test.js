@@ -269,7 +269,7 @@ test('evidence report distinguishes the immutable release from the collector fam
   assert.match(source, /codeVersion: run\.epoch_code_version/);
   assert.match(source, /collectorCodeVersion: run\.run_code_version/);
   assert.match(source, /transient stale-feed heartbeat\(s\) in epoch/);
-  assert.match(source, /requirementsVersion: 'evidence-health-v3-feed-gaps'/);
+  assert.match(source, /requirementsVersion: 'evidence-health-v4-lane-scoped'/);
   assert.match(source, /primary redundant CLOB coverage is/);
   assert.match(source, /primary redundant RTDS coverage is/);
   assert.match(source, /public-flow process is warming, stale or repeatedly restarting/);
