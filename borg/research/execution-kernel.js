@@ -33,7 +33,8 @@ function qualityGrade({ connectionGap, stateSource, stateAgeMs }) {
 function executionFidelity({ model, dataQualityGrade = 'F', fullDepth = false, queueReplay = false, exchangeAck = false }) {
   if (exchangeAck) return { fidelityLevel: 'L5', executionFidelityGrade: dataQualityGrade === 'F' ? 'F' : 'A' };
   if (model === 'full_event_book') return { fidelityLevel: 'L4', executionFidelityGrade: dataQualityGrade === 'F' ? 'F' : 'A' };
-  if (String(model || '').startsWith('event_order_') || queueReplay) {
+  if (String(model || '').startsWith('event_order_')
+      || String(model || '').startsWith('wal_arrival_') || queueReplay) {
     return { fidelityLevel: 'L3', executionFidelityGrade: dataQualityGrade === 'F' ? 'F' : (dataQualityGrade === 'A' ? 'A' : 'B') };
   }
   if (model === 'latency_1s' || fullDepth) {

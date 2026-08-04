@@ -22,6 +22,7 @@
     "research:h73-calibration": "node scripts/h73-calibration-train.js",
     "benchmark:infra": "node scripts/infra-benchmark.js",
     "replay:latency": "node scripts/borg-latency-replay.js",
+    "replay:wal-execution": "node scripts/wal-execution-replay.js",
     "replay:latency-sweep": "node scripts/latency-sweep.js",
     "archive:parquet": "node scripts/parquet-mirror.js",
     "archive:parquet-lake": "node scripts/parquet-lake.js compact",

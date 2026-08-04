@@ -32,6 +32,7 @@ const {
   qualityGrade,
   simulateTakerTouch,
 } = require('../research/execution-kernel');
+const { persistWalExecutionReplays } = require('../research/execution-replay');
 
 const GRID = { '05x': 0.5, '1x': 1, '2x': 2 };
 const PROMOTION_LATENCIES_MS = Object.freeze([100, 250, 500]);
@@ -43,12 +44,14 @@ async function ensureSchema() {
     SELECT to_regclass('borg_shadow_orders') IS NOT NULL AS orders_ready,
            to_regclass('borg_shadow_scores') IS NOT NULL AS scores_ready,
            to_regclass('borg_shadow_latency_scores') IS NOT NULL AS latency_scores_ready,
+           to_regclass('borg_shadow_execution_replays') IS NOT NULL AS execution_replays_ready,
            EXISTS (
              SELECT 1 FROM information_schema.columns
               WHERE table_name='borg_shadow_scores' AND column_name='simulator_version'
            ) AS score_contract_ready`);
   const state = rows[0] || {};
   if (!state.orders_ready || !state.scores_ready || !state.latency_scores_ready
+      || !state.execution_replays_ready
       || !state.score_contract_ready) await migrate();
 }
 
@@ -453,6 +456,7 @@ async function main() {
     // a transient failure then leaves the order eligible for a complete retry.
     // These rows never feed back into the signal, primary fill or order path.
     await persistLatencyCounterfactuals(o);
+    await persistWalExecutionReplays(pool, o);
     await pool.query(
       `INSERT INTO borg_shadow_scores (order_id, strategy, phase, market_id, filled, fill_ts, fill_price,
          fill_size, fair_5s, fair_30s, outcome, pnl_gross, pnl_05x, pnl_1x, pnl_2x, detail,

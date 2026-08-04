@@ -505,6 +505,32 @@ CREATE TABLE IF NOT EXISTS borg_shadow_latency_scores (
 );
 CREATE INDEX IF NOT EXISTS borg_shadow_latency_scores_profile
   ON borg_shadow_latency_scores (latency_ms, order_id);
+-- Versioned execution replays never overwrite the frozen primary score or the
+-- legacy latency table. The latest causal CLOB state must carry WAL provenance;
+-- missing tape is stored separately from a proved non-fill.
+CREATE TABLE IF NOT EXISTS borg_shadow_execution_replays (
+  order_id BIGINT NOT NULL REFERENCES borg_shadow_orders(id),
+  replay_version TEXT NOT NULL,
+  latency_ms INT NOT NULL,
+  scored_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  state_ts TIMESTAMPTZ,
+  state_source TEXT,
+  filled BOOLEAN NOT NULL,
+  fill_ts TIMESTAMPTZ,
+  fill_price REAL,
+  fill_size REAL,
+  pnl_gross REAL NOT NULL DEFAULT 0,
+  pnl_1x REAL NOT NULL DEFAULT 0,
+  pnl_2x REAL NOT NULL DEFAULT 0,
+  data_quality_grade TEXT NOT NULL,
+  execution_fidelity_grade TEXT NOT NULL,
+  fidelity_level TEXT NOT NULL,
+  execution_state TEXT NOT NULL,
+  detail JSONB NOT NULL DEFAULT '{}'::jsonb,
+  PRIMARY KEY (order_id, replay_version, latency_ms)
+);
+CREATE INDEX IF NOT EXISTS borg_shadow_execution_replays_profile
+  ON borg_shadow_execution_replays (replay_version,latency_ms,order_id);
 CREATE TABLE IF NOT EXISTS h53_live_orders (
   id BIGSERIAL PRIMARY KEY,
   shadow_order_id BIGINT UNIQUE NOT NULL REFERENCES borg_shadow_orders(id),
