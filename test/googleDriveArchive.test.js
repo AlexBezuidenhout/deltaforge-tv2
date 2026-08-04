@@ -29,10 +29,11 @@ test('Google Drive archive accepts only a least-privilege drive.file remote', (t
     'scope = drive.file',
     'token = {"refresh_token":"secret"}',
   ].join('\n'));
-  assert.deepEqual(validateRcloneConfig(config, 'deltaforge-gdrive'), {
-    type: 'drive',
-    scope: 'drive.file',
-  });
+  const valid = validateRcloneConfig(config, 'deltaforge-gdrive');
+  assert.equal(valid.type, 'drive');
+  assert.equal(valid.scope, 'drive.file');
+  assert.equal(valid.oauthClient.mode, 'SHARED_RCLONE');
+  assert.equal(valid.oauthClient.migrationRequired, true);
   fs.writeFileSync(config, [
     '[deltaforge-gdrive]',
     'type = drive',

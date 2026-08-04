@@ -113,9 +113,11 @@
         const archiveOk = archive.reportStatus === 'verified' && parquet.healthy === true;
         const batches = Number(parquet.verifiedBatches || 0);
         const pendingRaw = Number(archive.rawBacklog?.pendingFiles || 0);
+        const pendingResearch = Number(parquet.pendingContinuousSourceFiles ?? 0);
+        const bronzeRetained = Number(parquet.unmaterializedBronzeSourceFiles ?? 0);
         setRail('globalArchiveState', archiveOk ? 'ok' : 'failed',
           archiveOk ? 'Verified' : 'Attention',
-          archiveOk ? `Drive receipt · ${batches} Parquet batches · ${pendingRaw} raw pending`
+          archiveOk ? `Drive receipt · ${batches} Parquet batches · ${pendingRaw} upload pending · ${pendingResearch} research pending · ${bronzeRetained} bronze retained`
             : compact(parquet.critical?.[0] || 'Archive or Parquet verification missing', 50));
       } else {
         setRail('globalEvidenceState', 'warning', 'Sign in', 'Evidence report requires dashboard access');

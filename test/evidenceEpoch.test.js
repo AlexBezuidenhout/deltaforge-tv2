@@ -147,6 +147,9 @@ test('Parquet evidence requires recurrent remotely verified queryable batches', 
     'latest_batch=second',
     'compression=ZSTD',
     'remote_verification=google-drive-md5-via-rclone-check',
+    'pending_source_files=120',
+    'pending_scope_source_files=3',
+    'unmaterialized_bronze_source_files=117',
   ].join('\n'));
   fs.writeFileSync(path.join(dir, 'last-report.json'), JSON.stringify({
     format: 'deltaforge-parquet-lake-run-v1', status: 'verified', pendingSourceFiles: 12,
@@ -163,6 +166,9 @@ test('Parquet evidence requires recurrent remotely verified queryable batches', 
   assert.equal(report.sourceFiles, 2);
   assert.equal(report.rows, 20);
   assert.equal(report.latestBatch, 'second');
+  assert.equal(report.pendingSourceFiles, 120);
+  assert.equal(report.pendingContinuousSourceFiles, 3);
+  assert.equal(report.unmaterializedBronzeSourceFiles, 117);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

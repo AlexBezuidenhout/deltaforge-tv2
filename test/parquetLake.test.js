@@ -88,6 +88,8 @@ test('raw selection can materialize an audited source/date window oldest first',
   assert.deepEqual(selected.records.map((row) => row.id), ['oldest', 'newest']);
   assert.equal(selected.remaining, 0);
   assert.equal(selected.globalRemaining, 2);
+  assert.equal(selected.bronzeRemaining, 2);
+  assert.equal(selected.scopeEligible, 2);
   assert.deepEqual(selected.scope, {
     sources: ['binance'], from: '2026-08-02', to: '2026-08-02', order: 'oldest',
   });

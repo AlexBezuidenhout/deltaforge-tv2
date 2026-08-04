@@ -285,6 +285,11 @@ function selectVerifiedRawObjects(rawState, lakeState, options = {}) {
     bytes,
     remaining: Math.max(0, candidates.length - selected.length),
     globalRemaining: Math.max(0, globallyEligible - selected.length),
+    // Continuous compaction intentionally scopes itself to compact decision
+    // and proof streams. Files outside that scope are immutable bronze, not a
+    // failed operational backlog. Keep both quantities explicit.
+    bronzeRemaining: Math.max(0, globallyEligible - candidates.length),
+    scopeEligible: candidates.length,
     eligible: candidates.length,
     scope: {
       sources: sources ? [...sources].sort() : null,
@@ -685,6 +690,7 @@ function receiptText(batch, pending, options = {}) {
     `parquet_files=${parquetFiles}`,
     `pending_source_files=${pending}`,
     `pending_scope_source_files=${Number(options.pendingScopeSourceFiles ?? pending)}`,
+    `unmaterialized_bronze_source_files=${Number(options.unmaterializedBronzeSourceFiles ?? 0)}`,
     `selection_scope=${JSON.stringify(options.selectionScope || {
       sources: null, from: null, to: null, order: 'newest',
     })}`,
@@ -772,6 +778,7 @@ async function compactFromGoogle(options = {}) {
     if (prior) {
       writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.globalRemaining, {
         pendingScopeSourceFiles: selection.remaining,
+        unmaterializedBronzeSourceFiles: selection.bronzeRemaining,
         selectionScope: selection.scope,
         rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
       }), 0o644);
@@ -782,6 +789,7 @@ async function compactFromGoogle(options = {}) {
       latestVerifiedBatch: prior?.batchHash || null,
       pending: selection.globalRemaining,
       pendingScopeSourceFiles: selection.remaining,
+      unmaterializedBronzeSourceFiles: selection.bronzeRemaining,
       selection: selection.scope,
       rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
     };
@@ -833,6 +841,7 @@ async function compactFromGoogle(options = {}) {
       if (prior) {
         writeAtomic(receiptFile(env, stateRoot), receiptText(prior, selection.globalRemaining, {
           pendingScopeSourceFiles: selection.remaining,
+          unmaterializedBronzeSourceFiles: selection.bronzeRemaining,
           selectionScope: selection.scope,
           rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
         }), 0o644);
@@ -847,6 +856,7 @@ async function compactFromGoogle(options = {}) {
         rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
         pendingSourceFiles: selection.globalRemaining,
         pendingScopeSourceFiles: selection.remaining,
+        unmaterializedBronzeSourceFiles: selection.bronzeRemaining,
         selection: selection.scope,
       };
       writeAtomic(path.join(stateRoot, 'last-report.json'), `${JSON.stringify(report, null, 2)}\n`, 0o600);
@@ -879,6 +889,7 @@ async function compactFromGoogle(options = {}) {
     writeAtomic(receiptFile(env, stateRoot),
       receiptText(batch, selection.globalRemaining, {
         pendingScopeSourceFiles: selection.remaining,
+        unmaterializedBronzeSourceFiles: selection.bronzeRemaining,
         selectionScope: selection.scope,
         rejectedSourceFilesTotal: Object.keys(lakeState.rejectedSources || {}).length,
       }), 0o644);
@@ -900,6 +911,7 @@ async function compactFromGoogle(options = {}) {
       parquetBytes: batch.outputs.reduce((sum, row) => sum + row.bytes, 0),
       pendingSourceFiles: selection.globalRemaining,
       pendingScopeSourceFiles: selection.remaining,
+      unmaterializedBronzeSourceFiles: selection.bronzeRemaining,
       selection: selection.scope,
       remote: remoteResult,
       hotPrune: prune,

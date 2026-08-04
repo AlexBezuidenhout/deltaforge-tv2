@@ -260,6 +260,18 @@ function assessParquetLake(options = {}) {
       receipt?.pending_source_files ?? report?.pendingSourceFiles ?? report?.pending,
       null,
     ),
+    pendingContinuousSourceFiles: finite(
+      receipt?.pending_scope_source_files
+        ?? report?.pendingScopeSourceFiles
+        ?? report?.pendingSourceFiles
+        ?? report?.pending,
+      null,
+    ),
+    unmaterializedBronzeSourceFiles: finite(
+      receipt?.unmaterialized_bronze_source_files
+        ?? report?.unmaterializedBronzeSourceFiles,
+      null,
+    ),
   };
 }
 

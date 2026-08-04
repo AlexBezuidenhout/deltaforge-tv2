@@ -88,7 +88,25 @@ function validateRcloneConfig(file, remote) {
     throw new Error(`${remote} must use least-privilege scope drive.file`);
   }
   if (!values.token) throw new Error(`${remote} has no OAuth token`);
-  return { type: values.type, scope: values.scope };
+  return {
+    type: values.type,
+    scope: values.scope,
+    oauthClient: googleDriveClientPolicy(values),
+  };
+}
+
+function googleDriveClientPolicy(values = {}) {
+  const customId = Boolean(String(values.client_id || '').trim());
+  const customSecret = Boolean(String(values.client_secret || '').trim());
+  const custom = customId && customSecret;
+  return {
+    mode: custom ? 'CUSTOM' : 'SHARED_RCLONE',
+    customClientIdConfigured: customId,
+    customClientSecretConfigured: customSecret,
+    migrationRequired: !custom,
+    warning: custom ? null
+      : 'The shared rclone Google Drive OAuth client is being retired during 2026; configure a private client_id and client_secret.',
+  };
 }
 
 function loadState(file) {
@@ -438,7 +456,7 @@ async function main(options = {}) {
   const account = String(env.GDRIVE_ACCOUNT_LABEL || '').trim();
   if (!account) throw new Error('GDRIVE_ACCOUNT_LABEL is required');
   const configFile = env.GDRIVE_RCLONE_CONFIG || DEFAULT_CONFIG;
-  validateRcloneConfig(configFile, remote);
+  const configPolicy = validateRcloneConfig(configFile, remote);
   const rcloneBinary = env.GDRIVE_RCLONE_BINARY || '/usr/local/bin/rclone';
   if (!fs.existsSync(rcloneBinary)) throw new Error(`rclone is missing: ${rcloneBinary}`);
   const destination = `gdrive://${account}/${prefix}`;
@@ -482,6 +500,7 @@ async function main(options = {}) {
     transferredBytes: 0,
     receiptPublished: false,
     snapshotReceiptPublished: false,
+    oauthClient: configPolicy.oauthClient,
   };
   try {
     const pendingRaw = allRecords.filter((record) =>
@@ -608,6 +627,7 @@ module.exports = {
   manifestDocument,
   parseCombinedReport,
   parseIniSection,
+  googleDriveClientPolicy,
   positiveInt,
   receiptText,
   recordsFor,
