@@ -1,0 +1,12 @@
+[Unit]
+Description=Run DeltaForge research evidence reports every six hours
+
+[Timer]
+OnBootSec=20min
+OnCalendar=*-*-* 00,06,12,18:20:00
+AccuracySec=2min
+Persistent=true
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

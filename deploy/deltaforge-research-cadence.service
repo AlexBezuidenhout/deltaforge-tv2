@@ -1,0 +1,35 @@
+[Unit]
+Description=Generate immutable DeltaForge six-hour research cadence reports
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/deltaforge/tv2.env
+
+[Service]
+Type=oneshot
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/var/lib/deltaforge/research-tools/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=-/etc/deltaforge/google-drive-archive.env
+Environment=NODE_ENV=production
+Environment=DELTAFORGE_RESEARCH_REPORT_DIR=/var/lib/deltaforge/research-reports
+StateDirectory=deltaforge/research-reports
+StateDirectoryMode=0700
+# Live coverage is diagnostic-only and never mutates SQL or registers an arm.
+# A transient venue outage must not suppress the epoch execution report.
+ExecStart=-/usr/local/bin/node scripts/options-exact-expiry-coverage.js --persist
+ExecStart=/usr/local/bin/node scripts/research-cadence-report.js --persist
+TimeoutStartSec=10min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/deltaforge/research-reports
+
+[Install]
+WantedBy=multi-user.target

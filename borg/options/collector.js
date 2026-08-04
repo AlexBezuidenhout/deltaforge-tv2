@@ -990,6 +990,7 @@ module.exports = {
   DB_SAMPLE_MS, DIAGNOSTIC_HEARTBEAT_MS, EXECUTABLE_HEARTBEAT_MS,
   MARK_TRANSITION_DWELL_MS, OPTIONS_EXPERIMENT_ID, REQUIRE_EXACT_EXPIRY,
   OptionsObserver, classifyExecutionBarrier, feeMetadata, fetchIndexPrice,
+  fetchInstruments,
   fetchThresholdEvents, isRetryableDbError, listedCallExpiries, loadTargets,
   resolverFeed, retryTransientDb, syncPolymarketSubscriptions,
 };
