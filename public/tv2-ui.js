@@ -95,10 +95,12 @@
         const epochId = evidence.epoch?.id || 'No active epoch';
         const blockers = Array.isArray(evidence.critical) ? evidence.critical : [];
         const remaining = Array.isArray(evidence.warnings) ? evidence.warnings[0] : null;
+        const laneValues = Object.values(evidence.lanes || {});
+        const healthyLanes = laneValues.filter((lane) => lane.healthy === true).length;
         setRail('globalEvidenceState', failed ? 'failed' : passed ? 'ok' : 'warning',
           failed ? 'Invalid' : passed ? '24h clean' : 'Collecting',
           failed ? `${compact(epochId, 24)} · ${blockers.length} blocker${blockers.length === 1 ? '' : 's'}`
-            : `${compact(epochId, 24)}${remaining ? ` · ${compact(remaining, 27)}` : ''}`);
+            : `${compact(epochId, 24)} · ${healthyLanes}/${laneValues.length || 0} lanes valid${remaining ? ` · ${compact(remaining, 20)}` : ''}`);
 
         const free = Number(evidence.metrics?.disk?.freeGiB);
         const storageState = Number.isFinite(free) ? (free < 30 ? 'failed' : free < 40 ? 'warning' : 'ok') : 'failed';
@@ -110,9 +112,10 @@
         const parquet = evidence.metrics?.parquet || {};
         const archiveOk = archive.reportStatus === 'verified' && parquet.healthy === true;
         const batches = Number(parquet.verifiedBatches || 0);
+        const pendingRaw = Number(archive.rawBacklog?.pendingFiles || 0);
         setRail('globalArchiveState', archiveOk ? 'ok' : 'failed',
           archiveOk ? 'Verified' : 'Attention',
-          archiveOk ? `Drive receipt · ${batches} Parquet batches`
+          archiveOk ? `Drive receipt · ${batches} Parquet batches · ${pendingRaw} raw pending`
             : compact(parquet.critical?.[0] || 'Archive or Parquet verification missing', 50));
       } else {
         setRail('globalEvidenceState', 'warning', 'Sign in', 'Evidence report requires dashboard access');

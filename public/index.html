@@ -1969,7 +1969,7 @@
         <table>
           <thead><tr>
             <th>Time</th><th>Strategy</th><th>Action</th><th>Side</th><th>Px</th><th>Size</th>
-            <th>TTE</th><th>Queue</th><th>Filled</th><th>Quality</th><th>Fidelity</th><th>PnL 1×</th><th>Note</th>
+            <th>TTE</th><th>Queue</th><th>Execution</th><th>Quality</th><th>Fidelity</th><th>PnL 1×</th><th>Note</th>
           </tr></thead>
           <tbody id="borgOrdersBody"><tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:18px;">No shadow orders yet</td></tr></tbody>
         </table>
@@ -3508,8 +3508,16 @@
     document.getElementById('cvStatusSubtitle').textContent = (status.evidenceBlocker || ('Polymarket WebSocket + Kalshi ' + (status.contract?.kalshiTransport || 'public_batch_rest') + ' · deterministic payoff relations · $500 depth-optimized sizing · orders non-atomic')) + cvUniverseHealth + ' · refreshed ' + new Date().toLocaleTimeString();
     document.getElementById('cvPolyMarkets').textContent = runtime.poly_markets ?? 0;
     document.getElementById('cvKalshiMarkets').textContent = runtime.kalshi_markets ?? 0;
-    document.getElementById('cvCandidates').textContent = (status.exactRuleCoverage?.paperEligibleExact ?? 0) + ' enrolled / ' + (status.exactRuleCoverage?.exactRulePairs ?? 0) + ' exact / ' + (status.exactRuleCoverage?.hardVetoes ?? 0) + ' vetoed';
-    document.getElementById('cvMonitored').textContent = (matches.total ?? runtime.candidates ?? 0) + ' discovered · ' + (status.exactRuleCoverage?.feeSupported ?? 0) + ' fees certified · ' + (runtime.monitored_matches ?? 0) + ' monitored';
+    const cvFunnel = status.exactRuleCoverage || {};
+    document.getElementById('cvCandidates').textContent = (cvFunnel.candidates ?? 0) +
+      ' candidates → ' + (cvFunnel.exactRulePairs ?? 0) + ' exact → ' +
+      (cvFunnel.paperEligibleExact ?? 0) + ' enrolled';
+    const topMismatch = (cvFunnel.mismatchReasons || [])[0];
+    document.getElementById('cvMonitored').textContent =
+      (cvFunnel.synchronizedExactObservations ?? 0) + ' synced exact → ' +
+      (cvFunnel.fullDepthExactObservations ?? 0) + ' full-depth → ' +
+      (cvFunnel.paperEntries ?? 0) + ' entries' +
+      (topMismatch ? ' · top veto ' + topMismatch.reason + ' (' + topMismatch.pairs + ')' : '');
     document.getElementById('cvEpisodes').textContent = activity.relation_events ?? 0;
     document.getElementById('cvLockable').textContent = (activity.ever_economic ?? 0) + ' ever economic · ' + (activity.disappeared ?? 0) + ' disappeared';
 
@@ -3713,6 +3721,23 @@
     const label = String(lifecycle || 'PAUSED').toUpperCase();
     return '<span class="borg-lifecycle ' + label.toLowerCase() + '">' + escapeHtml(label) + '</span>';
   };
+  const _bExecutionBadge = (state, detail = '') => {
+    const value = String(state || 'PENDING').toUpperCase();
+    const labels = {
+      ELIGIBLE_FILL: ['eligible fill', 'var(--green)'],
+      PROVEN_NONFILL: ['proved non-fill', 'var(--text-muted)'],
+      UNSCOREABLE_TAPE: ['missing tape', 'var(--danger)'],
+      UNSCOREABLE_PROVENANCE: ['missing provenance', 'var(--danger)'],
+      INVALID_CONNECTION_GAP: ['connection gap', 'var(--danger)'],
+      LOW_QUALITY: ['low quality', 'var(--yellow)'],
+      NOT_APPLICABLE: ['—', 'var(--text-muted)'],
+      PENDING: ['pending', 'var(--text-muted)'],
+    };
+    const [label, color] = labels[value]
+      || [value.replaceAll('_', ' ').toLowerCase(), 'var(--yellow)'];
+    return '<span title="' + escapeHtml(detail) + '" style="color:' + color +
+      ';font-weight:700;">' + escapeHtml(label) + '</span>';
+  };
   const _bDiagnosticObject = (value) => {
     const raw = value?.diagnostics ?? value ?? {};
     if (raw && typeof raw === 'object') return raw;
@@ -3907,7 +3932,10 @@
         pnlCell(row.eligible_pnl_2x, historicalFills,
           'Historical diagnostic only · ' + historicalFills + ' eligible fills / ' + number(row, 'eligible_markets') + ' markets') +
         '<td>' + (quality == null ? '—' : quality + '%') +
-          '<div class="borg-cell-sub">quality · fidelity ' + (fidelity == null ? '—' : fidelity + '%') + '</div></td>' +
+          '<div class="borg-cell-sub">quality · fidelity ' + (fidelity == null ? '—' : fidelity + '%') + '</div>' +
+          '<div class="borg-cell-sub">WAL ' + number(row, 'wal_eligible_fills') + ' fill · ' +
+            number(row, 'wal_proven_nonfills') + ' no-fill · ' +
+            number(row, 'wal_unscoreable') + ' unscoreable</div></td>' +
         '<td class="borg-activity">' + _bAgeFromDate(row.last_activity_at) +
           '<div class="borg-cell-sub">order ' + _bAgeFromDate(row.latest) + '</div>' +
           '<div class="borg-cell-sub">deployed ' + _bAgeFromDate(row.deployed_at) + '</div></td>' +
@@ -3933,6 +3961,7 @@
     const runtime = data.runtime || {};
     const evidence = data.evidence || {};
     const halves = data.chronologicalHalves || {};
+    const executionReplay = data.executionReplay || [];
     const markets = Number(evidence.independent_markets ?? summaryRow?.current_eligible_markets ?? 0);
     const fills = Number(evidence.eligible_fills ?? summaryRow?.current_eligible_fills ?? 0);
     const days = Number(evidence.utc_days || 0);
@@ -3967,13 +3996,30 @@
       '<tr><td>' + escapeHtml(row.experiment_id) + '</td><td>' + escapeHtml(String(row.status || '—').replaceAll('_', ' ')) +
       '</td><td>' + escapeHtml(row.phase || '—') + '</td><td>' + _bDateTime(row.frozen_at) + '</td></tr>').join('')
       : emptyRows(4, 'No registered experiment history');
-    const recentRows = (data.recent || []).length ? data.recent.map((row) =>
-      '<tr><td>' + new Date(row.ts).toLocaleTimeString() + '</td><td>' + escapeHtml(row.asset || '—') +
-      '</td><td>' + escapeHtml((row.action || '—') + ' ' + (row.token || '')) + '</td><td>' +
-      (row.price == null ? '—' : Number(row.price).toFixed(3)) + '</td><td>' +
-      (row.filled == null ? 'pending' : row.filled ? 'filled' : 'no fill') + '</td><td style="color:' +
-      _bPnlColor(Number(row.pnl_2x || 0)) + ';">' + (row.pnl_2x == null ? '—' : _bMoney(Number(row.pnl_2x))) +
-      '</td></tr>').join('') : emptyRows(6, 'No orders in the current frozen cohort');
+    const recentRows = (data.recent || []).length ? data.recent.map((row) => {
+      const executionState = row.wal_execution_state || row.primary_execution_state || 'PENDING';
+      const executionDetail = row.wal_execution_state
+        ? 'WAL replay at ' + row.wal_latency_ms + 'ms · quality ' +
+          (row.wal_data_quality_grade || '—') + '/' +
+          (row.wal_execution_fidelity_grade || '—')
+        : 'Frozen primary score';
+      return '<tr><td>' + new Date(row.ts).toLocaleTimeString() + '</td><td>' +
+        escapeHtml(row.asset || '—') + '</td><td>' +
+        escapeHtml((row.action || '—') + ' ' + (row.token || '')) + '</td><td>' +
+        (row.price == null ? '—' : Number(row.price).toFixed(3)) + '</td><td>' +
+        _bExecutionBadge(executionState, executionDetail) + '</td><td style="color:' +
+        _bPnlColor(Number(row.pnl_2x || 0)) + ';">' +
+        (row.pnl_2x == null ? '—' : _bMoney(Number(row.pnl_2x))) + '</td></tr>';
+    }).join('') : emptyRows(6, 'No orders in the current frozen cohort');
+    const replayRows = executionReplay.length ? executionReplay.map((row) =>
+      '<tr><td>' + Number(row.latency_ms) + 'ms</td><td>' + Number(row.intents || 0) +
+      '</td><td style="color:var(--green);">' + Number(row.eligible_fills || 0) +
+      '</td><td>' + Number(row.proven_nonfills || 0) +
+      '</td><td style="color:var(--danger);">' + Number(row.unscoreable || 0) +
+      '</td><td style="color:var(--yellow);">' + Number(row.low_quality || 0) +
+      '</td><td style="color:' + _bPnlColor(Number(row.pnl_2x || 0)) + ';">' +
+      _bMoney(Number(row.pnl_2x || 0)) + '</td></tr>').join('')
+      : emptyRows(7, 'No immutable WAL-arrival replay rows exist for this fresh cohort yet');
 
     const prior = data.priorOutcome
       ? '<div class="borg-dossier-card"><div class="borg-dossier-label">Earlier version / concentration warning</div>' +
@@ -4011,6 +4057,16 @@
         '<div class="borg-dossier-copy muted" style="margin-top:8px;">' + fills + ' eligible fills · first observation ' +
           escapeHtml(_bDateTime(evidence.first_observation_at)) + ' · last ' + escapeHtml(_bDateTime(evidence.last_observation_at)) + '</div>' +
       '</section>' +
+      '<section class="borg-dossier-section"><div class="borg-dossier-label">Execution evidence funnel</div>' +
+        '<div class="borg-dossier-grid">' +
+          metric('Intended places', String(Number(evidence.places || 0))) +
+          metric('Primary eligible fills', String(fills), 'var(--green)') +
+          metric('Proved non-fills', String(Number(evidence.proven_nonfills || 0))) +
+          metric('Missing / unscoreable tape', String(Number(evidence.unscoreable_tape || 0)),
+            Number(evidence.unscoreable_tape || 0) ? 'var(--danger)' : '') +
+        '</div><div class="borg-dossier-copy muted" style="margin-top:8px;">A proved non-fill has valid A/B tape showing the quote or capacity was unavailable. Missing tape is not a non-fill and contributes no P&amp;L.</div>' +
+        '<div style="overflow:auto;margin-top:10px;"><table class="borg-dossier-table"><thead><tr><th>Arrival</th><th>Intents</th><th>Eligible fills</th><th>Proved no-fill</th><th>Unscoreable</th><th>Low quality</th><th>2× P&amp;L</th></tr></thead><tbody>' +
+          replayRows + '</tbody></table></div></section>' +
       '<section class="borg-dossier-section"><div class="borg-dossier-columns">' +
         '<div class="borg-dossier-card"><div class="borg-dossier-label">' + (lifecycle === 'DEAD' ? 'Why the exact rule failed' : 'Current disposition') + '</div>' +
           '<div class="borg-dossier-copy">' + escapeHtml(data.outcome || summaryRow?.outcome || 'No decision yet.') + '</div></div>' +
@@ -4283,8 +4339,9 @@
       } else {
         ob.innerHTML = orders.map((o) => {
           const t = new Date(o.ts).toLocaleTimeString();
-          const filled = o.filled == null ? '<span style="color:var(--text-muted);">pending</span>'
-            : o.filled ? '<span style="color:var(--green);">yes</span>' : '<span style="color:var(--text-muted);">no</span>';
+          const executionDetail = (o.execution_evidence_source || 'unscored') +
+            (o.replay_latency_ms == null ? '' : ' · ' + o.replay_latency_ms + 'ms');
+          const execution = _bExecutionBadge(o.execution_state, executionDetail);
           return '<tr>' +
             '<td style="color:var(--text-muted);">' + t + '</td>' +
             '<td>' + escapeHtml(o.strategy) + '</td>' +
@@ -4294,9 +4351,9 @@
             '<td>' + (o.size != null ? Number(o.size).toFixed(1) : '—') + '</td>' +
             '<td>' + (o.tte_sec != null ? Math.round(o.tte_sec) + 's' : '—') + '</td>' +
             '<td>' + (o.queue_ahead != null ? Number(o.queue_ahead).toFixed(0) : '—') + '</td>' +
-            '<td>' + (o.action === 'place' ? filled : '') + '</td>' +
-            '<td>' + escapeHtml(o.data_quality_grade || '—') + '</td>' +
-            '<td title="' + escapeHtml(o.fidelity_level || '') + '">' + escapeHtml(o.execution_fidelity_grade || '—') + '</td>' +
+            '<td>' + (o.action === 'place' ? execution : '') + '</td>' +
+            '<td>' + escapeHtml(o.replay_data_quality_grade || o.data_quality_grade || '—') + '</td>' +
+            '<td title="' + escapeHtml(o.fidelity_level || '') + '">' + escapeHtml(o.replay_execution_fidelity_grade || o.execution_fidelity_grade || '—') + '</td>' +
             '<td style="color:' + _bPnlColor(o.pnl_1x) + ';">' + (o.pnl_1x != null ? _bMoney(o.pnl_1x) : '') + '</td>' +
             '<td style="color:var(--text-muted);">' + escapeHtml(o.note || '') + '</td>' +
             '</tr>';

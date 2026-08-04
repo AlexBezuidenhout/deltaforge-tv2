@@ -460,6 +460,27 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
           count(s.order_id) FILTER (WHERE s.data_quality_grade='F')::int quality_f,
           count(s.order_id) FILTER (WHERE s.execution_fidelity_grade IN ('A','B'))::int fidelity_ab,
           count(s.order_id) FILTER (WHERE s.execution_fidelity_grade='F')::int fidelity_f,
+          count(s.order_id) FILTER (
+            WHERE NOT s.filled
+              AND s.data_quality_grade IN ('A','B')
+              AND s.execution_fidelity_grade IN ('A','B')
+          )::int proven_nonfills,
+          count(s.order_id) FILTER (
+            WHERE s.detail @> '{"latency_tape_missing":true}'::jsonb
+          )::int unscoreable_tape,
+          count(wr.order_id) FILTER (
+            WHERE wr.execution_state='ELIGIBLE_FILL'
+          )::int wal_eligible_fills,
+          count(wr.order_id) FILTER (
+            WHERE wr.execution_state='PROVEN_NONFILL'
+          )::int wal_proven_nonfills,
+          count(wr.order_id) FILTER (
+            WHERE wr.execution_state LIKE 'UNSCOREABLE%'
+               OR wr.execution_state='INVALID_CONNECTION_GAP'
+          )::int wal_unscoreable,
+          count(wr.order_id) FILTER (
+            WHERE wr.execution_state='LOW_QUALITY'
+          )::int wal_low_quality,
           min(o.ts) first_seen,
           max(o.ts) latest,
           lt.status trial_status,
@@ -477,6 +498,12 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
           ae.epoch_started_at current_epoch_started_at
         FROM borg_shadow_orders o
         LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
+        LEFT JOIN borg_shadow_execution_replays wr
+          ON wr.order_id=o.id
+         AND wr.replay_version='borg-wal-arrival-v3'
+         AND wr.latency_ms=CASE
+           WHEN o.features->>'execution_model'='latency_1s' THEN 1250
+           ELSE 250 END
         LEFT JOIN latest_trial lt ON lt.strategy=o.strategy
         LEFT JOIN active_epoch ae ON true
         WHERE o.features->>'research_capital_version' = $1
@@ -531,6 +558,8 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
         'fills_24h', 'markets_24h', 'pnl_1x_24h', 'pnl_2x_24h',
         'fills_3d', 'markets_3d', 'pnl_1x_3d', 'pnl_2x_3d',
         'quality_ab', 'quality_f', 'fidelity_ab', 'fidelity_f',
+        'proven_nonfills', 'unscoreable_tape', 'wal_eligible_fills',
+        'wal_proven_nonfills', 'wal_unscoreable', 'wal_low_quality',
       ];
       const byStrategy = new Map();
       for (const row of rows) {
@@ -673,6 +702,7 @@ router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
           byDay: [],
           byAsset: [],
           recent: [],
+          executionReplay: [],
         };
         if (!trial || !epoch) return response;
 
@@ -697,7 +727,8 @@ router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
           AND COALESCE(o.available_at,o.ts)>=$6
           AND o.features->>'research_capital_version'=$7
         `;
-        const [evidenceResult, halvesResult, dayResult, assetResult, recentResult] = await Promise.all([
+        const [evidenceResult, halvesResult, dayResult, assetResult, recentResult,
+          replayResult] = await Promise.all([
           client.query(`
             SELECT count(*) FILTER (WHERE o.action='place')::int places,
                    count(*) FILTER (WHERE o.action='cancel')::int cancels,
@@ -708,6 +739,18 @@ router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
                        AND s.data_quality_grade IN ('A','B')
                        AND s.execution_fidelity_grade IN ('A','B')
                    )::int eligible_fills,
+                   count(*) FILTER (
+                     WHERE s.order_id IS NOT NULL AND NOT s.filled
+                       AND s.data_quality_grade IN ('A','B')
+                       AND s.execution_fidelity_grade IN ('A','B')
+                   )::int proven_nonfills,
+                   count(*) FILTER (
+                     WHERE s.detail @> '{"latency_tape_missing":true}'::jsonb
+                   )::int unscoreable_tape,
+                   count(*) FILTER (
+                     WHERE s.order_id IS NOT NULL AND s.data_quality_grade='F'
+                       AND NOT (s.detail @> '{"latency_tape_missing":true}'::jsonb)
+                   )::int invalid_or_missing_provenance,
                    count(DISTINCT o.market_id) FILTER (
                      WHERE s.filled
                        AND s.data_quality_grade IN ('A','B')
@@ -783,11 +826,51 @@ router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
                    o.price::float price,o.size::float size,o.tte_sec::float tte_sec,
                    o.order_kind,o.features->>'note' note,o.features->>'asset' asset,
                    s.filled,s.pnl_1x::float pnl_1x,s.pnl_2x::float pnl_2x,
-                   s.data_quality_grade,s.execution_fidelity_grade
+                   s.data_quality_grade,s.execution_fidelity_grade,
+                   CASE
+                     WHEN s.order_id IS NULL THEN 'PENDING'
+                     WHEN s.filled AND s.data_quality_grade IN ('A','B')
+                       AND s.execution_fidelity_grade IN ('A','B') THEN 'ELIGIBLE_FILL'
+                     WHEN NOT s.filled AND s.data_quality_grade IN ('A','B')
+                       AND s.execution_fidelity_grade IN ('A','B') THEN 'PROVEN_NONFILL'
+                     WHEN s.detail @> '{"latency_tape_missing":true}'::jsonb THEN 'UNSCOREABLE_TAPE'
+                     WHEN s.detail @> '{"connection_gap":true}'::jsonb THEN 'INVALID_CONNECTION_GAP'
+                     ELSE 'LOW_QUALITY'
+                   END primary_execution_state,
+                   wr.execution_state wal_execution_state,
+                   wr.latency_ms wal_latency_ms,
+                   wr.data_quality_grade wal_data_quality_grade,
+                   wr.execution_fidelity_grade wal_execution_fidelity_grade
               FROM borg_shadow_orders o
               LEFT JOIN borg_shadow_scores s ON s.order_id=o.id
+              LEFT JOIN borg_shadow_execution_replays wr
+                ON wr.order_id=o.id
+               AND wr.replay_version='borg-wal-arrival-v3'
+               AND wr.latency_ms=CASE
+                 WHEN o.features->>'execution_model'='latency_1s' THEN 1250
+                 ELSE 250 END
              WHERE ${cohortWhere}
              ORDER BY o.id DESC LIMIT 12
+          `, cohortParams),
+          client.query(`
+            SELECT wr.latency_ms,
+                   count(*)::int intents,
+                   count(*) FILTER (WHERE wr.execution_state='ELIGIBLE_FILL')::int eligible_fills,
+                   count(*) FILTER (WHERE wr.execution_state='PROVEN_NONFILL')::int proven_nonfills,
+                   count(*) FILTER (WHERE wr.execution_state LIKE 'UNSCOREABLE%'
+                     OR wr.execution_state='INVALID_CONNECTION_GAP')::int unscoreable,
+                   count(*) FILTER (WHERE wr.execution_state='LOW_QUALITY')::int low_quality,
+                   count(DISTINCT o.market_id) FILTER (
+                     WHERE wr.execution_state='ELIGIBLE_FILL')::int filled_markets,
+                   COALESCE(sum(wr.pnl_1x) FILTER (
+                     WHERE wr.execution_state='ELIGIBLE_FILL'),0)::float pnl_1x,
+                   COALESCE(sum(wr.pnl_2x) FILTER (
+                     WHERE wr.execution_state='ELIGIBLE_FILL'),0)::float pnl_2x
+              FROM borg_shadow_orders o
+              JOIN borg_shadow_execution_replays wr ON wr.order_id=o.id
+             WHERE ${cohortWhere}
+               AND wr.replay_version='borg-wal-arrival-v3'
+             GROUP BY wr.latency_ms ORDER BY wr.latency_ms
           `, cohortParams),
         ]);
         response.evidence = evidenceResult.rows[0] || null;
@@ -795,6 +878,7 @@ router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
         response.byDay = dayResult.rows;
         response.byAsset = assetResult.rows;
         response.recent = recentResult.rows;
+        response.executionReplay = replayResult.rows;
         return response;
       } finally {
         client.release();
@@ -966,9 +1050,33 @@ router.get('/shadow/orders', authMiddleware, async (req, res) => {
                o.experiment_id, o.arm, o.latency_profile,
                o.features->>'note' AS note,
                s.filled, s.fill_size, s.pnl_1x, s.outcome,
-               s.data_quality_grade, s.execution_fidelity_grade, s.fidelity_level
+               s.data_quality_grade, s.execution_fidelity_grade, s.fidelity_level,
+               s.detail AS score_detail,
+               CASE
+                 WHEN o.action<>'place' THEN 'NOT_APPLICABLE'
+                 WHEN s.order_id IS NULL THEN 'PENDING'
+                 WHEN wr.order_id IS NOT NULL THEN wr.execution_state
+                 WHEN s.filled AND s.data_quality_grade IN ('A','B')
+                   AND s.execution_fidelity_grade IN ('A','B') THEN 'ELIGIBLE_FILL'
+                 WHEN NOT s.filled AND s.data_quality_grade IN ('A','B')
+                   AND s.execution_fidelity_grade IN ('A','B') THEN 'PROVEN_NONFILL'
+                 WHEN s.detail @> '{"latency_tape_missing":true}'::jsonb THEN 'UNSCOREABLE_TAPE'
+                 WHEN s.detail @> '{"connection_gap":true}'::jsonb THEN 'INVALID_CONNECTION_GAP'
+                 ELSE 'LOW_QUALITY'
+               END execution_state,
+               CASE WHEN wr.order_id IS NOT NULL THEN 'WAL_REPLAY'
+                 WHEN s.order_id IS NOT NULL THEN 'PRIMARY_SCORE' ELSE NULL END execution_evidence_source,
+               wr.latency_ms replay_latency_ms,
+               wr.data_quality_grade replay_data_quality_grade,
+               wr.execution_fidelity_grade replay_execution_fidelity_grade
         FROM borg_shadow_orders o
         LEFT JOIN borg_shadow_scores s ON s.order_id = o.id
+        LEFT JOIN borg_shadow_execution_replays wr
+          ON wr.order_id=o.id
+         AND wr.replay_version='borg-wal-arrival-v3'
+         AND wr.latency_ms=CASE
+           WHEN o.features->>'execution_model'='latency_1s' THEN 1250
+           ELSE 250 END
         WHERE o.features->>'research_capital_version' = $1
         ORDER BY o.id DESC LIMIT $2`, [RESEARCH_CAPITAL_VERSION, limit]);
       return rows;
@@ -1624,7 +1732,8 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
 // --- Polymarket/Kalshi cross-venue identity + executable-book lab (paper only) ---
 router.get('/crossvenue/status', authMiddleware, async (req, res) => {
   try {
-    const [heartbeat, runtime, activity, relationEvents, exactRules] = await Promise.all([
+    const [heartbeat, runtime, activity, relationEvents, exactRules,
+      exactObservations, mismatchReasons] = await Promise.all([
       pool.query(`SELECT beat_at,meta FROM system_heartbeats WHERE component='crossvenue_lab'`),
       pool.query(`SELECT * FROM cv_runtime ORDER BY started_at DESC LIMIT 1`),
       pool.query(`SELECT count(*) FILTER (WHERE observed_at>now()-interval '1 hour')::int evaluations_1h,
@@ -1658,6 +1767,22 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
                          count(*) FILTER (WHERE active AND kalshi_fee_schedule IS NOT NULL
                            AND COALESCE((kalshi_fee_schedule->>'supported')::boolean,false))::int fee_supported
                     FROM cv_contract_matches`),
+      pool.query(`SELECT
+          count(*) FILTER (WHERE exact_rule_eligible AND NOT hard_mismatch)::int synchronized_exact,
+          count(*) FILTER (WHERE exact_rule_eligible AND NOT hard_mismatch
+            AND full_depth)::int full_depth_exact,
+          count(*) FILTER (WHERE exact_rule_eligible AND NOT hard_mismatch
+            AND paper_trade_eligible)::int paper_entries,
+          count(*) FILTER (WHERE exact_rule_eligible AND NOT hard_mismatch
+            AND economic)::int economic_exact
+        FROM cv_opportunities
+       WHERE experiment_id=$1 AND synchronized`, [CROSSVENUE_EXPERIMENT_ID]),
+      pool.query(`SELECT reason,count(*)::int pairs
+        FROM cv_contract_matches m
+        CROSS JOIN LATERAL jsonb_array_elements_text(
+          COALESCE(m.hard_mismatch_reasons,'[]'::jsonb)) AS r(reason)
+       WHERE m.active AND m.hard_mismatch
+       GROUP BY reason ORDER BY pairs DESC,reason LIMIT 12`),
     ]);
     const hb = heartbeat.rows[0] || null;
     const currentRuntime = runtime.rows[0] || null;
@@ -1697,6 +1822,11 @@ router.get('/crossvenue/status', authMiddleware, async (req, res) => {
         unknownRules: parseInt(exact.unknown_rules, 10) || 0,
         feeSupported: parseInt(exact.fee_supported, 10) || 0,
         legacyRelationApproved: approvedMatches,
+        synchronizedExactObservations: parseInt(exactObservations.rows[0]?.synchronized_exact, 10) || 0,
+        fullDepthExactObservations: parseInt(exactObservations.rows[0]?.full_depth_exact, 10) || 0,
+        paperEntries: parseInt(exactObservations.rows[0]?.paper_entries, 10) || 0,
+        economicExactObservations: parseInt(exactObservations.rows[0]?.economic_exact, 10) || 0,
+        mismatchReasons: mismatchReasons.rows,
       },
       activity: { ...(activity.rows[0] || {}), ...(relationEvents.rows[0] || {}) },
     });
