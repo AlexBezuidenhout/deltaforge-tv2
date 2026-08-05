@@ -10,7 +10,7 @@ const { riskWindowFloor } = require('../src/bot/PortfolioRiskPolicy');
 
 const BASE_REQUIRED_HEARTBEATS = Object.freeze([
   'main_bot', 'george_bot', 'structural_scanner', 'options_surface',
-  'pyth_boundary', 'crossvenue_lab', 'allmarket_lab',
+  'pyth_boundary', 'crossvenue_lab', 'allmarket_lab', 'public_info_collector',
 ]);
 const OPTIONAL_EXECUTOR_HEARTBEATS = Object.freeze([
   'gla_live', 'flow_boundary_canary', 'h53_live', 'eth_g_late_live',
@@ -202,11 +202,12 @@ async function main() {
     }
     for (const component of [
       'structural_scanner', 'options_surface', 'pyth_boundary', 'crossvenue_lab',
-      'allmarket_lab',
+      'allmarket_lab', 'public_info_collector',
     ]) {
       const beat = beatByName[component];
       if (beat && (beat.meta?.paperOnly !== true || beat.meta?.walletLoaded !== false
-          || (['pyth_boundary', 'crossvenue_lab', 'allmarket_lab'].includes(component)
+          || (['pyth_boundary', 'crossvenue_lab', 'allmarket_lab', 'public_info_collector']
+            .includes(component)
             && beat.meta?.liveOrderPath !== false))) {
         critical.push(`${component} violated its paper-only runtime contract`);
       }

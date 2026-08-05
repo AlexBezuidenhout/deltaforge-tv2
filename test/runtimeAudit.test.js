@@ -22,6 +22,7 @@ test('runtime health requires optional executors only when their live switch is 
   });
   assert.ok(paperOnly.includes('main_bot'));
   assert.ok(paperOnly.includes('structural_scanner'));
+  assert.ok(paperOnly.includes('public_info_collector'));
   assert.equal(paperOnly.includes('gla_live'), false);
   assert.equal(paperOnly.includes('flow_boundary_canary'), false);
   assert.equal(paperOnly.includes('h53_live'), false);
