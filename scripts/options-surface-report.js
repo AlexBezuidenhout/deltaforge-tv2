@@ -133,10 +133,20 @@ async function buildReport(pool) {
   )).toISOString();
   const { rows: runtime } = await pool.query(`
     SELECT * FROM borg_options_runtime ORDER BY updated_at DESC LIMIT 1`);
-  const { rows: inventory } = await pool.query(`
-    SELECT count(*)::int touches,count(DISTINCT instrument_name)::int instruments,
-           min(sample_at) first_at,max(sample_at) last_at
-      FROM borg_deribit_option_touch WHERE sample_at >= $1`, [evidenceStart]);
+  const runtimeRow = runtime[0] || null;
+  // The raw touch table contains millions of append-only surface ticks per
+  // day. Counting it for a dashboard report is both redundant and capable of
+  // timing out ingestion. The collector's durable runtime ledger already
+  // records exact persisted-touch and subscribed-instrument counters for this
+  // run, so use that bounded source instead.
+  const capture = runtimeRow ? {
+    touches: finite(runtimeRow.stored_touches)
+      ?? finite(runtimeRow.metrics?.storedTouches) ?? 0,
+    instruments: finite(runtimeRow.subscribed_instruments) ?? 0,
+    first_at: runtimeRow.started_at || null,
+    last_at: runtimeRow.last_event_at || runtimeRow.metrics?.lastEventAt || null,
+    source: 'borg_options_runtime durable counters; no raw-table count scan',
+  } : null;
   const { rows: diagnosticRows } = await pool.query(`
     SELECT surface_fidelity,
            COALESCE(detail->'surface'->>'mode','UNKNOWN') surface_mode,
@@ -170,8 +180,8 @@ async function buildReport(pool) {
     collectionEpoch: collection,
     trial,
     policy: 'first executable exact-expiry A-fidelity surface signal per market; no stacking or best-in-hindsight replacement',
-    runtime: runtime[0] || null,
-    capture: inventory[0] || null,
+    runtime: runtimeRow,
+    capture,
     evidenceProduction: {
       diagnostics: diagnosticRows,
       interpretation: diagnosticRows.some((row) => row.surface_fidelity === 'A')
