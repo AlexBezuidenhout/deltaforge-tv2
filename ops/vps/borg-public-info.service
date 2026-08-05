@@ -8,7 +8,7 @@ After=network-online.target postgresql.service
 Type=simple
 User=deltaforge
 Group=deltaforge
-WorkingDirectory=/opt/deltaforge/tv2/current
+WorkingDirectory=/opt/deltaforge/tv2/public-info-current
 EnvironmentFile=/etc/deltaforge/tv2.env
 EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
 Environment=NODE_ENV=production

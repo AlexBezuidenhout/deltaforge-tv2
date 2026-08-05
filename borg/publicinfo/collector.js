@@ -11,6 +11,7 @@
  */
 
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
@@ -38,6 +39,8 @@ const {
 
 const EXPERIMENT_ID = 'xtracker-resolver-count-barrier-v1';
 const STRATEGY = 'N01_xtracker_count_barrier_v1';
+const CODE_RELEASE_ID = process.env.DELTAFORGE_PUBLIC_INFO_RELEASE_ID
+  || path.basename(fs.realpathSync(process.cwd()));
 const RUN_ID = `public-info:${os.hostname()}:${new Date().toISOString()}:${process.pid}:${crypto.randomUUID().slice(0, 8)}`;
 const COLLECTION_EPOCH_ID = process.env.BORG_COLLECTION_EPOCH_ID || 'public-info-unmarked';
 const ALLOWED_PLATFORMS = new Set(String(process.env.PUBLIC_INFO_PLATFORMS || 'TRUTH_SOCIAL')
@@ -167,6 +170,7 @@ class PublicInfoCollector {
         (run_id,experiment_id,started_at,host,pid,status,paper_only,wallet_loaded,metrics)
       VALUES ($1,$2,now(),$3,$4,'STARTING',true,false,$5::jsonb)
     `, [RUN_ID, EXPERIMENT_ID, os.hostname(), process.pid, json({
+      codeReleaseId: CODE_RELEASE_ID,
       platforms: [...ALLOWED_PLATFORMS], latencyProfilesMs: LATENCY_PROFILES_MS,
     })]);
     await this.refreshSources();
@@ -538,6 +542,7 @@ class PublicInfoCollector {
       paperOnly: true,
       liveOrderPath: false,
       collectionEpochId: COLLECTION_EPOCH_ID,
+      codeReleaseId: CODE_RELEASE_ID,
       ruleHash: target.ruleHash,
       ruleReasons: target.ruleReasons,
       groupLabel: target.groupLabel,
@@ -656,6 +661,7 @@ class PublicInfoCollector {
       walletLoaded: false,
       liveOrderPath: false,
       collectionEpochId: COLLECTION_EPOCH_ID,
+      codeReleaseId: CODE_RELEASE_ID,
       providers: {
         polymarketXtracker: 'ENABLED_PUBLIC_RESOLVER_API',
         truthSocialDirect: 'BLOCKED_TERMS_NO_AUTOMATION',
@@ -734,6 +740,7 @@ if (require.main === module) main().catch(async (error) => {
 });
 
 module.exports = {
+  CODE_RELEASE_ID,
   EXPERIMENT_ID,
   PublicInfoCollector,
   RUN_ID,
