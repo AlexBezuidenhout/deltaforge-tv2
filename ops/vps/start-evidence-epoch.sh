@@ -111,6 +111,7 @@ systemctl stop \
   borg-crossvenue.service \
   borg-options-surface.service \
   borg-pyth-boundary.service \
+  borg-public-info.service \
   borg-structural-scanner.service \
   polymarket-flow.service \
   eth-g-late-canary.service
@@ -153,6 +154,7 @@ systemctl enable \
   borg-crossvenue.service \
   borg-options-surface.service \
   borg-pyth-boundary.service \
+  borg-public-info.service \
   borg-structural-scanner.service \
   polymarket-flow.service
 
@@ -163,6 +165,7 @@ systemctl start \
   borg-crossvenue.service \
   borg-options-surface.service \
   borg-pyth-boundary.service \
+  borg-public-info.service \
   borg-structural-scanner.service \
   polymarket-flow.service
 

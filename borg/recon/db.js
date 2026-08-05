@@ -2125,6 +2125,199 @@ async function migrateCrossVenue() {
   await pool.query(CROSSVENUE_SCHEMA);
 }
 
+// Public-information research lane. This namespace is deliberately limited to
+// public resolver/source data, linked public CLOB books and paper decisions.
+// It contains no wallet, signer, API secret or authenticated order state.
+const PUBLIC_INFO_SCHEMA = `
+CREATE TABLE IF NOT EXISTS borg_public_sources (
+  source_id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  handle TEXT NOT NULL,
+  display_name TEXT,
+  verified BOOLEAN NOT NULL DEFAULT false,
+  source_updated_at TIMESTAMPTZ,
+  first_observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  raw JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE UNIQUE INDEX IF NOT EXISTS borg_public_sources_provider_platform_handle
+  ON borg_public_sources (provider, platform, handle);
+
+CREATE TABLE IF NOT EXISTS borg_public_trackings (
+  tracking_id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL REFERENCES borg_public_sources(source_id),
+  title TEXT NOT NULL,
+  event_slug TEXT,
+  market_link TEXT,
+  starts_at TIMESTAMPTZ NOT NULL,
+  ends_at TIMESTAMPTZ NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT false,
+  source_created_at TIMESTAMPTZ,
+  source_updated_at TIMESTAMPTZ,
+  first_observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  raw JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS borg_public_trackings_active_window
+  ON borg_public_trackings (is_active, starts_at, ends_at);
+
+CREATE TABLE IF NOT EXISTS borg_public_events (
+  id BIGSERIAL PRIMARY KEY,
+  provider TEXT NOT NULL,
+  source_event_id TEXT NOT NULL,
+  platform_event_id TEXT,
+  source_id TEXT NOT NULL REFERENCES borg_public_sources(source_id),
+  platform TEXT NOT NULL,
+  actor_handle TEXT NOT NULL,
+  source_timestamp TIMESTAMPTZ NOT NULL,
+  upstream_observed_at TIMESTAMPTZ,
+  received_at TIMESTAMPTZ NOT NULL,
+  receive_monotonic_ns NUMERIC(30,0),
+  tracker_lag_ms BIGINT,
+  local_poll_lag_ms BIGINT,
+  content_hash TEXT NOT NULL,
+  content_html TEXT,
+  content_text TEXT,
+  metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+  raw JSONB NOT NULL,
+  raw_wal_event_id TEXT,
+  normalized_wal_event_id TEXT,
+  UNIQUE (provider, source_event_id)
+);
+CREATE INDEX IF NOT EXISTS borg_public_events_source_time
+  ON borg_public_events (source_id, source_timestamp);
+CREATE INDEX IF NOT EXISTS borg_public_events_received_brin
+  ON borg_public_events USING BRIN (received_at);
+
+CREATE TABLE IF NOT EXISTS borg_public_markets (
+  tracking_id TEXT NOT NULL REFERENCES borg_public_trackings(tracking_id),
+  condition_id TEXT NOT NULL,
+  gamma_id TEXT,
+  event_slug TEXT NOT NULL,
+  question TEXT NOT NULL,
+  group_label TEXT,
+  lower_bound INT,
+  upper_bound INT,
+  outcome TEXT NOT NULL,
+  asset_id TEXT NOT NULL,
+  token_index INT NOT NULL,
+  tick_size NUMERIC NOT NULL,
+  minimum_order_size NUMERIC NOT NULL,
+  fees_enabled BOOLEAN NOT NULL DEFAULT false,
+  fee_rate NUMERIC NOT NULL DEFAULT 0,
+  fee_exponent NUMERIC NOT NULL DEFAULT 1,
+  rule_certified BOOLEAN NOT NULL DEFAULT false,
+  rule_hash TEXT,
+  active BOOLEAN NOT NULL DEFAULT true,
+  accepting_orders BOOLEAN NOT NULL DEFAULT true,
+  refreshed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  raw JSONB NOT NULL DEFAULT '{}'::jsonb,
+  PRIMARY KEY (tracking_id, asset_id)
+);
+CREATE INDEX IF NOT EXISTS borg_public_markets_asset
+  ON borg_public_markets (asset_id, active, accepting_orders);
+CREATE INDEX IF NOT EXISTS borg_public_markets_condition
+  ON borg_public_markets (condition_id, tracking_id);
+
+CREATE TABLE IF NOT EXISTS borg_public_market_touches (
+  id BIGSERIAL PRIMARY KEY,
+  observed_at TIMESTAMPTZ NOT NULL,
+  source_ts TIMESTAMPTZ,
+  tracking_id TEXT NOT NULL,
+  condition_id TEXT NOT NULL,
+  asset_id TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  best_bid NUMERIC,
+  bid_size NUMERIC,
+  best_ask NUMERIC,
+  ask_size NUMERIC,
+  state_age_ms NUMERIC,
+  reaction_us NUMERIC,
+  data_quality_grade TEXT NOT NULL,
+  event_type TEXT,
+  connection_epoch INT,
+  connection_shard INT,
+  event_sequence BIGINT,
+  wal_event_id TEXT,
+  book_hash TEXT
+);
+CREATE INDEX IF NOT EXISTS borg_public_market_touches_asset_time
+  ON borg_public_market_touches (asset_id, observed_at);
+CREATE INDEX IF NOT EXISTS borg_public_market_touches_observed_brin
+  ON borg_public_market_touches USING BRIN (observed_at);
+
+CREATE TABLE IF NOT EXISTS borg_public_paper_intents (
+  intent_id TEXT PRIMARY KEY,
+  dedup_key TEXT UNIQUE NOT NULL,
+  run_id TEXT NOT NULL,
+  experiment_id TEXT NOT NULL,
+  strategy TEXT NOT NULL,
+  tracking_id TEXT NOT NULL,
+  condition_id TEXT NOT NULL,
+  asset_id TEXT NOT NULL,
+  guaranteed_outcome TEXT NOT NULL,
+  barrier_kind TEXT NOT NULL,
+  prior_count INT NOT NULL,
+  current_count INT NOT NULL,
+  lower_bound INT,
+  upper_bound INT,
+  trigger_source_event_id TEXT,
+  trigger_source_at TIMESTAMPTZ,
+  trigger_upstream_at TIMESTAMPTZ,
+  decision_at TIMESTAMPTZ NOT NULL,
+  latency_ms INT NOT NULL,
+  requested_shares NUMERIC,
+  filled BOOLEAN NOT NULL DEFAULT false,
+  average_fill_price NUMERIC,
+  displayed_shares NUMERIC,
+  fee_2x_per_share NUMERIC,
+  tick_stress_per_share NUMERIC,
+  source_risk_reserve_per_share NUMERIC,
+  nominal_terminal_pnl_usd NUMERIC,
+  stressed_terminal_pnl_usd NUMERIC,
+  qualified BOOLEAN NOT NULL DEFAULT false,
+  reason TEXT NOT NULL,
+  data_quality_grade TEXT NOT NULL,
+  execution_fidelity_grade TEXT NOT NULL,
+  paper_only BOOLEAN NOT NULL DEFAULT true,
+  detail JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS borg_public_paper_intents_experiment_time
+  ON borg_public_paper_intents (experiment_id, decision_at);
+CREATE INDEX IF NOT EXISTS borg_public_paper_intents_tracking
+  ON borg_public_paper_intents (tracking_id, decision_at);
+
+CREATE TABLE IF NOT EXISTS borg_public_runtime (
+  run_id TEXT PRIMARY KEY,
+  experiment_id TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  stopped_at TIMESTAMPTZ,
+  host TEXT NOT NULL,
+  pid INT NOT NULL,
+  status TEXT NOT NULL,
+  paper_only BOOLEAN NOT NULL DEFAULT true,
+  wallet_loaded BOOLEAN NOT NULL DEFAULT false,
+  sources INT NOT NULL DEFAULT 0,
+  active_trackings INT NOT NULL DEFAULT 0,
+  subscribed_markets INT NOT NULL DEFAULT 0,
+  subscribed_tokens INT NOT NULL DEFAULT 0,
+  public_events BIGINT NOT NULL DEFAULT 0,
+  book_events BIGINT NOT NULL DEFAULT 0,
+  paper_intents BIGINT NOT NULL DEFAULT 0,
+  qualified_intents BIGINT NOT NULL DEFAULT 0,
+  persistence_queue BIGINT NOT NULL DEFAULT 0,
+  last_source_event_at TIMESTAMPTZ,
+  last_book_event_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  metrics JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+`;
+
+async function migratePublicInfo() {
+  await pool.query(PUBLIC_INFO_SCHEMA);
+}
+
 function parameterSafeChunks(cols, rows, maxParameters = 60000) {
   if (!cols.length) throw new Error('insertRows requires at least one column');
   const rowsPerChunk = Math.max(1, Math.floor(maxParameters / cols.length));
@@ -2293,6 +2486,7 @@ async function upsertStrategyRuntime(epochId, runId, rows) {
 module.exports = {
   pool, migrate, migrateFlow, migrateStructural, migrateOptions,
   migratePyth, migrateAllMarket, migratePairedMaker, migrateCrossVenue,
+  migratePublicInfo,
   insertRows, logEvent, parameterSafeChunks,
   registerCollectionEpoch, startCollectorRun, finishCollectorRun, upsertStrategyRuntime,
 };

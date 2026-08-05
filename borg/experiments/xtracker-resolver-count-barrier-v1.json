@@ -1,0 +1,82 @@
+{
+  "experiment_id": "xtracker-resolver-count-barrier-v1",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-05T15:05:00.000Z",
+  "frozen_at": "2026-08-05T15:05:00.000Z",
+  "evidence_started_at": "2026-08-05T15:05:00.000Z",
+  "phase": "eval",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "public_information_resolver_state",
+  "strategy_version": "xtracker-resolver-count-barrier-v1",
+  "starting_bankroll_usd": 500,
+  "target_stake_usd": 10,
+  "provisional": true,
+  "historical_rows_reused": false,
+  "entry_authorization": "paper intents only after exact XTracker rule certification and irreversible count-boundary transition",
+  "hypothesis": "When Polymarket's public XTracker count irreversibly crosses a resolver-defined range boundary, the corresponding terminal token is known before every displayed order is cancelled; occasional executable asks may retain positive value after conservative costs.",
+  "mechanism": {
+    "payer": "Stale resting inventory in small social post-count markets after the primary resolver tracker updates.",
+    "proof": "A range outcome is impossible after current_count exceeds its upper bound; an open-ended upper bucket is certain after current_count reaches its lower bound. Deleted posts remain counted under the certified rule text.",
+    "residual_risk": "XTracker outage or incorrect update, fallback-source interpretation, market cancellation, settlement delay and non-authenticated paper-fill error.",
+    "not_generic_sentiment": true
+  },
+  "source_contract": {
+    "primary": "https://xtracker.polymarket.com/api",
+    "primary_is_named_in_market_rules": true,
+    "truth_social_direct_scraping": "forbidden_without_written_permission_or_licensed_feed",
+    "raw_before_parse_wal": true,
+    "required_clocks": [
+      "source_created_at",
+      "xtracker_imported_at",
+      "local_receive_wall",
+      "local_receive_monotonic",
+      "clob_source_time"
+    ],
+    "immutable_content_hash": true
+  },
+  "frozen_execution": {
+    "platforms": ["TRUTH_SOCIAL"],
+    "latency_profiles_ms": [100, 250, 500],
+    "target_stake_usd": 10,
+    "walk_displayed_l2_depth": true,
+    "fees": "two_times_current_or_conservative_polymarket_taker_fee",
+    "price_stress_ticks": 1,
+    "source_fallback_reserve_per_share": 0.01,
+    "source_fallback_reserve_is_mechanism_default_not_pnl_tuned": true,
+    "hold_to_terminal_resolution": true,
+    "partial_or_missing_depth": "no fill",
+    "stale_or_gapped_book": "no fill"
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "N01_xtracker_count_barrier_v1",
+      "family": "public_information_resolver_state",
+      "arm": "truth_social_primary_resolver",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 30,
+      "primary_metric": "stressed_terminal_pnl_clustered_by_tracking_window_and_day"
+    }
+  ],
+  "independent_unit": "one unique tracking window; range bins and latency profiles within a window are correlated diagnostics",
+  "promotion_contract": {
+    "minimum_fresh_independent_tracking_windows": 300,
+    "minimum_calendar_days": 30,
+    "positive_stressed_pnl_in_both_chronological_halves": true,
+    "tracking_window_and_day_clustered_lower_bound_above_zero": true,
+    "family_wise_multiple_testing_correction": true,
+    "positive_latency_profiles_ms": [100, 250, 500],
+    "realistic_nonfills_partial_fills_and_depth": true,
+    "shared_bankroll_usd": 500,
+    "no_dominant_actor_window_or_day": true,
+    "authenticated_pilot": "Not authorized. Requires a separate review after every paper and source-fidelity gate passes."
+  },
+  "selection_disclosure": {
+    "selected_after_source_and_rule_audit": true,
+    "selected_after_viewing_strategy_pnl": false,
+    "reason": "The public XTracker API is explicitly named as the primary resolver in current post-count rules and supplies both source and import timestamps. This creates a deterministic state-barrier test without prohibited Truth Social scraping."
+  },
+  "no_optional_stopping": true
+}

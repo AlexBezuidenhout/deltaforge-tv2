@@ -1,0 +1,42 @@
+[Unit]
+Description=BORG Polymarket XTracker resolver-state collector (paper only)
+Wants=network-online.target
+Requires=postgresql.service
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
+Environment=NODE_ENV=production
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_WAL_MIN_FREE_GB=20
+Environment=PUBLIC_INFO_PLATFORMS=TRUTH_SOCIAL
+Environment=PUBLIC_INFO_POLL_MS=15000
+Environment=PUBLIC_INFO_METADATA_REFRESH_MS=60000
+Environment=PUBLIC_INFO_TOUCH_MIN_INTERVAL_MS=250
+Environment=PUBLIC_INFO_MAX_ACTIVE_TRACKINGS=8
+Environment=PUBLIC_INFO_MAX_MARKETS=80
+Environment=PUBLIC_INFO_CLOB_SHARDS=2
+Environment=PUBLIC_INFO_LATENCY_PROFILES_MS=100,250,500
+Environment=PUBLIC_INFO_TARGET_USD=10
+Environment=PUBLIC_INFO_SOURCE_RISK_RESERVE=0.01
+ExecStart=/usr/local/bin/node borg/publicinfo/collector.js
+Restart=always
+RestartSec=3
+TimeoutStopSec=45
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

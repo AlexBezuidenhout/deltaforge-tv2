@@ -61,6 +61,7 @@
     "research:cadence": "node scripts/research-cadence-report.js",
     "research:crossvenue-autopsy": "node scripts/crossvenue-mismatch-autopsy.js",
     "research:options-exact-coverage": "node scripts/options-exact-expiry-coverage.js",
+    "research:xtracker-resolver": "node scripts/xtracker-resolver-backtest.js",
     "prune:hot": "node scripts/hot-tier-prune.js",
     "research:inverse": "node scripts/borg-inverse-autopsy.js",
     "audit:runtime": "node scripts/runtime-audit.js",
@@ -79,6 +80,7 @@
     "structural:collect": "node borg/structural/scanner.js",
     "options:collect": "node borg/options/collector.js",
     "pyth:collect": "node borg/pyth/collector.js",
+    "publicinfo:collect": "node borg/publicinfo/collector.js",
     "access:create-viewer": "node scripts/create-collaborator-viewer.js",
     "access:verify-viewer": "node scripts/verify-collaborator-viewer.js"
   },
