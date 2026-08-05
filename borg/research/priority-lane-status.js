@@ -71,18 +71,44 @@ async function buildPriorityLaneStatus(pool, options = {}) {
        WHERE epoch_id=$1 AND strategy=$2`, [epochId, H43_STRATEGY])
       : Promise.resolve({ rows: [{}] }),
     epochStart ? pool.query(`
-      SELECT count(*) FILTER (WHERE e.economic_candidate)::int economic,
-             count(*) FILTER (WHERE e.qualified)::int qualified,
-             max(e.evaluated_at) latest
-        FROM borg_structural_evaluations e
-        JOIN borg_structural_candidates c USING(candidate_id)
-       WHERE c.universe_id=$1 AND e.evaluated_at >= $2
-         AND (e.economic_candidate OR e.qualified)`, [STRUCTURAL_EXPERIMENT_ID, epochStart])
+      WITH positive AS MATERIALIZED (
+        SELECT e.candidate_id,e.evaluated_at,e.economic_candidate,e.qualified,
+               e.orphan_safe_profit_2x_usd
+          FROM borg_structural_evaluations e
+          JOIN borg_structural_candidates c USING(candidate_id)
+         WHERE c.universe_id=$1 AND e.evaluated_at >= $2
+           AND (e.economic_candidate OR e.qualified)
+      ), qualified_rows AS (
+        SELECT candidate_id,evaluated_at,
+               lag(evaluated_at) OVER (
+                 PARTITION BY candidate_id ORDER BY evaluated_at
+               ) previous_at
+          FROM positive WHERE qualified
+      )
+      SELECT count(DISTINCT candidate_id)
+               FILTER (WHERE economic_candidate)::int economic,
+             count(*) FILTER (WHERE economic_candidate)::int economic_observations,
+             count(DISTINCT candidate_id)
+               FILTER (WHERE qualified)::int qualified,
+             count(*) FILTER (WHERE qualified)::int qualified_observations,
+             COALESCE((SELECT count(*) FROM qualified_rows
+               WHERE previous_at IS NULL
+                  OR evaluated_at-previous_at > interval '60 seconds'),0)::int qualified_episodes,
+             count(DISTINCT (evaluated_at AT TIME ZONE 'UTC')::date)
+               FILTER (WHERE qualified)::int qualified_days,
+             max(orphan_safe_profit_2x_usd)
+               FILTER (WHERE qualified)::float max_orphan_safe_profit_2x_usd,
+             max(evaluated_at) latest
+        FROM positive`, [STRUCTURAL_EXPERIMENT_ID, epochStart])
       : Promise.resolve({ rows: [{}] }),
   ]);
 
   const h43 = h43Result.rows[0] || {};
   const structuralPositive = structuralResult.rows[0] || {};
+  const structuralQualifiedEpisodes = finite(
+    structuralPositive.qualified_episodes,
+    finite(structuralPositive.qualified),
+  );
   const structuralMeta = heartbeats.structural_scanner?.meta || {};
   const crossMeta = heartbeats.crossvenue_lab?.meta || {};
   const optionsMeta = heartbeats.options_surface?.meta || {};
@@ -166,7 +192,7 @@ async function buildPriorityLaneStatus(pool, options = {}) {
       priority: 2, program: 'certified_payoff_graph', runMode: 'PAPER_SCANNER',
       active: structuralActive,
       status: !structuralActive ? 'COLLECTOR_STALE_OR_ERROR'
-        : finite(structuralPositive.qualified) > 0
+        : structuralQualifiedEpisodes > 0
           ? 'QUALIFIED_CANDIDATES_REQUIRE_EXECUTION_REVIEW'
           : finite(structuralPositive.economic) > 0
             ? 'NONATOMIC_ECONOMIC_LEADS_REQUIRE_ORPHAN_REVIEW'
@@ -175,7 +201,15 @@ async function buildPriorityLaneStatus(pool, options = {}) {
         candidates: finite(structuralMeta.candidates),
         catalogCandidates: finite(structuralMeta.catalogCandidates),
         tokens: finite(structuralMeta.tokens), economic: finite(structuralPositive.economic),
-        qualified: finite(structuralPositive.qualified), latest: structuralPositive.latest || null,
+        economicObservations: finite(structuralPositive.economic_observations),
+        qualified: finite(structuralPositive.qualified),
+        qualifiedObservations: finite(structuralPositive.qualified_observations),
+        qualifiedEpisodes: structuralQualifiedEpisodes,
+        qualifiedDays: finite(structuralPositive.qualified_days),
+        maxOrphanSafeProfit2xUsd: finite(
+          structuralPositive.max_orphan_safe_profit_2x_usd, null,
+        ),
+        latest: structuralPositive.latest || null,
         persistenceErrors: finite(structuralMeta.persistenceErrors),
         liveness: structuralState,
       },

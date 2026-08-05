@@ -50,7 +50,8 @@ function laneReadiness(lane, evidence, lifecycle, active, now = new Date()) {
     days = finite(evidence.days);
     firstEligibleAt = evidence.first || null;
   } else if (lane.laneId.startsWith('structural-')) {
-    units = finite(evidence.qualified);
+    units = finite(evidence.qualifiedEpisodes, finite(evidence.qualified));
+    unitsLabel = 'one non-overlapping orphan-safe relationship episode';
     firstEligibleAt = lane.evidenceStartedAt;
     if (active && firstEligibleAt) {
       days = Math.max(0, Math.ceil((new Date(now) - new Date(firstEligibleAt)) / 86_400_000));

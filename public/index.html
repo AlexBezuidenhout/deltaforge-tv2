@@ -2052,7 +2052,7 @@
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Universe</div><div style="font-size:18px;font-weight:700;" id="bookLabUniverse">—</div><div style="font-size:10px;color:var(--text-muted);" id="bookLabSelected">— selected</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Intents 1h</div><div style="font-size:18px;font-weight:700;" id="bookLabIntents">—</div><div style="font-size:10px;color:var(--text-muted);" id="bookLabFills">— fills</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Reaction</div><div style="font-size:18px;font-weight:700;" id="bookLabReaction">—</div><div style="font-size:10px;color:var(--text-muted);">target 20–50 ms internal</div></div></div>
-    <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Structural</div><div style="font-size:18px;font-weight:700;" id="bookLabStructural">—</div><div style="font-size:10px;color:var(--text-muted);">economic / orphan-safe</div></div></div>
+    <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Structural</div><div style="font-size:18px;font-weight:700;" id="bookLabStructural">—</div><div style="font-size:10px;color:var(--text-muted);">unique leads / independent episodes</div></div></div>
     <div class="panel" style="margin:0;"><div class="panel-body" style="padding:10px 14px;"><div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);">Mode</div><div style="font-size:18px;font-weight:700;color:var(--yellow);">PAPER</div><div style="font-size:10px;color:var(--text-muted);">$500 cohort · no DB hot path</div></div></div>
   </div>
 
@@ -2071,8 +2071,8 @@
     <tbody id="pairedMakerCyclesBody"><tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">No paired cycles yet</td></tr></tbody>
   </table></div></div></div>
 
-  <div class="panel"><div class="panel-header"><span>STRUCTURAL PAYOFF IDENTITIES</span><span style="font-size:10px;color:var(--text-muted);">qualified = doubled-cost profit survives full executable orphan reserve</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
-    <thead><tr><th>Structure</th><th>Latency</th><th>Evaluations</th><th>Economic leads</th><th>Orphan-safe qualified</th><th>Max displayed 2×</th><th>Max after reserve</th><th>Latest</th></tr></thead>
+  <div class="panel"><div class="panel-header"><span>STRUCTURAL PAYOFF IDENTITIES</span><span style="font-size:10px;color:var(--text-muted);">* rows overlap across ticks/latency arms; independence is counted above · qualified = full orphan reserve survives</span></div><div class="panel-body" style="padding:0;"><div class="table-wrap" style="margin:0;border:none;overflow:auto;"><table>
+    <thead><tr><th>Structure</th><th>Latency</th><th>Evaluations</th><th>Economic rows*</th><th>Orphan-safe rows*</th><th>Max displayed 2×</th><th>Max after reserve</th><th>Latest</th></tr></thead>
     <tbody id="bookLabStructuralBody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;">No structural evaluations yet</td></tr></tbody>
   </table></div></div></div>
 
@@ -3390,10 +3390,12 @@
     document.getElementById('bookLabFills').textContent = (status.activity?.fills_1h ?? 0) + ' fills';
     const reaction = Number(status.runtime?.metrics?.reactionUsP95);
     document.getElementById('bookLabReaction').textContent = Number.isFinite(reaction) ? (reaction / 1000).toFixed(2) + ' ms' : '—';
-    const economic = structural.rows.reduce((sum, row) => sum + Number(row.economic_candidates || 0), 0);
-    const qualified = structural.rows.reduce((sum, row) =>
-      sum + Number(row.orphan_safe_qualified || 0), 0);
-    document.getElementById('bookLabStructural').textContent = economic + ' / ' + qualified;
+    const structuralLane = (priority.lanes || []).find((lane) =>
+      lane.laneId === 'structural-certified-graph-v5')
+      || (priority.lanes || []).find((lane) => lane.program === 'certified_payoff_graph');
+    const structuralEvidence = structuralLane?.evidence || {};
+    document.getElementById('bookLabStructural').textContent = Number(structuralEvidence.economic || 0)
+      + ' / ' + Number(structuralEvidence.qualifiedEpisodes || 0);
     const pairedActivity = pairedStatus.activity || {};
     document.getElementById('pairedMakerStatus').textContent = pairedStatus.alive
       ? 'LIVE PAPER · ' + (pairedStatus.runtime?.open_cycles ?? 0) + ' open cycles · '
@@ -3415,7 +3417,10 @@
       if (lane.mechanismId === 'N09') return (e.proposals || 0) + ' proposals · ' + (e.crossEventProposals || 0) + ' novel cross-event · ' + (e.executable || 0) + ' executable';
       if (e.fills != null) return (e.fills || 0) + ' A/B fills · ' + (e.markets || 0) + ' markets · ' + _bMoney(e.pnl2x || 0) + ' at 2×';
       if (lane.program === 'resolver_boundary_transfer') return (e.evaluations || 0) + ' evaluations · ' + (e.actions || 0) + ' actions · ' + (e.errors || 0) + ' errors';
-      if (lane.program === 'certified_payoff_graph') return (e.candidates || 0) + ' candidates · ' + (e.qualified || 0) + ' qualified';
+      if (lane.program === 'certified_payoff_graph') return (e.candidates || 0)
+        + ' subscribed · ' + (e.qualified || 0) + ' unique qualified candidates · '
+        + (e.qualifiedEpisodes || 0) + ' independent episodes ('
+        + (e.qualifiedObservations || 0) + ' overlapping rows)';
       if (lane.program === 'rule_aware_crossvenue') return (e.exactRuleMatches || 0) + ' exact pairs · ' + (e.hardMismatchMatches || 0) + ' hard vetoes · ' + (e.paperTradeLeads || 0) + ' eligible leads';
       if (lane.program === 'options_implied_binary_residual') return (e.markets || 0) + ' targets · ' + (e.executable || 0) + ' executable marks';
       return (e.selectedMarkets || 0) + ' frozen capture markets · ' + (e.decisions || 0) + ' quote decisions';
