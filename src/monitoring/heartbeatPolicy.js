@@ -102,6 +102,10 @@ function heartbeatPolicies(settings = {}, options = {}) {
       required: researchRequired,
       maxAgeSec: TIMER_MAX_AGE_SEC,
     },
+    public_info_collector: {
+      required: researchRequired,
+      maxAgeSec: FAST_MAX_AGE_SEC,
+    },
     paired_maker_lab: {
       required: researchRequired && enabled(options.pairedMakerRequired, false),
       maxAgeSec: FAST_MAX_AGE_SEC,

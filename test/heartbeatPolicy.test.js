@@ -17,6 +17,8 @@ test('dashboard-only TV2 process monitors the fleet without gaining runner autho
   assert.equal(researchFleetRequired('tv2'), true);
   assert.equal(researchFleetRequired('df2-dashboard'), false);
   assert.equal(researchFleetRequired('tv2-dashboard', 'false'), false);
+  assert.equal(heartbeatPolicies({}, { researchRequired: true })
+    .public_info_collector.required, true);
 });
 
 test('fleet bot count is derived from configured fresh heartbeats', () => {
