@@ -133,6 +133,15 @@ reserving the worst unwind loss. Its separate passive arm is paper-only and
 C-grade: public prints consume frozen queue-ahead, partial fills are hedged
 immediately, and cancellation volume receives no queue credit.
 
+`borg-public-info.service` is an isolated, paper-only XTracker resolver-state
+collector. It stores source creation, upstream import, local wall and monotonic
+receipt clocks, certifies the exact linked market rules, and evaluates only
+irreversible count-range transitions against a fresh public execution book.
+It has no wallet or authenticated order dependency. The unit runs through the
+dedicated `/opt/deltaforge/tv2/public-info-current` release pointer so it can be
+deployed without moving the shared application pointer or changing code under
+an existing evidence cohort.
+
 `borg-paired-maker.service` is an isolated condition-level paper experiment
 inspired by the observed two-sided inventory/merge mechanism of a large public
 Polymarket operation. It never copy-trades that wallet and has no authenticated
