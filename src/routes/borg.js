@@ -1681,6 +1681,7 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
                     FROM borg_structural_evaluations e
                     JOIN borg_structural_candidates c USING (candidate_id)
                    WHERE c.universe_id=$1
+                     AND (e.economic_candidate OR e.qualified)
                    GROUP BY e.structure_type,e.latency_ms ORDER BY e.structure_type,e.latency_ms`,
           [STRUCTURAL_EXPERIMENT_ID]),
         pool.query(`SELECT structure_type,latency_ms,count(*)::int quotes,

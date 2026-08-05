@@ -172,6 +172,25 @@ async function buildNeglectedEdgeReport(pool, options = {}) {
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     const { rows: clock } = await client.query('SELECT clock_timestamp() AS as_of');
     const asOf = clock[0].as_of;
+    const runtimes = (await client.query(`
+      SELECT component,beat_at,meta FROM system_heartbeats
+       WHERE component=ANY($1::text[]) ORDER BY component`, [[
+      'allmarket_lab', 'crossvenue_lab', 'options_surface',
+      'pyth_boundary', 'structural_scanner',
+    ]])).rows;
+    const runtimeByComponent = Object.fromEntries(runtimes.map((row) => [row.component, row]));
+    const allMarketHeartbeat = runtimeByComponent.allmarket_lab || null;
+    const allMarketMeta = allMarketHeartbeat?.meta || {};
+    const structuralEpochId = runtimeByComponent.structural_scanner?.meta?.collectionEpochId
+      || allMarketMeta.collectionEpochId || null;
+    const structuralEpoch = structuralEpochId ? (await client.query(`
+      SELECT started_at FROM borg_collection_epochs WHERE epoch_id=$1`,
+    [structuralEpochId])).rows[0] : null;
+    // A missing epoch must not turn a dashboard report into an unbounded scan.
+    // The fallback matches the structural SQL hot tier; immutable WAL/Parquet
+    // remains the source for older replay.
+    const structuralEvidenceStart = structuralEpoch?.started_at
+      || new Date(new Date(asOf).getTime() - 2 * 86_400_000);
 
     const h43 = (await client.query(`
       WITH first_market AS (
@@ -192,34 +211,53 @@ async function buildNeglectedEdgeReport(pool, options = {}) {
         FROM first_market`, [H43_EXPERIMENT_ID])).rows[0];
 
     const structural = (await client.query(`
-      WITH latest AS (
-        SELECT DISTINCT ON (e.candidate_id,e.latency_ms) e.*,c.atomic,c.active
+      WITH positive AS MATERIALIZED (
+        SELECT e.candidate_id,e.evaluated_at,e.economic_candidate,e.qualified,
+               e.displayed_profit_2x_usd,e.orphan_safe_profit_2x_usd
           FROM borg_structural_evaluations e
           JOIN borg_structural_candidates c USING(candidate_id)
-         WHERE c.universe_id=$1 AND c.active=true
-         ORDER BY e.candidate_id,e.latency_ms,e.evaluated_at DESC,e.id DESC
+         WHERE c.universe_id=$1 AND e.evaluated_at >= $2
+           AND (e.economic_candidate OR e.qualified)
+      ), qualified_rows AS (
+        SELECT candidate_id,evaluated_at,
+               lag(evaluated_at) OVER (
+                 PARTITION BY candidate_id ORDER BY evaluated_at
+               ) previous_at
+          FROM positive WHERE qualified
       )
-      SELECT count(*)::int current_cells,count(DISTINCT candidate_id)::int candidates,
-             count(*) FILTER (WHERE pass_proof)::int payoff_proved,
-             count(*) FILTER (WHERE pass_rule_certification)::int rule_certified,
-             count(*) FILTER (WHERE economic_candidate)::int economic,
-             count(*) FILTER (WHERE qualified)::int qualified,
+      SELECT count(*)::int positive_observations,
+             count(DISTINCT candidate_id)::int candidates,
+             count(DISTINCT candidate_id)
+               FILTER (WHERE economic_candidate)::int economic,
+             count(*) FILTER (WHERE economic_candidate)::int economic_observations,
+             count(DISTINCT candidate_id)
+               FILTER (WHERE qualified)::int qualified,
+             count(*) FILTER (WHERE qualified)::int qualified_observations,
+             COALESCE((SELECT count(*) FROM qualified_rows
+               WHERE previous_at IS NULL
+                  OR evaluated_at-previous_at > interval '60 seconds'),0)::int qualified_episodes,
+             count(DISTINCT (evaluated_at AT TIME ZONE 'UTC')::date)
+               FILTER (WHERE qualified)::int qualified_days,
              max(displayed_profit_2x_usd)::float max_displayed_profit_2x,
+             max(orphan_safe_profit_2x_usd)
+               FILTER (WHERE qualified)::float max_orphan_safe_profit_2x,
              max(evaluated_at) latest
-        FROM latest`, [STRUCTURAL_UNIVERSE_ID])).rows[0];
+        FROM positive`, [STRUCTURAL_UNIVERSE_ID, structuralEvidenceStart])).rows[0];
 
     const structuralRows = includeCandidateRows ? (await client.query(`
-      WITH latest AS (
-        SELECT DISTINCT ON (e.candidate_id,e.latency_ms)
+      WITH latest_positive AS (
+        SELECT DISTINCT ON (e.candidate_id)
                e.*,c.atomic,c.end_date
           FROM borg_structural_evaluations e
           JOIN borg_structural_candidates c USING(candidate_id)
-         WHERE c.universe_id=$1 AND c.active=true
-         ORDER BY e.candidate_id,e.latency_ms,e.evaluated_at DESC,e.id DESC
+         WHERE c.universe_id=$1 AND e.evaluated_at >= $2
+           AND (e.economic_candidate OR e.qualified)
+         ORDER BY e.candidate_id,e.evaluated_at DESC,e.id DESC
       )
-      SELECT * FROM latest
+      SELECT * FROM latest_positive
        ORDER BY economic_candidate DESC,residual_2x_per_bundle DESC NULLS LAST,
-                displayed_profit_2x_usd DESC NULLS LAST`, [STRUCTURAL_UNIVERSE_ID])).rows : [];
+                displayed_profit_2x_usd DESC NULLS LAST`,
+    [STRUCTURAL_UNIVERSE_ID, structuralEvidenceStart])).rows : [];
 
     const crossvenue = (await client.query(`
       SELECT count(*)::int observations,count(DISTINCT match_id)::int pairs,
@@ -284,15 +322,6 @@ async function buildNeglectedEdgeReport(pool, options = {}) {
              COALESCE(sum(modeled_reward_adjusted_pnl),0)::float reward_adjusted_pnl
         FROM pmm_cycles`)).rows[0];
 
-    const runtimes = (await client.query(`
-      SELECT component,beat_at,meta FROM system_heartbeats
-       WHERE component=ANY($1::text[]) ORDER BY component`, [[
-      'allmarket_lab', 'crossvenue_lab', 'options_surface',
-      'pyth_boundary', 'structural_scanner',
-    ]])).rows;
-    const runtimeByComponent = Object.fromEntries(runtimes.map((row) => [row.component, row]));
-    const allMarketHeartbeat = runtimeByComponent.allmarket_lab || null;
-    const allMarketMeta = allMarketHeartbeat?.meta || {};
     const allMarketAgeSec = allMarketHeartbeat
       ? Math.max(0, (new Date(asOf).getTime() - new Date(allMarketHeartbeat.beat_at).getTime()) / 1000)
       : null;
@@ -341,8 +370,9 @@ async function buildNeglectedEdgeReport(pool, options = {}) {
         },
         {
           priority: 2, program: 'certified_payoff_graph', runMode: 'PAPER_SCANNER', active: true,
-          status: Number(structural.qualified) > 0
-            ? 'QUALIFIED_CANDIDATES_REQUIRE_MANUAL_EXECUTION_REVIEW' : 'ZERO_ATOMIC_QUALIFIED_CANDIDATES',
+          status: Number(structural.qualified_episodes) > 0
+            ? 'QUALIFIED_CANDIDATES_REQUIRE_MANUAL_EXECUTION_REVIEW'
+            : 'ZERO_ORPHAN_SAFE_QUALIFIED_EPISODES',
           evidence: structural,
           nextTest: 'Continue deterministic rule proof; rank only absolute executable dollars after full orphan reserve and capital duration.',
         },

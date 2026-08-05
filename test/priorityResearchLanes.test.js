@@ -57,6 +57,15 @@ test('dashboard reports all five lanes without adding a live-order endpoint', ()
   assert.doesNotMatch(route, /createAndPostOrder/);
 });
 
+test('structural dashboard reports use sparse positive evidence instead of full snapshot scans', () => {
+  const report = read('borg/research/neglected-edge-report.js');
+  const route = read('src/routes/borg.js');
+  assert.match(report, /WITH positive AS MATERIALIZED/);
+  assert.match(report, /e\.evaluated_at >= \$2/);
+  assert.match(report, /e\.economic_candidate OR e\.qualified/);
+  assert.match(route, /WHERE c\.universe_id=\$1\s+AND \(e\.economic_candidate OR e\.qualified\)/);
+});
+
 test('live lane status uses current heartbeats and sparse positive rows only', async () => {
   const now = new Date('2026-07-21T22:30:00.000Z');
   const heartbeatRows = [
