@@ -3813,8 +3813,24 @@ class BotInstance extends EventEmitter {
       }
 
       const lg = signal.log || {};
+      const numericOrNull = (value) => {
+        const parsed = parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      };
       const modelProbLogged = (Number.isFinite(signal.modelProb)
         ? signal.modelProb : gates.gate2?.modelProb) ?? null;
+      const exactIndicators = signal.indicators || null;
+      const loggedIndicators = lg.indicators || null;
+      const indicatorSnapshot = exactIndicators || loggedIndicators;
+      const indicatorAtrPct = exactIndicators?.atrPct != null
+        ? parseFloat(exactIndicators.atrPct)
+        : (loggedIndicators?.atrPct != null ? parseFloat(loggedIndicators.atrPct) / 100 : null);
+      const yesExecutionBook = signal.executionBooks?.yes || null;
+      const noExecutionBook = signal.executionBooks?.no || null;
+      const executableYesAsk = numericOrNull(yesExecutionBook?.bestAsk);
+      const executableNoAsk = numericOrNull(noExecutionBook?.bestAsk);
+      const executableYesAskUsd = numericOrNull(yesExecutionBook?.bestAskUsd);
+      const executableNoAskUsd = numericOrNull(noExecutionBook?.bestAskUsd);
       const challenger = MainModelChallenger.evaluate({
         marketProbability: lg.yesPrice,
         legacyProbability: modelProbLogged,
@@ -3822,15 +3838,28 @@ class BotInstance extends EventEmitter {
         phiProbability: lg.ensemble?.pPhi,
         remainingSec: gates.timeGate?.remaining ?? gates.gate2?.remaining,
         sigma5min: lg.phi?.sigma5min,
+        scenario: lg.scenario,
+        indicators: indicatorSnapshot,
+        btcDelta: lg.btcDelta,
+        yesAsk: executableYesAsk,
+        noAsk: executableNoAsk,
       }, new Date());
       await pool.query(`
         INSERT INTO signals (user_id, market_id, market_question, verdict, reason, direction, confidence, ev_raw, ev_adj, ema_edge, gate1_passed, gate2_passed, gate3_passed, gate_failed, lag_age_sec, spread_pct, scenario,
           model_prob, p_phi, p_heur, btc_edge, micro_edge, ensemble_delta, yes_price, sigma_5min, sigma_source, oracle_divergence_bps, remaining_sec, btc_price, chainlink_price, poly_yes_price, poly_no_price, asset,
           model_challenger_experiment_id, model_challenger_evidence_eligible,
-          market_baseline_prob, residual_prob, residual_model_version)
+          market_baseline_prob, residual_prob, residual_model_version,
+          indicator_regime, indicator_trend, indicator_adx, indicator_atr_pct,
+          indicator_rsi, indicator_plus_di, indicator_minus_di, indicator_realized_vol,
+          indicator_klines_age_sec, main_market_mode, main_mode_policy,
+          main_mode_model_version, executable_yes_ask, executable_no_ask,
+          executable_yes_ask_usd, executable_no_ask_usd,
+          regime_challenger_direction, regime_challenger_edge,
+          regime_challenger_eligible)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
           $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33,
-          $34, $35, $36, $37, $38)
+          $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47,
+          $48, $49, $50, $51, $52, $53, $54, $55, $56, $57)
       `, [
         this.userId,
         marketId,
@@ -3870,7 +3899,26 @@ class BotInstance extends EventEmitter {
         challenger?.evidenceEligible ?? false,
         challenger?.marketBaselineProbability ?? null,
         challenger?.residualProbability ?? null,
-        challenger?.residualModelVersion ?? null
+        challenger?.residualModelVersion ?? null,
+        indicatorSnapshot?.regime ?? null,
+        indicatorSnapshot?.trend ?? null,
+        numericOrNull(indicatorSnapshot?.adx),
+        Number.isFinite(indicatorAtrPct) ? indicatorAtrPct : null,
+        numericOrNull(indicatorSnapshot?.rsi),
+        numericOrNull(indicatorSnapshot?.plusDI),
+        numericOrNull(indicatorSnapshot?.minusDI),
+        numericOrNull(indicatorSnapshot?.realizedVol),
+        numericOrNull(loggedIndicators?.klinesAgeSec),
+        challenger?.marketMode ?? null,
+        challenger?.modePolicy ?? null,
+        challenger?.marketModeModelVersion ?? null,
+        executableYesAsk,
+        executableNoAsk,
+        executableYesAskUsd,
+        executableNoAskUsd,
+        challenger?.regimeChallengerDirection ?? null,
+        challenger?.regimeChallengerEdge ?? null,
+        challenger?.regimeChallengerEligible ?? false
       ]);
 
       // Store skipped signals with enough context for post-hoc analysis.

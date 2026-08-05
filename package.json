@@ -36,6 +36,7 @@
     "research:promising-forward": "node scripts/promising-forward-report.js",
     "research:main-v2": "node scripts/main-v2-report.js",
     "research:main-video": "node scripts/main-video-forensic-audit.js",
+    "research:main-regime": "node scripts/main-regime-autopsy.js",
     "research:pairedmaker": "node scripts/paired-maker-report.js",
     "research:wallet": "node scripts/wallet-mechanism-report.js",
     "research:flow": "node scripts/flow-evidence-report.js",

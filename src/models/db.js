@@ -363,7 +363,30 @@ const initDB = async () => {
         ADD COLUMN IF NOT EXISTS model_challenger_evidence_eligible BOOLEAN DEFAULT false,
         ADD COLUMN IF NOT EXISTS market_baseline_prob DECIMAL(6,4),
         ADD COLUMN IF NOT EXISTS residual_prob DECIMAL(6,4),
-        ADD COLUMN IF NOT EXISTS residual_model_version TEXT;
+        ADD COLUMN IF NOT EXISTS residual_model_version TEXT,
+        -- MAIN regime experiment telemetry. These fields are measurement-only:
+        -- the legacy/live order path does not read them. Persisting executable
+        -- asks fixes the historical inability to distinguish model edge from a
+        -- midpoint/last-trade illusion.
+        ADD COLUMN IF NOT EXISTS indicator_regime TEXT,
+        ADD COLUMN IF NOT EXISTS indicator_trend TEXT,
+        ADD COLUMN IF NOT EXISTS indicator_adx DECIMAL(10,4),
+        ADD COLUMN IF NOT EXISTS indicator_atr_pct DECIMAL(12,8),
+        ADD COLUMN IF NOT EXISTS indicator_rsi DECIMAL(10,4),
+        ADD COLUMN IF NOT EXISTS indicator_plus_di DECIMAL(10,4),
+        ADD COLUMN IF NOT EXISTS indicator_minus_di DECIMAL(10,4),
+        ADD COLUMN IF NOT EXISTS indicator_realized_vol DECIMAL(14,8),
+        ADD COLUMN IF NOT EXISTS indicator_klines_age_sec INTEGER,
+        ADD COLUMN IF NOT EXISTS main_market_mode TEXT,
+        ADD COLUMN IF NOT EXISTS main_mode_policy TEXT,
+        ADD COLUMN IF NOT EXISTS main_mode_model_version TEXT,
+        ADD COLUMN IF NOT EXISTS executable_yes_ask DECIMAL(8,5),
+        ADD COLUMN IF NOT EXISTS executable_no_ask DECIMAL(8,5),
+        ADD COLUMN IF NOT EXISTS executable_yes_ask_usd DECIMAL(20,4),
+        ADD COLUMN IF NOT EXISTS executable_no_ask_usd DECIMAL(20,4),
+        ADD COLUMN IF NOT EXISTS regime_challenger_direction VARCHAR(10),
+        ADD COLUMN IF NOT EXISTS regime_challenger_edge DECIMAL(10,6),
+        ADD COLUMN IF NOT EXISTS regime_challenger_eligible BOOLEAN DEFAULT false;
 
       ALTER TABLE trades
         ADD COLUMN IF NOT EXISTS scenario          VARCHAR(32),
