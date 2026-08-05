@@ -89,6 +89,8 @@ test('VPS allowlist is restricted to the frozen priority and fresh worthy succes
     'H43X_chainlink_tail_residual_v1',
     'H43_resolution_boundary_buffer',
     'MAIN_LONGSHOT_0_20_V1',
+    'MAIN_REGIME_CONTROL_V1',
+    'MAIN_REGIME_RESIDUAL_V1',
     'NEXT_H54_dynamic_ofi_resolver_confirm_v1',
     'NEXT_H7_btc_oracle_confirm_v1',
   ]);

@@ -22,7 +22,7 @@ Environment=BORG_CODE_VERSION=priority-research-v14
 # They consume the same five-minute books as the priority set, so this does not
 # widen the continuity-critical CLOB subscription universe. Historical arms
 # remain immutable and queryable but do not generate fresh rows.
-Environment=BORG_ACTIVE_STRATEGIES=H43_resolution_boundary_buffer,H43X_chainlink_tail_residual_v1,MAIN_LONGSHOT_0_20_V1,NEXT_H54_dynamic_ofi_resolver_confirm_v1,NEXT_H7_btc_oracle_confirm_v1
+Environment=BORG_ACTIVE_STRATEGIES=H43_resolution_boundary_buffer,H43X_chainlink_tail_residual_v1,MAIN_LONGSHOT_0_20_V1,MAIN_REGIME_CONTROL_V1,MAIN_REGIME_RESIDUAL_V1,NEXT_H54_dynamic_ofi_resolver_confirm_v1,NEXT_H7_btc_oracle_confirm_v1
 Environment=BORG_CAPTURE_ASSETS=btc,eth,sol,xrp
 # All five active hypotheses consume five-minute books. Hourly, threshold and
 # range authority is collected by the dedicated all-market/options/structural
