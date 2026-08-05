@@ -42,23 +42,51 @@ function parseArgs(argv) {
   };
 }
 
-async function fetchPage(coin, startTime, endTime) {
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ type: 'fundingHistory', coin, startTime, endTime }),
-  });
-  if (!response.ok) throw new Error(`${coin}: HTTP ${response.status} from fundingHistory`);
-  const body = await response.json();
-  if (!Array.isArray(body)) throw new Error(`${coin}: malformed fundingHistory response`);
-  return body;
+function retryAfterMs(value, now = Date.now()) {
+  if (value == null || value === '') return null;
+  const seconds = Number.parseFloat(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds * 1000);
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - now) : null;
 }
 
-async function fetchFundingHistory(coin, startTime, endTime) {
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function fetchPage(coin, startTime, endTime, options = {}) {
+  const fetchImpl = options.fetchImpl || global.fetch;
+  const waitImpl = options.waitImpl || wait;
+  const maxRetries = Math.max(0, Number.parseInt(options.maxRetries ?? 5, 10));
+  const baseRetryMs = Math.max(1, Number.parseInt(options.baseRetryMs ?? 500, 10));
+  const maxRetryMs = Math.max(baseRetryMs, Number.parseInt(options.maxRetryMs ?? 8000, 10));
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const response = await fetchImpl(API_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'fundingHistory', coin, startTime, endTime }),
+    });
+    if (response.ok) {
+      const body = await response.json();
+      if (!Array.isArray(body)) throw new Error(`${coin}: malformed fundingHistory response`);
+      return body;
+    }
+    const retryable = response.status === 429 || response.status >= 500;
+    if (!retryable || attempt === maxRetries) {
+      throw new Error(`${coin}: HTTP ${response.status} from fundingHistory after ${attempt + 1} attempt(s)`);
+    }
+    const headerDelay = retryAfterMs(response.headers?.get?.('retry-after'));
+    const exponentialDelay = Math.min(maxRetryMs, baseRetryMs * (2 ** attempt));
+    await waitImpl(headerDelay == null ? exponentialDelay : Math.min(maxRetryMs, headerDelay));
+  }
+  throw new Error(`${coin}: fundingHistory retry loop exhausted`);
+}
+
+async function fetchFundingHistory(coin, startTime, endTime, options = {}) {
   const rows = [];
   let cursor = startTime;
   while (cursor <= endTime) {
-    const page = await fetchPage(coin, cursor, endTime);
+    const page = await fetchPage(coin, cursor, endTime, options);
     if (!page.length) break;
     for (const row of page) {
       const time = parseInt(row.time, 10);
@@ -226,9 +254,11 @@ if (require.main === module) main().catch((error) => {
 });
 
 module.exports = {
+  fetchPage,
   fetchFundingHistory,
   maxDrawdown,
   parseArgs,
+  retryAfterMs,
   rollingMinimum,
   summarizeCarry,
   utcDay,
