@@ -46,7 +46,9 @@ Capture funding announcement/effective timestamps, predicted and realized fundin
 
 ### Public news/social event tape
 
-Only build after obtaining terms-compliant causal access. Preserve post/publication ID, original publication and edit times, local receipt and monotonic times, source authenticity, raw text/media hash, model start/end, decision and simulated arrival. Start with official government/company/RSS sources before paid firehoses. Storage is likely below 1 GiB/month for text, excluding media. The decision is whether reaction persists after realistic source and inference latency—not whether an LLM can explain an event after the market moved.
+The first terms-compliant lane is now implemented against Polymarket's public XTracker API, which is named as the primary resolver in current post-count rules. `borg/publicinfo/collector.js` preserves source creation time, XTracker import time, local receive/monotonic time, immutable content hash and linked public CLOB L2 before emitting paper-only resolver-boundary observations. Direct automated Truth Social access remains prohibited by its published terms and is not used. X's official filtered stream is technically available on pay-per-use credentials, but should be added only for a pre-registered account list and spending cap.
+
+The next source collectors should use official SEC EDGAR, government/RSS and exact weather-resolver feeds. Preserve publication ID, original publication and edit times, local receipt and monotonic times, source authenticity, raw text/media hash, model start/end, decision and simulated arrival. Storage is likely below 1 GiB/month for text, excluding media; linked book capture dominates. The decision is whether reaction persists after realistic source and inference latency—not whether an LLM can explain an event after the market moved.
 
 ### On-chain/DEX execution tape
 
