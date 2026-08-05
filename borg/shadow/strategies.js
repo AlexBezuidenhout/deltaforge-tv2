@@ -30,6 +30,7 @@ const makeMainV4Strategies = require('./main-v4');
 const makeMainVideoParityStrategies = require('./main-video-parity');
 const makeMetaChampionStreakStrategies = require('./meta-champion-streak');
 const makePrioritySuccessors = require('./priority-successors');
+const makeMainRegimeStrategies = require('./main-regime');
 const { EthGLateExactForward } = require('./eth-g-late-forward');
 const {
   RESEARCH_CAPITAL_VERSION,
@@ -1613,6 +1614,7 @@ module.exports = () => [
   ...makeWorthyForwardStrategies(),
   ...makeMetaChampionStreakStrategies(),
   ...makePrioritySuccessors(),
+  ...makeMainRegimeStrategies(),
 ];
 module.exports._test = {
   BtcLeadsAlts,

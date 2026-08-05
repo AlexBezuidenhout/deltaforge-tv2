@@ -1,0 +1,66 @@
+{
+  "manifest_format": "borg-experiment-v1",
+  "experiment_id": "main-regime-residual-v1",
+  "status": "FROZEN_FORWARD_EVAL",
+  "phase": "eval",
+  "family": "main_market_offset_regime_residual",
+  "strategy_version": "main-regime-residual-v1",
+  "frozen_at_utc": "2026-08-05T17:23:27.000Z",
+  "evidence_started_at": "2026-08-05T17:23:27.000Z",
+  "paper_only": true,
+  "live_order_path": false,
+  "starting_bankroll_usd": 500,
+  "target_notional_usd": 10,
+  "provisional": true,
+  "discovery_rows_reused": false,
+  "hypothesis": "MAIN's pre-cutoff market-offset residual may add executable value only during a coherent causal directional impulse; all other modes should abstain or require a different uncertainty model.",
+  "selection_disclosure": "The eligible scenario family was selected after a forward calibration diagnostic showed residual Brier improvement in LAG_EDGE, MOMENTUM_BREAKOUT, VOLATILITY_EXPANSION and MOMENTUM_FADE. The clean executable replay remained negative in every scenario. No historical row counts as evidence for either fresh arm.",
+  "matched_design": {
+    "source": "MAIN_VIDEO_PARITY_V1__taker250",
+    "control": "fresh unchanged source instance with a new identity",
+    "challenger": "consume the identical first source intent, retain only DIRECTIONAL_IMPULSE when the frozen residual agrees with the source side and clears the executable ask after doubled taker fees plus one token tick",
+    "filtered_first_intent_rule": "A rejected first source intent consumes the market for both source instances; the challenger cannot search later quotes for a favorable mode.",
+    "mode_rules": {
+      "DIRECTIONAL_IMPULSE": "RESIDUAL_EXECUTABLE_HURDLE",
+      "VOLATILITY_TRANSITION": "ABSTAIN; a separate multi-sigma envelope such as H61 is required",
+      "CHOP": "OBSERVE_ONLY",
+      "TREND_DECAY": "OBSERVE_ONLY",
+      "REVERSAL_RISK": "OBSERVE_ONLY",
+      "ESTABLISHED_TREND": "OBSERVE_ONLY",
+      "BASELINE": "OBSERVE_ONLY"
+    }
+  },
+  "strategy_bindings": [
+    {
+      "strategy": "MAIN_REGIME_CONTROL_V1",
+      "family": "main_market_offset_regime_residual",
+      "arm": "unchanged_control",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "net_pnl_2x_matched_by_market_day"
+    },
+    {
+      "strategy": "MAIN_REGIME_RESIDUAL_V1",
+      "family": "main_market_offset_regime_residual",
+      "arm": "directional_impulse_residual",
+      "phase": "eval",
+      "min_independent_markets": 300,
+      "min_days": 14,
+      "primary_metric": "incremental_net_pnl_2x_vs_matched_control_by_market_day"
+    }
+  ],
+  "evaluation": {
+    "minimum_independent_markets_per_arm": 300,
+    "minimum_calendar_days": 14,
+    "require_both_chronological_halves_positive": true,
+    "require_2x_cost_stress_positive": true,
+    "require_market_and_day_clustered_lower_bounds_above_zero": true,
+    "require_incremental_pnl_vs_control": true,
+    "require_latency_profiles_ms": [100, 250, 500],
+    "multiple_testing": "Holm correction across every MAIN variant, inspected scenario and price band",
+    "capacity": "at most $10 and 20% of displayed touch under a shared $500 bankroll",
+    "promotion": "No live path. A mechanical pass only permits review for a separate authenticated $1-$2 canary.",
+    "null_outcome": "No orders, negative PnL or approximately zero incremental edge are valid outcomes and do not permit threshold changes."
+  }
+}

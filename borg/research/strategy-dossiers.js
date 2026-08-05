@@ -12,7 +12,9 @@ const PRIORITY_RESEARCH = Object.freeze({
   H43_resolution_boundary_buffer: { rank: 2, tier: 'CONTROL' },
   NEXT_H54_dynamic_ofi_resolver_confirm_v1: { rank: 3, tier: 'PRIORITY' },
   NEXT_H7_btc_oracle_confirm_v1: { rank: 4, tier: 'CONTROL' },
-  MAIN_LONGSHOT_0_20_V1: { rank: 5, tier: 'FALSIFICATION' },
+  MAIN_REGIME_RESIDUAL_V1: { rank: 5, tier: 'FALSIFICATION' },
+  MAIN_REGIME_CONTROL_V1: { rank: 6, tier: 'CONTROL' },
+  MAIN_LONGSHOT_0_20_V1: { rank: 7, tier: 'FALSIFICATION' },
 });
 
 const PREMISES = Object.freeze({
@@ -27,6 +29,8 @@ const PREMISES = Object.freeze({
   MAIN_V4_warm_vol_temporal_consensus: 'Require warmed volatility and agreement across several recent observations before accepting MAIN’s directional signal.',
   MAIN_VIDEO_PARITY_V1__taker250: 'Falsify the purchased MAIN/video signal recipe at the executable ask with 250 ms quote survival, doubled dynamic taker fees and one tick of stress.',
   MAIN_VIDEO_PARITY_V1__postonly: 'Test the same purchased MAIN/video signal behind a non-crossing post-only bid with queue-ahead, partial-fill and adverse-selection accounting.',
+  MAIN_REGIME_CONTROL_V1: 'Run a fresh unchanged executable MAIN/video control beside the regime challenger so abstention and selection effects are measured causally.',
+  MAIN_REGIME_RESIDUAL_V1: 'Retain the identical first MAIN control intent only in a directional-impulse mode when the frozen market-offset residual agrees and clears the executable ask after doubled fees plus one tick.',
   META_CHAMPION_STREAK_V1: 'Test whether strategy-level performance persists long enough to allocate only to a causally observed, cost-stressed winning source without hindsight or same-market outcome leakage.',
   T240_four_state_residual_v1: 'At four minutes to expiry, model the joint state of price direction and market quote, then trade only the residual not already reflected in the token.',
   H1_pair_arb_2x: 'Buy a complementary YES/NO bundle only when its executable cost remains below the guaranteed $1 payout after doubled fees.',
@@ -155,6 +159,8 @@ const PRIOR_OUTCOMES = Object.freeze({
   MAIN_V4_warm_vol_temporal_consensus: 'Warm-volatility and temporal agreement did not repair MAIN’s negative forward economics.',
   MAIN_VIDEO_PARITY_V1__taker250: 'The promotional win rate is inadmissible: two of three visible BUY rows bought the official losing side, and the purchased paper engine used synthetic fills. This fresh arm starts at zero.',
   MAIN_VIDEO_PARITY_V1__postonly: 'The video claims resting GTC behaviour that the purchased execution path does not implement. This fresh post-only reinterpretation starts at zero and cannot inherit the promotional PnL.',
+  MAIN_REGIME_CONTROL_V1: 'The underlying executable MAIN reconstruction was materially negative in every historical scenario. This control starts at zero and exists to measure the challenger without survivor bias.',
+  MAIN_REGIME_RESIDUAL_V1: 'Residual calibration improved in several directional scenario buckets, but every clean executable scenario replay remained negative. The regime and residual filter is post-diagnostic and therefore starts at zero as a strict falsification arm.',
   META_CHAMPION_STREAK_V1: 'This selector starts at zero. Winning-streak routing is especially exposed to winner’s curse and multiple testing, so source PnL is only an input feature; only the meta-strategy’s fresh forward PnL can validate it.',
   H74_markov_regime_residual: 'The 30-day development prior was negative across BTC, ETH, SOL and XRP. H74 is retained as a strict forward falsification arm, not a promising backtest.',
   H75_4h_dynamic_liquidity_leadlag: 'The only encouraging development cell was ETH over three minutes (23 episodes, +2.645 bps), but its Wilson interval included chance and no Polymarket execution costs were available. All four asset arms remain in the fresh test.',
