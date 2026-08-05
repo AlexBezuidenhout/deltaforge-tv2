@@ -41,6 +41,8 @@
     "research:flow": "node scripts/flow-evidence-report.js",
     "research:flow-boundary": "node scripts/flow-boundary-report.js",
     "research:funding": "node scripts/funding-carry-backtest.js",
+    "research:free-cex": "node scripts/free-cex-mechanism-backtest.js --days=180",
+    "research:free-coverage": "node scripts/free-edge-test-report.js",
     "research:dvol-threshold": "node scripts/dvol-threshold-backtest.js",
     "research:options-surface": "node scripts/options-surface-report.js",
     "research:h43x-train": "node scripts/train-h43x-tail-model.js",
