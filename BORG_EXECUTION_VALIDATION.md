@@ -21,7 +21,7 @@ The replay:
 - retains partial fills and proves non-fills separately from missing data;
 - fails closed on sequence gaps, stale transport and redundant-path disagreement;
 - calculates P&L after doubled modelled taker fees;
-- reruns each fill with one adverse tick per leg;
+- preserves each executed quantity and worsens its execution price by one tick;
 - splits every latency profile into chronological halves.
 
 This is counterfactual L4 evidence. It is not L5 exchange acknowledgement and
@@ -78,6 +78,11 @@ config with root-only ownership, locking out the production archive service.
 Large transfers may use `--stage-root=/var/lib/deltaforge/research-cache/<run>`;
 an interrupted download is then retained and checksum-resumed, while a complete
 replay removes the bounded stage after publishing its report.
+
+Run large historical replays at low operating-system priority (`nice 19` and
+idle I/O scheduling on Linux). The validator is research-only and must yield to
+live collectors; saturating the four-core VPS can otherwise make an economic
+feed fail its freshness budget even though the socket remains connected.
 
 Staging switches from per-object `--no-traverse` lookup to `--fast-list` at 500
 selected segments. This follows rclone's guidance for larger or mostly

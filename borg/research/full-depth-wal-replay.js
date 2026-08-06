@@ -12,7 +12,7 @@
 
 const { binaryPnl } = require('./execution-kernel');
 
-const FULL_DEPTH_REPLAY_VERSION = 'borg-wal-full-depth-v1';
+const FULL_DEPTH_REPLAY_VERSION = 'borg-wal-full-depth-v2';
 const DEFAULT_TRANSPORT_FRESH_MS = 10_000;
 const A_GRADE_TRANSPORT_FRESH_MS = 2_000;
 const EPSILON = 1e-9;
@@ -116,6 +116,34 @@ function walkDepth(order, state, options = {}) {
     levelsConsumed,
     limitPrice: limit,
     tickStress: tickSize,
+  };
+}
+
+/**
+ * Apply an adverse execution-price stress to the quantity that actually
+ * filled. Re-walking the original limit after shifting the book can reduce
+ * the filled quantity and make a losing trade look better. That is a useful
+ * quote-survival counterfactual, but it is not a conservative P&L stress.
+ */
+function adverseFillStress(order, exact, tickSize) {
+  const tick = finite(tickSize);
+  const exactPrice = finite(exact?.fillPrice);
+  const exactSize = finite(exact?.fillSize);
+  if (!exact?.filled || !(tick > 0) || !(exactPrice > 0 && exactPrice < 1)
+      || !(exactSize > 0)) return null;
+  const side = String(order.side || 'BUY').toUpperCase();
+  const fillPrice = side === 'SELL'
+    ? Math.max(0.001, exactPrice - tick)
+    : Math.min(0.999, exactPrice + tick);
+  return {
+    ...exact,
+    filled: true,
+    fillPrice,
+    fillSize: exactSize,
+    fillNotional: fillPrice * exactSize,
+    tickStress: tick,
+    stressBasis: 'fixed_executed_quantity',
+    originalFillPrice: exactPrice,
   };
 }
 
@@ -311,7 +339,7 @@ class FullDepthWalReconstructor {
       const tickSize = inferTickSize(state);
       const explicitTickSize = finite(state.tickSize);
       const exact = walkDepth(order, state);
-      const stressed = tickSize == null ? null : walkDepth(order, state, { tickSize });
+      const stressed = tickSize == null ? null : adverseFillStress(order, exact, tickSize);
       paths.push({
         shard, exact, stressed, tickSize,
         tickSizeBasis: explicitTickSize > 0
@@ -432,6 +460,14 @@ function attachPnl(order, replay) {
     fillPrice: stressed.fillPrice, fillSize: stressed.fillSize,
     orderKind: order.order_kind, feeMultiplier: 2,
   }).net : 0;
+  if (stressed?.filled) {
+    if (Math.abs(finite(stressed.fillSize, 0) - finite(replay.fillSize, 0)) > EPSILON) {
+      throw new Error('One-tick stress changed the executed quantity');
+    }
+    if (stressedPnl > two.net + EPSILON) {
+      throw new Error('One-tick stress improved doubled-cost P&L');
+    }
+  }
   return {
     ...replay,
     gross: one.gross,
@@ -484,6 +520,7 @@ function summarizeFullDepthReplays(rows, profiles = [100, 250, 500]) {
 
 module.exports = {
   A_GRADE_TRANSPORT_FRESH_MS,
+  adverseFillStress,
   DEFAULT_TRANSPORT_FRESH_MS,
   FULL_DEPTH_REPLAY_VERSION,
   FullDepthWalReconstructor,

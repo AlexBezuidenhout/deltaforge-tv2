@@ -8,6 +8,7 @@ const test = require('node:test');
 const {
   FULL_DEPTH_REPLAY_VERSION,
   FullDepthWalReconstructor,
+  adverseFillStress,
   attachPnl,
   orderAssetId,
   summarizeFullDepthReplays,
@@ -79,6 +80,25 @@ test('one-tick stress shifts executable depth pessimistically', () => {
   assert.equal(stressed.fillSize, 4);
   assert.equal(stressed.partial, true);
   assert.equal(stressed.fillPrice, 0.55);
+});
+
+test('execution PnL stress preserves the filled quantity and is monotone adverse', () => {
+  const exact = walkDepth({ ...order, price: 0.55 }, {
+    asks: [[0.54, 4], [0.55, 9]], bids: [],
+  });
+  const stressed = adverseFillStress(order, exact, 0.01);
+  assert.equal(stressed.fillSize, exact.fillSize);
+  assert.ok(stressed.fillPrice > exact.fillPrice);
+  assert.equal(stressed.stressBasis, 'fixed_executed_quantity');
+
+  const replay = new FullDepthWalReconstructor();
+  replay.applyEnvelope(envelope(1, 0, book(), 10));
+  const result = replay.replay(order, BASE + 100);
+  assert.equal(result.detail.one_tick_stress.fillSize, result.fillSize);
+  const winner = attachPnl(order, result);
+  const loser = attachPnl({ ...order, outcome: 'DOWN' }, result);
+  assert.ok(winner.pnl2xOneTick <= winner.pnl2x);
+  assert.ok(loser.pnl2xOneTick <= loser.pnl2x);
 });
 
 test('two agreeing redundant paths produce an A-grade causal L4 fill', () => {
