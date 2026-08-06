@@ -6,6 +6,8 @@ const { extractExactPythFeedSymbol } = require('../pyth/hermes');
 const { feeMetadata, parseArray, sha256 } = require('../pyth/universe');
 
 const EQUITY_OPTION_UNIVERSE_VERSION = 'equity-pyth-exact-expiry-v1';
+const GAMMA = 'https://gamma-api.polymarket.com';
+const FINANCE_TAG_ID = '104152';
 
 function finite(value) {
   const parsed = parseFloat(value);
@@ -130,8 +132,42 @@ function selectEquityThresholds(events, options = {}) {
   };
 }
 
+async function fetchJson(url, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15_000));
+  try {
+    const response = await (options.fetchImpl || fetch)(url, { signal: controller.signal });
+    const body = await response.text();
+    if (!response.ok) throw new Error(`Gamma HTTP ${response.status}: ${body.slice(0, 160)}`);
+    return JSON.parse(body);
+  } finally { clearTimeout(timeout); }
+}
+
+async function fetchCurrentEquityEvents(options = {}) {
+  const nowMs = Number(options.nowMs ?? Date.now());
+  const pages = Math.max(1, Math.min(8, Number(options.pages || 4)));
+  const events = [];
+  for (let page = 0; page < pages; page += 1) {
+    const url = new URL(`${GAMMA}/events`);
+    const params = {
+      tag_id: String(options.tagId || FINANCE_TAG_ID), active: 'true', closed: 'false',
+      limit: '100', offset: String(page * 100), order: 'endDate', ascending: 'true',
+      end_date_min: new Date(nowMs - 3600_000).toISOString(),
+      end_date_max: new Date(nowMs + Number(options.lookaheadDays || 8) * 86_400_000).toISOString(),
+    };
+    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+    const rows = await fetchJson(url.toString(), options);
+    if (!Array.isArray(rows)) throw new Error('Gamma equity event response is not an array');
+    events.push(...rows);
+    if (rows.length < 100) break;
+  }
+  return [...new Map(events.map((event) => [String(event.id || event.slug), event])).values()];
+}
+
 module.exports = {
   EQUITY_OPTION_UNIVERSE_VERSION,
+  FINANCE_TAG_ID,
+  fetchCurrentEquityEvents,
   normalizeEquityThreshold,
   selectEquityThresholds,
   thresholdStrike,

@@ -70,8 +70,8 @@ test('robust vertical evaluator keeps token and option price scales separate', (
     nowMs: now,
     optionQuotes: [option('call-98', 98, 1.1, 1.2), option('call-99', 99, 1.0, 1.1)],
     polyBooks: {
-      yes: { asks: [[0.5, 1000]], bids: [[0.49, 1000]] },
-      no: { asks: [[0.4, 1000]], bids: [[0.39, 1000]] },
+      yes: { asks: [[0.5, 1000]], bids: [[0.49, 1000]], at: now },
+      no: { asks: [[0.4, 1000]], bids: [[0.39, 1000]], at: now },
     },
     config: {
       basisBoundUsd: 1,
@@ -107,6 +107,10 @@ test('vertical experiment fails closed without untouched basis evidence or curre
   const now = EXPIRY - 3600_000;
   const stale = scanRobustVerticals({
     target, nowMs: now,
+    polyBooks: {
+      yes: { asks: [[0.5, 1000]], bids: [[0.49, 1000]], at: now },
+      no: { asks: [[0.4, 1000]], bids: [[0.39, 1000]], at: now },
+    },
     optionQuotes: [{
       instrumentId: 'stale', underlying: 'SPY', optionType: 'call', strike: 99,
       expiryMs: EXPIRY, bid: 1, ask: 1.1, bidSize: 5, askSize: 5,
@@ -121,4 +125,18 @@ test('vertical experiment fails closed without untouched basis evidence or curre
     },
   });
   assert.deepEqual(stale.failures, ['NO_FRESH_EXACT_EXPIRY_OPTION_QUOTES']);
+});
+
+test('vertical experiment rejects unclocked or stale Polymarket books', () => {
+  const target = normalizeEquityThreshold(event(), event().markets[0]);
+  const now = EXPIRY - 3600_000;
+  const result = scanRobustVerticals({
+    target, nowMs: now, polyBooks: { yes: {}, no: {} }, config: {
+      basisBoundUsd: 1, basisEvidenceId: 'basis', basisObservationDays: 30,
+      regularSessionTradeObserved: true, corporateActionClear: true,
+      optionFeePerContractPerLeg: 0.65, optionTickSizeUsd: 0.01,
+      assignmentReserveUsdPerContract: 1, feeMultiplier: 2, maxAgeMs: 1000,
+    },
+  });
+  assert.ok(result.failures.includes('POLYMARKET_BOOK_STALE_OR_UNTIMESTAMPED'));
 });

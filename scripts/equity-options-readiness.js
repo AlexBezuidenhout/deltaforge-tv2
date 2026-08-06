@@ -5,30 +5,12 @@
 
 const path = require('node:path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const { FINANCE_UPDOWN_TAG, GAMMA, fetchJson } = require('../borg/pyth/universe');
-const { selectEquityThresholds } = require('../borg/equity-options/universe');
+const {
+  fetchCurrentEquityEvents, selectEquityThresholds,
+} = require('../borg/equity-options/universe');
 
 async function fetchCurrentEvents(nowMs = Date.now()) {
-  const events = [];
-  for (let page = 0; page < 4; page += 1) {
-    const url = new URL(`${GAMMA}/events`);
-    const params = {
-      tag_id: FINANCE_UPDOWN_TAG,
-      active: 'true',
-      closed: 'false',
-      limit: '100',
-      offset: String(page * 100),
-      order: 'endDate',
-      ascending: 'true',
-      end_date_min: new Date(nowMs - 3600_000).toISOString(),
-      end_date_max: new Date(nowMs + 8 * 86_400_000).toISOString(),
-    };
-    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-    const rows = await fetchJson(url.toString());
-    events.push(...rows);
-    if (rows.length < 100) break;
-  }
-  return [...new Map(events.map((event) => [String(event.id || event.slug), event])).values()];
+  return fetchCurrentEquityEvents({ nowMs });
 }
 
 async function main() {
@@ -37,8 +19,7 @@ async function main() {
     .split(',').map((value) => value.trim().toUpperCase()).filter(Boolean);
   const events = await fetchCurrentEvents(nowMs);
   const selection = selectEquityThresholds(events, { symbols, nowMs });
-  const licensedFeedConfigured = Boolean(process.env.IBKR_CLIENT_PORTAL_URL
-    && process.env.IBKR_ACCOUNT_ID);
+  const licensedFeedConfigured = Boolean(process.env.IBKR_CLIENT_PORTAL_URL);
   const report = {
     format: 'deltaforge-equity-options-readiness-v1',
     generatedAt: new Date(nowMs).toISOString(),

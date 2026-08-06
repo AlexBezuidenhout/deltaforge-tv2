@@ -4,8 +4,8 @@
   "registered_at": "2026-08-06T09:26:54.000Z",
   "frozen_at": "2026-08-06T09:26:54.000Z",
   "evidence_started_at": null,
-  "phase": "staged",
-  "status": "staged_waiting_for_licensed_options_feed",
+  "phase": "capture",
+  "status": "blocked_external_prerequisite",
   "paper_only": true,
   "live_order_path": "disabled",
   "family": "equity_options_structural_residual",
@@ -16,17 +16,19 @@
   "initial_symbols": ["SPY", "EWY"],
   "required_external_input": {
     "feed": "licensed real-time OPRA top-of-book with source and receive timestamps",
-    "acceptable_adapter": "IBKR Client Portal or TWS API with the user's entitled market-data subscription",
-    "prohibited": "automated extraction of delayed Cboe web pages"
+    "acceptable_adapter": "read-only IBKR Client Portal market data with the user's entitled subscription",
+    "exact_basis_sources": "Pyth final regular-session one-minute candle plus official primary-listing close",
+    "prohibited": "automated extraction of delayed quote webpages or relabeling broker last prices as settlement evidence"
   },
   "hard_vetoes": [
-    "option expiry is not exactly the Polymarket settlement timestamp",
+    "option expiry date is not exactly the Polymarket settlement date",
     "Pyth rule, comparator, tie treatment or feed symbol is uncertified",
     "fewer than 30 untouched Pyth-versus-official close basis days",
     "regular-session trading has not been observed",
     "corporate action is not cleared",
     "missing option commission, exchange fee, tick stress or assignment reserve",
     "missing source timestamp, receive timestamp or displayed option size",
+    "stale or untimestamped Polymarket book",
     "non-atomic orphan reserve erases the residual"
   ],
   "cost_model": {
@@ -48,7 +50,7 @@
     "strategy": "equity_pyth_vertical_floor_v1",
     "family": "equity_options_structural_residual",
     "arm": "exact_expiry_robust_vertical",
-    "phase": "staged",
+    "phase": "capture",
     "min_independent_markets": 300,
     "min_days": 30,
     "primary_metric": "orphan_safe_pnl_after_synchronized_2x_costs"

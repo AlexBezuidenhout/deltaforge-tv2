@@ -52,6 +52,11 @@ function quoteFresh(quote, nowMs, maxAgeMs) {
     && quote.receiveMs <= nowMs + 1000 && quote.sourceMs <= nowMs + 1000;
 }
 
+function polyBookFresh(book, nowMs, maxAgeMs) {
+  const at = finite(book?.at ?? book?.receivedAt ?? book?.receiveMs);
+  return at != null && at <= nowMs + 1000 && nowMs - at <= maxAgeMs;
+}
+
 function optionLegUnwindPnl({ entryPrice, exitPrice, contracts, multiplier,
   optionFeePerContractPerLeg, feeMultiplier }) {
   return (exitPrice - entryPrice) * contracts * multiplier
@@ -228,6 +233,11 @@ function scanRobustVerticals(input = {}) {
   if (!(config.feeMultiplier >= 2)) failures.push('FEE_STRESS_BELOW_TWO_TIMES');
   if (!config.corporateActionClear) failures.push('CORPORATE_ACTION_NOT_CLEARED');
   if (!config.regularSessionTradeObserved) failures.push('NO_SESSION_STATE_NOT_ELIMINATED');
+  const books = input.polyBooks || {};
+  if (!polyBookFresh(books.yes, nowMs, config.maxAgeMs)
+      || !polyBookFresh(books.no, nowMs, config.maxAgeMs)) {
+    failures.push('POLYMARKET_BOOK_STALE_OR_UNTIMESTAMPED');
+  }
   if (failures.length) return {
     version: VERTICAL_FLOOR_VERSION, candidates: [], qualified: [], failures,
   };
@@ -241,7 +251,6 @@ function scanRobustVerticals(input = {}) {
     version: VERTICAL_FLOOR_VERSION, candidates: [], qualified: [],
     failures: ['NO_FRESH_EXACT_EXPIRY_OPTION_QUOTES'],
   };
-  const books = input.polyBooks || {};
   const candidates = [];
   for (const optionType of ['call', 'put']) {
     const rows = quotes.filter((quote) => quote.optionType === optionType)
@@ -277,6 +286,7 @@ function scanRobustVerticals(input = {}) {
 module.exports = {
   VERTICAL_FLOOR_VERSION,
   normalizeOptionQuote,
+  polyBookFresh,
   quoteFresh,
   scanRobustVerticals,
   verticalIdentity,
