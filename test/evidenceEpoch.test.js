@@ -292,6 +292,7 @@ test('evidence report distinguishes the immutable release from the collector fam
   assert.match(source, /requirementsVersion: 'evidence-health-v4-lane-scoped'/);
   assert.match(source, /primary redundant CLOB coverage is/);
   assert.match(source, /primary redundant RTDS coverage is/);
+  assert.match(source, /crossvenue_lab has \$\{consecutiveTimeouts\} consecutive universe timeouts/);
   assert.match(source, /public-flow process is warming, stale or repeatedly restarting/);
   assert.match(source, /row\.source === 'flow_heartbeat'[\s\S]*strategy_signals_enabled !== true/);
   assert.match(source, /\.\.\.broadCaptureCounters/);

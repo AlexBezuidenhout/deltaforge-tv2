@@ -369,6 +369,20 @@ async function assessEvidenceEpoch(pool, options = {}) {
         critical.push(`allmarket_lab has ${consecutiveTimeouts} consecutive universe timeouts`);
       }
     }
+    if (component === 'crossvenue_lab') {
+      const refreshAt = row?.meta?.lastUniverseRefreshAt;
+      const refreshAgeSec = ageSeconds(refreshAt, nowMs);
+      const maxRefreshAgeSec = finite(row?.meta?.universeMaxStaleMs, 3_600_000) / 1000;
+      const consecutiveTimeouts = finite(row?.meta?.consecutiveUniverseRefreshTimeouts, 0);
+      if (!isAtOrAfter(refreshAt, epochStart)
+          || refreshAgeSec == null || refreshAgeSec > maxRefreshAgeSec) {
+        critical.push(`crossvenue_lab universe refresh is ${
+          refreshAgeSec == null ? 'missing' : `${Math.round(refreshAgeSec)}s old`}`);
+      }
+      if (consecutiveTimeouts >= 3) {
+        critical.push(`crossvenue_lab has ${consecutiveTimeouts} consecutive universe timeouts`);
+      }
+    }
     if (component === 'pyth_boundary') {
       const meta = row?.meta || {};
       const processStartedAt = meta.processStartedAt;

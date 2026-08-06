@@ -245,6 +245,26 @@ async function main() {
         critical.push(`allmarket_lab has ${consecutiveTimeouts} consecutive universe timeouts`);
       }
     }
+    if (beatByName.crossvenue_lab) {
+      const universeRefreshAgeSec = ageSeconds(
+        beatByName.crossvenue_lab.meta?.lastUniverseRefreshAt,
+      );
+      const maxUniverseAgeMs = number(
+        beatByName.crossvenue_lab.meta?.universeMaxStaleMs,
+        3_600_000,
+      );
+      const consecutiveTimeouts = number(
+        beatByName.crossvenue_lab.meta?.consecutiveUniverseRefreshTimeouts,
+        0,
+      );
+      if (universeRefreshAgeSec == null
+          || universeRefreshAgeSec * 1000 > maxUniverseAgeMs) {
+        critical.push('crossvenue_lab full-universe metadata refresh is stale or missing');
+      }
+      if (consecutiveTimeouts >= 3) {
+        critical.push(`crossvenue_lab has ${consecutiveTimeouts} consecutive universe timeouts`);
+      }
+    }
     if (beatByName.pyth_boundary) {
       const feedState = beatByName.pyth_boundary.meta?.feedState;
       if (feedState === 'DISCONNECTED' || beatByName.pyth_boundary.meta?.transportConnected === false) {

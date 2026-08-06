@@ -729,6 +729,26 @@ test('full-universe discovery runs outside the live collector event loop', () =>
   assert.doesNotMatch(source, /await discoverCrossVenue\(/);
 });
 
+test('one transient cross-venue discovery timeout retains a fresh monitored cohort as a warning', () => {
+  const {
+    isTransientDiscoveryError, universeRefreshSeverity,
+  } = require('../borg/crossvenue/collector');
+  const error = new Error('cross-venue discovery exceeded 240000ms');
+  assert.equal(isTransientDiscoveryError(error), true);
+  assert.equal(universeRefreshSeverity({
+    error, monitoredMatches: 6, consecutiveTimeouts: 1,
+    lastSuccessAt: Date.now() - 60_000,
+  }), 'WARN');
+  assert.equal(universeRefreshSeverity({
+    error, monitoredMatches: 6, consecutiveTimeouts: 3,
+    lastSuccessAt: Date.now() - 60_000,
+  }), 'ERROR');
+  assert.equal(universeRefreshSeverity({
+    error: new Error('invalid rule payload'), monitoredMatches: 6,
+    consecutiveTimeouts: 0, lastSuccessAt: Date.now(),
+  }), 'ERROR');
+});
+
 test('cross-venue CLI convergence report retains the paper cohort flags', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'crossvenue-backtest.js'), 'utf8');
   assert.match(source, /entry_economic,paper_eval_approved,paper_entry_eligible/);

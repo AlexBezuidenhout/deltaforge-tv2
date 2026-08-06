@@ -56,6 +56,8 @@ const KALSHI_POLL_MS = Math.max(1000, Number(process.env.CROSSVENUE_KALSHI_POLL_
 const KALSHI_ORDERBOOK_BATCH_SIZE = 100;
 const DISCOVERY_TIMEOUT_MS = Math.max(60_000,
   Number(process.env.CROSSVENUE_DISCOVERY_TIMEOUT_MS || 240_000));
+const UNIVERSE_MAX_STALE_MS = Math.max(REFRESH_MS * 3,
+  Number(process.env.CROSSVENUE_UNIVERSE_MAX_STALE_MS || 3_600_000));
 // Kalshi's default WebSocket subscription tier supports 200 market tickers.
 // Keep one collector below that observed/documented boundary; larger cohorts
 // require explicit feed sharding rather than silently truncating discovery.
@@ -124,6 +126,30 @@ function chunkKalshiTickers(tickers, batchSize = KALSHI_ORDERBOOK_BATCH_SIZE) {
     batches.push(unique.slice(offset, offset + size));
   }
   return batches;
+}
+
+function isTransientDiscoveryError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const name = String(error?.name || '').toUpperCase();
+  const message = String(error?.message || error || '').toLowerCase();
+  return name === 'ABORTERROR'
+    || ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN', 'ENETUNREACH'].includes(code)
+    || /(?:discovery exceeded|operation was aborted|timed? ?out|fetch failed|socket hang up)/
+      .test(message);
+}
+
+function universeRefreshSeverity({
+  error, monitoredMatches, consecutiveTimeouts, lastSuccessAt,
+  now = Date.now(), maxStaleMs = UNIVERSE_MAX_STALE_MS,
+}) {
+  const lastSuccessMs = Number(lastSuccessAt);
+  const staleMs = Number.isFinite(lastSuccessMs) ? Math.max(0, now - lastSuccessMs) : Infinity;
+  return isTransientDiscoveryError(error)
+    && Number(monitoredMatches) > 0
+    && Number(consecutiveTimeouts) < 3
+    && staleMs <= maxStaleMs
+    ? 'WARN'
+    : 'ERROR';
 }
 const SNAPSHOT_COLUMNS = [
   'observed_at', 'match_id', 'trigger_venue', 'poly_book_at', 'kalshi_book_at',
@@ -340,6 +366,9 @@ class CrossVenueLab {
       synchronizedSnapshots: 0, synchronizationRejects: 0,
       terminalCarryMarks: 0, terminalCarryEligible: 0, terminalCarryEntries: 0,
       lastMarketAt: null, lastEvaluationAt: null,
+      lastUniverseRefreshAt: null, lastUniverseRefreshAttemptAt: null,
+      universeRefreshTimeouts: 0, consecutiveUniverseRefreshTimeouts: 0,
+      universeRefreshFailures: 0,
     };
     const walOptions = {
       root: process.env.BORG_WAL_DIR,
@@ -395,7 +424,8 @@ class CrossVenueLab {
       setInterval(() => this.pollKalshi('hot').catch((error) => this.recordError('kalshi_hot_poll', error)), KALSHI_POLL_MS),
       setInterval(() => this.pollKalshi('broad').catch((error) => this.recordError('kalshi_broad_poll', error)), BROAD_POLL_MS),
       setInterval(() => this.flush().catch((error) => this.recordError('flush', error)), 250),
-      setInterval(() => this.refreshUniverse().catch((error) => this.recordError('universe', error)), REFRESH_MS),
+      setInterval(() => this.refreshUniverse()
+        .catch((error) => this.recordUniverseRefreshFailure(error)), REFRESH_MS),
       setInterval(() => Promise.all([
         this.refreshTerminalCarryPrior(),
         this.refreshTerminalCarryCapital(),
@@ -420,12 +450,37 @@ class CrossVenueLab {
       terminalCarryPrior: this.terminalCarryPrior,
     });
     if (cachedMatches) {
-      this.refreshUniverse().catch((error) => this.recordError('background_universe', error));
+      this.refreshUniverse().catch((error) => this.recordUniverseRefreshFailure(error));
     }
   }
 
   recordError(scope, error) {
     logEvent('ERROR', 'crossvenue_lab', `${scope}: ${error.message}`).catch(() => {});
+  }
+
+  recordUniverseRefreshFailure(error) {
+    const transient = isTransientDiscoveryError(error);
+    if (transient) {
+      this.metrics.universeRefreshTimeouts += 1;
+      this.metrics.consecutiveUniverseRefreshTimeouts += 1;
+    } else {
+      this.metrics.universeRefreshFailures += 1;
+    }
+    const level = universeRefreshSeverity({
+      error,
+      monitoredMatches: this.matches.size,
+      consecutiveTimeouts: this.metrics.consecutiveUniverseRefreshTimeouts,
+      lastSuccessAt: this.metrics.lastUniverseRefreshAt,
+    });
+    return logEvent(level, 'crossvenue_lab',
+      `universe refresh retained current certified cohort: ${error.message}`, {
+        transient,
+        monitoredMatches: this.matches.size,
+        consecutiveTimeouts: this.metrics.consecutiveUniverseRefreshTimeouts,
+        lastSuccessAt: this.metrics.lastUniverseRefreshAt
+          ? new Date(this.metrics.lastUniverseRefreshAt).toISOString() : null,
+        maxStaleMs: UNIVERSE_MAX_STALE_MS,
+      });
   }
 
   async syncFrozenRelationReviews() {
@@ -951,6 +1006,9 @@ class CrossVenueLab {
     this.metrics.paperApprovalOverflow = selection.paperOverflow;
     this.metrics.monitoredMatches = selection.monitored.length;
     this.metrics.diagnosticControls = selection.diagnosticControls;
+    const cachedRefreshMs = Math.max(0, ...matchesResult.rows
+      .map((row) => new Date(row.refreshed_at).getTime()).filter(Number.isFinite));
+    this.metrics.lastUniverseRefreshAt = cachedRefreshMs || null;
     await logEvent('INFO', 'crossvenue_lab', 'loaded cached cross-venue universe for fast startup', {
       candidates: candidates.length, monitored: selection.monitored.length,
       paperApproved: this.metrics.paperApprovedMatches,
@@ -1001,6 +1059,7 @@ class CrossVenueLab {
   async refreshUniverse() {
     if (this.refreshing || this.stopping) return;
     this.refreshing = true;
+    this.metrics.lastUniverseRefreshAttemptAt = Date.now();
     try {
       const universe = await this.runDiscovery({
         kalshiPages: Number(process.env.CROSSVENUE_KALSHI_PAGES || 20),
@@ -1152,6 +1211,8 @@ class CrossVenueLab {
         .filter((match) => match.paperEvalApproved).length;
       this.metrics.paperApprovalOverflow = universe.paperOverflowCount;
       this.metrics.monitoredMatches = universe.monitored.length;
+      this.metrics.lastUniverseRefreshAt = Date.now();
+      this.metrics.consecutiveUniverseRefreshTimeouts = 0;
       await logEvent('INFO', 'crossvenue_lab', 'cross-venue universe refreshed', {
         polymarket: universe.polyCount, kalshi: universe.kalshiCount,
         polyEvents: universe.polyEventCount,
@@ -1730,6 +1791,7 @@ class CrossVenueLab {
       experimentId: EXPERIMENT_ID,
       kalshiFeed: this.kalshiFeed.health(), kalshiRestFallbackPollMs: KALSHI_POLL_MS,
       broadPollMs: BROAD_POLL_MS,
+      universeMaxStaleMs: UNIVERSE_MAX_STALE_MS,
       hotMonitored: Math.min(HOT_MONITORED, this.metrics.monitoredMatches),
       polyFeedStaleMs: POLY_FEED_STALE_MS,
       synchronization: {
@@ -1839,6 +1901,7 @@ module.exports = {
   BASIS_QUANTITY, BROAD_POLL_MS, CAPITAL_PER_VENUE_USD, CrossVenueLab,
   DIAGNOSTIC_CONTROLS, HOT_MONITORED, KALSHI_POLL_MS, MAX_MONITORED,
   DISCOVERY_TIMEOUT_MS, KALSHI_ORDERBOOK_BATCH_SIZE, chunkKalshiTickers,
+  isTransientDiscoveryError, universeRefreshSeverity, UNIVERSE_MAX_STALE_MS,
   POLY_FEED_STALE_MS, QUANTITIES, RUN_ID, TOTAL_CAPITAL_USD,
   BOOK_HISTORY_MS, EXPERIMENT_ID, MAX_PAIR_SKEW_MS, SYNC_HOLDBACK_MS,
 };
