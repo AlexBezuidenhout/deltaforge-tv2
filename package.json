@@ -64,6 +64,7 @@
     "research:cadence": "node scripts/research-cadence-report.js",
     "research:crossvenue-autopsy": "node scripts/crossvenue-mismatch-autopsy.js",
     "research:options-exact-coverage": "node scripts/options-exact-expiry-coverage.js",
+    "research:equity-options-readiness": "node scripts/equity-options-readiness.js",
     "research:xtracker-resolver": "node scripts/xtracker-resolver-backtest.js",
     "prune:hot": "node scripts/hot-tier-prune.js",
     "research:inverse": "node scripts/borg-inverse-autopsy.js",

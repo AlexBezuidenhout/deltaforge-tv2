@@ -1,0 +1,56 @@
+{
+  "experiment_id": "equity-pyth-exact-expiry-v1",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-06T09:26:54.000Z",
+  "frozen_at": "2026-08-06T09:26:54.000Z",
+  "evidence_started_at": null,
+  "phase": "staged",
+  "status": "staged_waiting_for_licensed_options_feed",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "equity_options_structural_residual",
+  "strategy_version": "equity-pyth-vertical-floor-v1",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "mechanism": "Pair exact-expiry listed equity-option verticals with strict Pyth close-above tokens using an outward strike shift derived from a frozen Pyth-versus-option-settlement basis bound.",
+  "initial_symbols": ["SPY", "EWY"],
+  "required_external_input": {
+    "feed": "licensed real-time OPRA top-of-book with source and receive timestamps",
+    "acceptable_adapter": "IBKR Client Portal or TWS API with the user's entitled market-data subscription",
+    "prohibited": "automated extraction of delayed Cboe web pages"
+  },
+  "hard_vetoes": [
+    "option expiry is not exactly the Polymarket settlement timestamp",
+    "Pyth rule, comparator, tie treatment or feed symbol is uncertified",
+    "fewer than 30 untouched Pyth-versus-official close basis days",
+    "regular-session trading has not been observed",
+    "corporate action is not cleared",
+    "missing option commission, exchange fee, tick stress or assignment reserve",
+    "missing source timestamp, receive timestamp or displayed option size",
+    "non-atomic orphan reserve erases the residual"
+  ],
+  "cost_model": {
+    "polymarket": "walk full ask depth with current fee schedule at two-times stress",
+    "options": "buy ask minus sell bid, two-times commissions, one tick per option leg",
+    "settlement": "explicit assignment and financing reserve",
+    "leg_risk": "worst immediate unwind across every proper subset of the three legs"
+  },
+  "promotion": {
+    "minimum_fresh_independent_symbol_days": 300,
+    "minimum_calendar_days": 30,
+    "positive_both_chronological_halves": true,
+    "clustered_lower_bound_above_zero": true,
+    "positive_at_latency_ms": [100, 250, 500, 1000],
+    "paper_only_until_authenticated_fill_pilot": true
+  },
+  "null_outcome": "Synchronized option costs, basis reserve and orphan risk may erase every apparent residual.",
+  "strategy_bindings": [{
+    "strategy": "equity_pyth_vertical_floor_v1",
+    "family": "equity_options_structural_residual",
+    "arm": "exact_expiry_robust_vertical",
+    "phase": "staged",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "orphan_safe_pnl_after_synchronized_2x_costs"
+  }]
+}
