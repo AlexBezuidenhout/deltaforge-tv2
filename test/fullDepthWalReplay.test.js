@@ -1,6 +1,9 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const test = require('node:test');
 const {
   FULL_DEPTH_REPLAY_VERSION,
@@ -11,6 +14,7 @@ const {
   walkDepth,
 } = require('../borg/research/full-depth-wal-replay');
 const {
+  acquireArchiveLock,
   coalesceWindows,
   parseProfiles,
   parseSegmentStart,
@@ -191,4 +195,21 @@ test('CLI profile and UTC-day parsing is deterministic and bounded', () => {
     utcDaysBetween(Date.parse('2026-08-05T23:59:00Z'), Date.parse('2026-08-07T00:01:00Z')),
     ['2026-08-05', '2026-08-06', '2026-08-07'],
   );
+});
+
+test('archive lease releases cleanly before a second remote reader proceeds', async (t) => {
+  if (!fs.existsSync('/usr/bin/flock')) return t.skip('flock is unavailable');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'borg-archive-lock-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const options = {
+    source: 'remote',
+    archiveLockFile: path.join(directory, 'archive.lock'),
+    archiveLockWaitSec: 2,
+  };
+  const first = await acquireArchiveLock(options);
+  assert.equal(first.acquired, true);
+  await first.release();
+  const second = await acquireArchiveLock(options);
+  assert.equal(second.acquired, true);
+  await second.release();
 });

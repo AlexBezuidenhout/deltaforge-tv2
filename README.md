@@ -262,6 +262,19 @@ an estimated probability of identical settlement rules, so it never sets
 depth and positive economics after entry fees, a second fee stress, and one
 adverse tick per leg. Rule-certified payoff evidence remains a separate cohort.
 
+### BORG causal full-depth execution validation
+
+`npm run replay:borg-fleet -- --inventory-only` inventories resolved taker
+cohorts without touching raw archives. A bounded replay can then reconstruct
+causal full-depth books at 100/250/500ms, apply doubled taker fees and one-tick
+stress, and test both chronological halves. The generated read-only report is
+shown as a separate **Execution truth** layer in the BORG dashboard; it never
+changes lifecycle state or promotes a strategy. See
+[`BORG_EXECUTION_VALIDATION.md`](BORG_EXECUTION_VALIDATION.md) for the evidence
+contract and operator commands. Remote replay staging shares the production
+archive advisory lock, so Google Drive research and backup transfers cannot run
+concurrently.
+
 ---
 
 ## Environment Variables (Railway)

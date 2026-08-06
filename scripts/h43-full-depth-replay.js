@@ -39,6 +39,7 @@ const DEFAULT_RCLONE = '/usr/local/bin/rclone';
 const DEFAULT_RCLONE_CONFIG = '/var/lib/deltaforge/google-drive-archive/rclone.conf';
 const DEFAULT_REMOTE = 'deltaforge-gdrive';
 const DEFAULT_REMOTE_PREFIX = 'VPS Data/wal/polymarket-clob';
+const DEFAULT_ARCHIVE_LOCK = '/var/lib/deltaforge/google-drive-archive/archive-retention.lock';
 const DEFAULT_LOOKBACK_MS = 7 * 60_000;
 const DEFAULT_TAIL_MS = 5_000;
 const MAX_PREDECESSOR_AGE_MS = 20 * 60_000;
@@ -172,6 +173,69 @@ function runCommand(binary, args, options = {}) {
       error.code = code;
       error.stderr = stderr;
       reject(error);
+    });
+  });
+}
+
+function acquireArchiveLock(options = {}) {
+  const lockFile = String(options.archiveLockFile || '').trim();
+  const flockBinary = String(options.flockBinary || '/usr/bin/flock');
+  if (!lockFile || options.source === 'local' || !fs.existsSync(flockBinary)
+    || !fs.existsSync(path.dirname(lockFile))) {
+    return Promise.resolve({ acquired: false, release: async () => {} });
+  }
+  return new Promise((resolve, reject) => {
+    const child = spawn(flockBinary, [
+      '--exclusive', '--wait', String(positiveInteger(options.archiveLockWaitSec, 7_200)),
+      lockFile, '/bin/sh', '-c', 'printf "LOCKED\\n"; IFS= read -r _',
+    ], { env: process.env, stdio: ['pipe', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    let released = false;
+    let closeResolve;
+    let closeReject;
+    const closed = new Promise((done, failed) => {
+      closeResolve = done;
+      closeReject = failed;
+    });
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+      if (!settled && stdout.includes('LOCKED\n')) {
+        settled = true;
+        resolve({
+          acquired: true,
+          release: async () => {
+            if (released) return closed;
+            released = true;
+            child.stdin.end('\n');
+            return closed;
+          },
+        });
+      }
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr = boundedText(`${stderr}${chunk}`, 8_000);
+    });
+    child.on('error', (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+      closeReject(error);
+    });
+    child.on('close', (code, signal) => {
+      if (code === 0) closeResolve();
+      else {
+        const error = new Error(
+          `${flockBinary} exited ${code ?? signal}: ${boundedText(stderr)}`,
+        );
+        closeReject(error);
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      }
     });
   });
 }
@@ -370,7 +434,7 @@ async function stageRemoteSegments(segments, options) {
     remoteSegments.reduce((sum, segment) => sum + finite(segment.size, 0), 0),
     options.diskReserveBytes,
   );
-  const stageRoot = fs.mkdtempSync(path.join(options.cacheRoot, 'h43-l4-'));
+  const stageRoot = fs.mkdtempSync(path.join(options.cacheRoot, options.stagePrefix || 'h43-l4-'));
   const listFile = path.join(stageRoot, 'selected.files');
   fs.writeFileSync(
     listFile,
@@ -502,6 +566,10 @@ function archiveMissingReplay(reconstructor, order, arrivalMs, latencyMs) {
   );
   return {
     ...attachPnl(order, replay),
+    strategy: order.strategy,
+    experimentId: order.experiment_id,
+    arm: order.arm || 'baseline',
+    phase: order.phase,
     orderId: order.id,
     marketId: order.market_id,
     availableAt: new Date(order.available_at).toISOString(),
@@ -555,6 +623,10 @@ async function replayOrders(orders, profiles, segments, options) {
         reconstructor.replay(task.order, task.arrivalMs));
       results.push({
         ...replay,
+        strategy: task.order.strategy,
+        experimentId: task.order.experiment_id,
+        arm: task.order.arm || 'baseline',
+        phase: task.order.phase,
         orderId: task.order.id,
         marketId: task.order.market_id,
         availableAt: new Date(task.order.available_at).toISOString(),
@@ -577,7 +649,7 @@ async function replayOrders(orders, profiles, segments, options) {
       lastWallMs = null;
     }
     if (!options.quiet && (index === 0 || (index + 1) % 25 === 0 || index + 1 === segments.length)) {
-      process.stderr.write(`[h43-l4] segment ${index + 1}/${segments.length} ${segment.relative}\n`);
+      process.stderr.write(`[${options.progressLabel || 'h43-l4'}] segment ${index + 1}/${segments.length} ${segment.relative}\n`);
     }
     try {
       await replaySegment(segment, options, (envelope) => {
@@ -604,7 +676,7 @@ async function replayOrders(orders, profiles, segments, options) {
       reconstructor.clearAll('WAL_SEGMENT_READ_FAILURE', {
         relative: segment.relative, error: boundedText(error.message, 500),
       });
-      if (!options.quiet) process.stderr.write(`[h43-l4] failed ${segment.relative}: ${error.message}\n`);
+      if (!options.quiet) process.stderr.write(`[${options.progressLabel || 'h43-l4'}] failed ${segment.relative}: ${error.message}\n`);
     }
   }
   scoreUntil(Infinity, true);
@@ -655,6 +727,9 @@ async function main() {
     diskReserveBytes: positiveInteger(arg('--disk-reserve-bytes'), 20 * 1024 ** 3),
     streamRemote: flag('--stream-remote'),
     quiet: flag('--quiet'),
+    archiveLockFile: arg('--archive-lock', process.env.DELTAFORGE_ARCHIVE_LOCK
+      || DEFAULT_ARCHIVE_LOCK),
+    archiveLockWaitSec: positiveInteger(arg('--archive-lock-wait-sec'), 7_200),
   };
   const pool = createResearchPool({
     applicationName: 'h43-full-depth-replay', statementTimeoutMs: 30_000,
@@ -692,49 +767,58 @@ async function main() {
       Math.min(...availableTimes) - options.lookbackMs - MAX_PREDECESSOR_AGE_MS,
       Math.max(...availableTimes) + maximumLatencyMs + options.tailMs,
     );
-    const catalog = await buildSegmentCatalog(days, options);
-    const selected = selectSegments(catalog.segments, windows);
-    const selectedBytes = selected.reduce((sum, segment) => sum + finite(segment.size, 0), 0);
-    if (flag('--plan-only')) {
-      const maximumLatency = Math.max(...profiles);
-      const coveredOrders = orders.filter((order) => hasSegmentCoverage(
-        order, selected, options.lookbackMs, options.tailMs, maximumLatency,
-      )).length;
-      process.stdout.write(`${JSON.stringify({
-        format: 'h43-causal-full-depth-replay-plan-v1',
-        generatedAt: new Date().toISOString(),
-        readOnly: true,
-        strategy: options.strategy,
-        experimentId: options.experiment,
-        profilesMs: profiles,
-        resolvedOrders: orders.length,
-        independentMarkets: new Set(orders.map((order) => order.market_id)).size,
-        firstAt: new Date(Math.min(...availableTimes)).toISOString(),
-        latestAt: new Date(Math.max(...availableTimes)).toISOString(),
-        daysRequested: days,
-        missingRemoteDays: catalog.missingRemoteDays,
-        catalogSegments: catalog.segments.length,
-        selectedSegments: selected.length,
-        selectedRemoteSegments: selected.filter((segment) => segment.origin === 'remote').length,
-        selectedLocalSegments: selected.filter((segment) => segment.origin === 'local').length,
-        selectedCompressedBytes: selectedBytes,
-        selectedCompressedGiB: selectedBytes / 1024 ** 3,
-        archiveCoveredOrders: coveredOrders,
-        archiveMissingOrders: orders.length - coveredOrders,
-        configuredMaximumGiB: options.maximumBytes / 1024 ** 3,
-        executableWithinConfiguredBound: selectedBytes <= options.maximumBytes,
-        warning: 'Plan only: no raw segment was downloaded or replayed.',
-        primaryPaperComparator: primaryComparison,
-      }, null, 2)}\n`);
-      return;
+    const archiveLock = await acquireArchiveLock(options);
+    let catalog;
+    let selected;
+    let selectedBytes;
+    let staged;
+    try {
+      catalog = await buildSegmentCatalog(days, options);
+      selected = selectSegments(catalog.segments, windows);
+      selectedBytes = selected.reduce((sum, segment) => sum + finite(segment.size, 0), 0);
+      if (flag('--plan-only')) {
+        const maximumLatency = Math.max(...profiles);
+        const coveredOrders = orders.filter((order) => hasSegmentCoverage(
+          order, selected, options.lookbackMs, options.tailMs, maximumLatency,
+        )).length;
+        process.stdout.write(`${JSON.stringify({
+          format: 'h43-causal-full-depth-replay-plan-v1',
+          generatedAt: new Date().toISOString(),
+          readOnly: true,
+          strategy: options.strategy,
+          experimentId: options.experiment,
+          profilesMs: profiles,
+          resolvedOrders: orders.length,
+          independentMarkets: new Set(orders.map((order) => order.market_id)).size,
+          firstAt: new Date(Math.min(...availableTimes)).toISOString(),
+          latestAt: new Date(Math.max(...availableTimes)).toISOString(),
+          daysRequested: days,
+          missingRemoteDays: catalog.missingRemoteDays,
+          catalogSegments: catalog.segments.length,
+          selectedSegments: selected.length,
+          selectedRemoteSegments: selected.filter((segment) => segment.origin === 'remote').length,
+          selectedLocalSegments: selected.filter((segment) => segment.origin === 'local').length,
+          selectedCompressedBytes: selectedBytes,
+          selectedCompressedGiB: selectedBytes / 1024 ** 3,
+          archiveCoveredOrders: coveredOrders,
+          archiveMissingOrders: orders.length - coveredOrders,
+          configuredMaximumGiB: options.maximumBytes / 1024 ** 3,
+          executableWithinConfiguredBound: selectedBytes <= options.maximumBytes,
+          warning: 'Plan only: no raw segment was downloaded or replayed.',
+          primaryPaperComparator: primaryComparison,
+        }, null, 2)}\n`);
+        return;
+      }
+      if (selectedBytes > options.maximumBytes) {
+        throw new Error(
+          `selected WAL is ${(selectedBytes / 1024 ** 3).toFixed(2)} GiB, above `
+          + `--max-bytes ${(options.maximumBytes / 1024 ** 3).toFixed(2)} GiB; narrow the cohort or explicitly raise the bound`,
+        );
+      }
+      staged = await stageRemoteSegments(selected, options);
+    } finally {
+      await archiveLock.release();
     }
-    if (selectedBytes > options.maximumBytes) {
-      throw new Error(
-        `selected WAL is ${(selectedBytes / 1024 ** 3).toFixed(2)} GiB, above `
-        + `--max-bytes ${(options.maximumBytes / 1024 ** 3).toFixed(2)} GiB; narrow the cohort or explicitly raise the bound`,
-      );
-    }
-    const staged = await stageRemoteSegments(selected, options);
     let replayed;
     try {
       replayed = await replayOrders(orders, profiles, staged.segments, options);
@@ -847,6 +931,9 @@ if (require.main === module) main().catch((error) => {
 });
 
 module.exports = {
+  MAX_PREDECESSOR_AGE_MS,
+  acquireArchiveLock,
+  atomicWrite,
   buildSegmentCatalog,
   coalesceWindows,
   hasSegmentCoverage,
@@ -854,6 +941,7 @@ module.exports = {
   loadPrimaryComparison,
   parseProfiles,
   parseSegmentStart,
+  removeStage,
   replayOrders,
   stageRemoteSegments,
   selectSegments,
