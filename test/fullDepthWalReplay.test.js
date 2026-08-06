@@ -20,6 +20,7 @@ const {
   parseProfiles,
   parseSegmentStart,
   selectSegments,
+  stagingTraversalArgs,
   utcDaysBetween,
 } = require('../scripts/h43-full-depth-replay');
 
@@ -226,4 +227,10 @@ test('remote replay refuses root so OAuth refresh cannot lock out production', (
   assert.doesNotThrow(
     () => assertRemoteRunIdentity({ source: 'local', processUid: 0 }),
   );
+});
+
+test('large or resumed archive sets use recursive listing instead of one API lookup per object', () => {
+  assert.deepEqual(stagingTraversalArgs(20, 500), ['--no-traverse']);
+  assert.deepEqual(stagingTraversalArgs(500, 500), ['--fast-list']);
+  assert.deepEqual(stagingTraversalArgs(1_544, 500), ['--fast-list']);
 });

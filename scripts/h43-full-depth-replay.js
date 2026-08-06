@@ -434,6 +434,11 @@ function assertStagingCapacity(root, selectedBytes, reserveBytes) {
   return freeBytes;
 }
 
+function stagingTraversalArgs(remoteSegmentCount, threshold = 500) {
+  return Number(remoteSegmentCount) >= positiveInteger(threshold, 500)
+    ? ['--fast-list'] : ['--no-traverse'];
+}
+
 async function stageRemoteSegments(segments, options) {
   const remoteSegments = segments.filter((segment) => segment.origin === 'remote');
   if (!remoteSegments.length || options.streamRemote) {
@@ -456,11 +461,14 @@ async function stageRemoteSegments(segments, options) {
     `${remoteSegments.map((segment) => segment.relative).join('\n')}\n`,
     { mode: 0o600 },
   );
+  const traversalArgs = stagingTraversalArgs(
+    remoteSegments.length, options.stagingFastListThreshold,
+  );
   try {
     const result = await runCommand(options.rcloneBinary, [
       'copy', remoteTarget(options.remote, options.remotePrefix), stageRoot,
       '--files-from-raw', listFile,
-      '--checksum', '--no-traverse',
+      '--checksum', ...traversalArgs,
       '--transfers', String(positiveInteger(process.env.H43_REPLAY_TRANSFERS, 4)),
       '--checkers', String(positiveInteger(process.env.H43_REPLAY_CHECKERS, 8)),
       ...rcloneCommon(options.rcloneConfig),
@@ -481,6 +489,7 @@ async function stageRemoteSegments(segments, options) {
       stagedSegments: remoteSegments.length,
       stagedBytes: remoteSegments.reduce((sum, segment) => sum + finite(segment.size, 0), 0),
       persistentStage,
+      traversalMode: traversalArgs[0],
       warning: result.stderr.trim() ? 'rclone emitted a warning during bounded staging' : null,
     };
   } catch (error) {
@@ -742,6 +751,7 @@ async function main() {
       || path.join(os.tmpdir(), 'deltaforge-h43-replay')),
     diskReserveBytes: positiveInteger(arg('--disk-reserve-bytes'), 20 * 1024 ** 3),
     stageRoot: arg('--stage-root', process.env.H43_REPLAY_STAGE_ROOT || null),
+    stagingFastListThreshold: positiveInteger(arg('--fast-list-threshold'), 500),
     streamRemote: flag('--stream-remote'),
     quiet: flag('--quiet'),
     archiveLockFile: arg('--archive-lock', process.env.DELTAFORGE_ARCHIVE_LOCK
@@ -889,6 +899,7 @@ async function main() {
         selectedCompressedGiB: selectedBytes / 1024 ** 3,
         stagedSegments: staged.stagedSegments,
         stagedBytes: staged.stagedBytes,
+        stagingTraversal: staged.traversalMode || null,
         temporaryCacheRemoved: staged.stageRoot != null,
         archiveCoveredOrders: replayed.archiveCoveredOrders,
         archiveMissingOrders: replayed.archiveMissingOrders,
@@ -964,6 +975,7 @@ module.exports = {
   removeStage,
   replayOrders,
   stageRemoteSegments,
+  stagingTraversalArgs,
   selectSegments,
   utcDaysBetween,
 };

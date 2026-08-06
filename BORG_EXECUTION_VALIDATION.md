@@ -79,6 +79,12 @@ Large transfers may use `--stage-root=/var/lib/deltaforge/research-cache/<run>`;
 an interrupted download is then retained and checksum-resumed, while a complete
 replay removes the bounded stage after publishing its report.
 
+Staging switches from per-object `--no-traverse` lookup to `--fast-list` at 500
+selected segments. This follows rclone's guidance for larger or mostly
+unchanged copies: recursive listing uses more bounded memory but materially
+fewer remote transactions. Override the crossover with
+`--fast-list-threshold=<count>` when profiling a different archive layout.
+
 The process is read-only against PostgreSQL. Remote raw segments are copied to
 a bounded temporary directory only after the plan passes the byte and free-disk
 guards, then removed in a `finally` block. Missing archive rows remain
