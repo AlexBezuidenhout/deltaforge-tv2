@@ -1,0 +1,50 @@
+{
+  "experiment_id": "structural-sports-physical-implications-v2",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-06T10:20:00.000Z",
+  "frozen_at": "2026-08-06T10:20:00.000Z",
+  "evidence_started_at": null,
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "certified_payoff_graph",
+  "strategy_version": "sports-physical-payoff-graph-v2",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "mechanism": "An exact full-time soccer score deterministically fixes match-result and BTTS predicates and, for a strict subset of scores, first-scorer predicates. Trade only a deterministic two-leg payout floor that also survives explicit cancellation settlement.",
+  "frozen_predicates": [
+    "same exact venue fixture id",
+    "same settlement timestamp and full-time scope",
+    "identical official-statistics and fallback resolver policy",
+    "typed exact-score implication",
+    "explicit cancellation payout for both legs"
+  ],
+  "required_gates": [
+    "worst-state payoff at least one",
+    "content-addressed rule certification",
+    "fresh synchronized event-driven books",
+    "current fee schedule and venue minimum",
+    "two-times fee stress",
+    "full displayed FOK depth",
+    "positive shared-500-USD capacity",
+    "positive economics after worst proper-subset orphan unwind reserve"
+  ],
+  "promotion": {
+    "minimum_fresh_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "positive_both_chronological_halves": true,
+    "market_and_day_clustered_lower_bound_above_zero": true,
+    "multiple_testing_correction": true,
+    "paper_only_until_authenticated_fill_pilot": true
+  },
+  "strategy_bindings": [{
+    "strategy": "structural_sports_physical_implications_v2",
+    "family": "certified_payoff_graph",
+    "arm": "exact_score_typed_implications",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "worst_state_profit_after_2x_costs_and_orphan_reserve"
+  }]
+}
