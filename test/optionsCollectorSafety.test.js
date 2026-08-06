@@ -7,7 +7,8 @@ const assert = require('node:assert/strict');
 const {
   DB_SAMPLE_MS, DIAGNOSTIC_HEARTBEAT_MS, EXECUTABLE_HEARTBEAT_MS,
   MARK_TRANSITION_DWELL_MS, REQUIRE_EXACT_EXPIRY,
-  classifyExecutionBarrier, feeMetadata, isRetryableDbError, retryTransientDb,
+  buildSurfaceDependencyIndex, classifyExecutionBarrier, feeMetadata,
+  isRetryableDbError, retryTransientDb,
 } = require('../borg/options/collector');
 
 test('option query tier uses transitions and bounded heartbeats', () => {
@@ -50,6 +51,19 @@ test('option observer has no live order or secret-key dependency', () => {
   assert.match(source, /this\.decisionWal\.append[\s\S]*options_shadow_mark/);
   assert.match(source, /if \(this\.flushPromise\) return this\.flushPromise/);
   assert.match(source, /persistenceErrors: this\.metrics\.persistenceErrors/);
+});
+
+test('option ticks reevaluate only prediction markets that depend on the changed anchor', () => {
+  const targets = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  const index = buildSurfaceDependencyIndex(targets, [
+    { targetId: 1, retainedInstrumentNames: ['BTC-A', 'BTC-B'] },
+    { targetId: 2, retainedInstrumentNames: ['BTC-B', 'BTC-C'] },
+    { targetId: 'archive:BTC:24h', retainedInstrumentNames: ['BTC-Z'] },
+  ]);
+  assert.deepEqual(index.instrumentNamesByTarget.get('1'), ['BTC-A', 'BTC-B']);
+  assert.deepEqual(index.instrumentNamesByTarget.get('3'), []);
+  assert.deepEqual(index.targetsByInstrument.get('BTC-B').map((row) => row.id), [1, 2]);
+  assert.equal(index.targetsByInstrument.has('BTC-Z'), false);
 });
 
 test('option persistence retries transient PostgreSQL concurrency errors only', async () => {

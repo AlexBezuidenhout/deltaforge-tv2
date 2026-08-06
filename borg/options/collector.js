@@ -146,6 +146,32 @@ function syncPolymarketSubscriptions(clob, targetByToken) {
   return tokenIds.length;
 }
 
+function buildSurfaceDependencyIndex(targets, coverage) {
+  const targetById = new Map((targets || []).map((target) => [String(target.id), target]));
+  const instrumentNamesByTarget = new Map();
+  const targetsByInstrument = new Map();
+  for (const row of coverage || []) {
+    const target = targetById.get(String(row.targetId));
+    if (!target) continue; // archive-only anchor, not a prediction-market target
+    const names = [...new Set((row.retainedInstrumentNames || row.instrumentNames || [])
+      .map(String).filter(Boolean))];
+    instrumentNamesByTarget.set(String(target.id), names);
+    for (const name of names) {
+      if (!targetsByInstrument.has(name)) targetsByInstrument.set(name, []);
+      targetsByInstrument.get(name).push(target);
+    }
+  }
+  // Every live target is represented, including an explicitly empty list when
+  // bounded instrument selection could not cover it. evaluateTarget then fails
+  // closed instead of borrowing unrelated strikes from another market.
+  for (const target of targets || []) {
+    if (!instrumentNamesByTarget.has(String(target.id))) {
+      instrumentNamesByTarget.set(String(target.id), []);
+    }
+  }
+  return { instrumentNamesByTarget, targetsByInstrument };
+}
+
 async function fetchJson(url, timeoutMs = 20_000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -361,6 +387,8 @@ class OptionsObserver {
       universeVersion: TARGET_UNIVERSE_VERSION, records: 0, rejected: {},
     };
     this.targetByToken = new Map();
+    this.instrumentNamesByTarget = new Map();
+    this.targetsByInstrument = new Map();
     this.instrumentByName = new Map();
     this.subscribed = new Set();
     this.latestTick = new Map();
@@ -380,6 +408,7 @@ class OptionsObserver {
       parseErrors: 0, refreshErrors: 0, clobTriggers: 0, deribitTriggers: 0,
       executableMarks: 0, executionBarriers: {}, surfaceFidelity: {},
       flushRetries: 0, persistenceErrors: 0, suppressedDerivedMarks: 0,
+      surfaceEvaluations: 0, dependencyTriggeredEvaluations: 0,
     };
     this.clob = new ClobMultiplex((token) => this.targetByToken.get(String(token))?.id || null, {
       shardCount: Number(process.env.OPTIONS_CLOB_SHARDS || 2),
@@ -504,7 +533,9 @@ class OptionsObserver {
     this.touchBuffer.set(`${row.instrumentName}:${row.sampleAt}`, row);
     this.metrics.tickerEvents += 1;
     this.metrics.deribitTriggers += 1;
-    for (const target of this.targets.filter((entry) => entry.currency === row.currency)) {
+    const dependentTargets = this.targetsByInstrument.get(row.instrumentName) || [];
+    this.metrics.dependencyTriggeredEvaluations += dependentTargets.length;
+    for (const target of dependentTargets) {
       this.evaluateTarget(target, 'DERIBIT_OPTION');
     }
   }
@@ -513,9 +544,15 @@ class OptionsObserver {
     const now = Date.now();
     const tteSec = (target.targetExpiryMs - now) / 1000;
     if (!(tteSec >= MIN_TTE_SEC && tteSec <= MAX_TTE_SEC)) return;
-    const rows = [...this.latestTick.values()].filter((row) => row.currency === target.currency
+    const targetKey = String(target.id);
+    const names = this.instrumentNamesByTarget.get(targetKey);
+    const candidateRows = names == null
+      ? [...this.latestTick.values()]
+      : names.map((name) => this.latestTick.get(name)).filter(Boolean);
+    const rows = candidateRows.filter((row) => row.currency === target.currency
       && now - row.receiveWallMs <= SURFACE_MAX_AGE_MS);
     if (rows.length < 2) return;
+    this.metrics.surfaceEvaluations += 1;
     const spotRows = rows.map((row) => row.underlyingPrice ?? row.indexPrice).filter((value) => value > 1);
     if (!spotRows.length) return;
     const spot = spotRows.sort((left, right) => left - right)[Math.floor(spotRows.length / 2)];
@@ -716,6 +753,9 @@ class OptionsObserver {
     ]));
     this.instrumentByName = new Map(selection.instruments
       .map((row) => [row.instrumentName, row]));
+    const dependencies = buildSurfaceDependencyIndex(targets, selection.coverage);
+    this.instrumentNamesByTarget = dependencies.instrumentNamesByTarget;
+    this.targetsByInstrument = dependencies.targetsByInstrument;
     this.changeSubscriptions([...this.instrumentByName.keys()]);
     syncPolymarketSubscriptions(this.clob, this.targetByToken);
     if (this.networkStarted && this.targetByToken.size && !this.clobStarted) {
@@ -912,6 +952,12 @@ class OptionsObserver {
       diagnosticTransitionDwellMs: DIAGNOSTIC_TRANSITION_DWELL_MS,
       surfaceFidelity: this.metrics.surfaceFidelity,
       executionBarriers: this.metrics.executionBarriers,
+      surfaceDependencyIndex: {
+        indexedTargets: this.instrumentNamesByTarget.size,
+        indexedInstruments: this.targetsByInstrument.size,
+        uncoveredTargets: [...this.instrumentNamesByTarget.values()]
+          .filter((names) => names.length < 2).length,
+      },
       wal: {
         deribit: this.deribitWal.health(), polymarket: this.polyWal.health(),
         chainlink: this.rtdsWal.health(), decisions: this.decisionWal.health(),
@@ -990,7 +1036,7 @@ module.exports = {
   DB_SAMPLE_MS, DIAGNOSTIC_HEARTBEAT_MS, EXECUTABLE_HEARTBEAT_MS,
   MARK_TRANSITION_DWELL_MS, OPTIONS_EXPERIMENT_ID, REQUIRE_EXACT_EXPIRY,
   OptionsObserver, classifyExecutionBarrier, feeMetadata, fetchIndexPrice,
-  fetchInstruments,
+  buildSurfaceDependencyIndex, fetchInstruments,
   fetchThresholdEvents, isRetryableDbError, listedCallExpiries, loadTargets,
   resolverFeed, retryTransientDb, syncPolymarketSubscriptions,
 };
