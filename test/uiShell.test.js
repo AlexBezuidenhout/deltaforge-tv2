@@ -33,6 +33,15 @@ test('dashboard shell keeps runtime health distinct from evidence validity', () 
   assert.match(shell, /verifiedBatches/);
 });
 
+test('BORG separates lifecycle from causal execution truth', () => {
+  assert.match(html, /id="borgExecutionFilters"/);
+  assert.match(html, /Full-depth execution truth/);
+  assert.match(html, /Counterfactual L4, not live fill proof|counterfactual L4/i);
+  assert.match(html, /ROBUST_POSITIVE/);
+  assert.match(css, /\.borg-truth-tape/);
+  assert.match(css, /\.borg-validation\.execution-negative/);
+});
+
 test('dashboard shell is responsive, keyboard visible and motion aware', () => {
   assert.match(css, /@media \(max-width: 860px\)/);
   assert.match(css, /:focus-visible/);

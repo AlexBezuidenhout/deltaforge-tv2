@@ -23,6 +23,12 @@ const { buildPriorityLaneStatus } = require('../../borg/research/priority-lane-s
 const { buildEdgeIncubatorStatus } = require('../../borg/research/edge-incubator-status');
 const { assessEvidenceEpoch } = require('../../borg/research/evidence-epoch');
 const { dossierFor } = require('../../borg/research/strategy-dossiers');
+const {
+  latestCohortsByStrategy,
+  matchesFrozenTrial,
+  publicExecutionValidation,
+  readExecutionValidationReport,
+} = require('../../borg/research/execution-validation-report');
 const { createReadThroughCache } = require('../utils/readThroughCache');
 
 const dashboardReports = createReadThroughCache();
@@ -145,6 +151,14 @@ router.get('/research/evidence-epoch', authMiddleware, async (req, res) => {
         parquetReportFile: process.env.PARQUET_LAKE_REPORT,
       }));
     res.json(value);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/research/execution-validation', authMiddleware, async (req, res) => {
+  try {
+    const value = await dashboardReports.get('borg-execution-validation-v1', 15_000,
+      () => readExecutionValidationReport());
+    res.json(publicExecutionValidation(value));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -623,6 +637,8 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
            ORDER BY strategy,frozen_at DESC,id DESC
         `),
       ]);
+      const executionValidation = await readExecutionValidationReport();
+      const executionByStrategy = latestCohortsByStrategy(executionValidation);
 
       const numericFields = [
         'places', 'cancels', 'scored', 'fills', 'pnl_gross', 'pnl_05x', 'pnl_1x', 'pnl_2x',
@@ -680,9 +696,15 @@ router.get('/shadow/summary', authMiddleware, async (req, res) => {
           row.last_action_at,
           row.latest,
         ].map((value) => value ? new Date(value).getTime() : NaN).filter(Number.isFinite);
+        const priorFullDepthValidation = executionByStrategy.get(row.strategy) || null;
+        const fullDepthValidation = matchesFrozenTrial(priorFullDepthValidation, row)
+          ? priorFullDepthValidation : null;
         return {
           ...row,
           ...dossier,
+          fullDepthValidation,
+          historicalFullDepthValidation: fullDepthValidation ? null : priorFullDepthValidation,
+          executionValidationGeneratedAt: executionValidation.generatedAt || null,
           deployed_at: row.current_trial_frozen_at || row.first_seen || row.runtime_started_at || null,
           last_activity_at: activityTimes.length ? new Date(Math.max(...activityTimes)).toISOString() : null,
         };
@@ -759,6 +781,10 @@ router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
           evaluations: parseFloat(runtime?.evaluations || 0),
           actions: parseFloat(runtime?.actions || 0),
         });
+        const executionValidation = await readExecutionValidationReport();
+        const priorFullDepthValidation = latestCohortsByStrategy(executionValidation).get(strategy) || null;
+        const fullDepthValidation = matchesFrozenTrial(priorFullDepthValidation, trial)
+          ? priorFullDepthValidation : null;
 
         const response = {
           ...dossier,
@@ -778,6 +804,9 @@ router.get('/shadow/strategy/:strategy', authMiddleware, async (req, res) => {
           byAsset: [],
           recent: [],
           executionReplay: [],
+          fullDepthValidation,
+          historicalFullDepthValidation: fullDepthValidation ? null : priorFullDepthValidation,
+          executionValidationGeneratedAt: executionValidation.generatedAt || null,
         };
         if (!trial || !epoch) return response;
 

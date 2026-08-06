@@ -1919,6 +1919,25 @@
       </div>
       <div class="borg-ledger-count" id="borgLedgerCount">Loading strategy states…</div>
     </div>
+    <div class="borg-truth-tape" id="borgExecutionFilters" aria-label="Full-depth execution validation filter">
+      <button type="button" class="borg-truth-intro active" data-validation="ALL" onclick="borgSetExecutionFilter('ALL')">
+        <span class="borg-truth-kicker">Execution truth</span>
+        <strong>CAUSAL L4 REPLAY</strong>
+        <small id="borgExecutionStamp">100 · 250 · 500ms</small>
+      </button>
+      <button type="button" class="borg-truth-cell robust" data-validation="ROBUST_POSITIVE" onclick="borgSetExecutionFilter('ROBUST_POSITIVE')">
+        <span>Robust positive</span><strong id="borgCountRobust">—</strong><small>2× + tick + both halves</small>
+      </button>
+      <button type="button" class="borg-truth-cell fragile" data-validation="FRAGILE_POSITIVE" onclick="borgSetExecutionFilter('FRAGILE_POSITIVE')">
+        <span>Fragile positive</span><strong id="borgCountFragile">—</strong><small>one stress check fails</small>
+      </button>
+      <button type="button" class="borg-truth-cell negative" data-validation="EXECUTION_NEGATIVE" onclick="borgSetExecutionFilter('EXECUTION_NEGATIVE')">
+        <span>Execution negative</span><strong id="borgCountExecutionNegative">—</strong><small>non-positive at a latency</small>
+      </button>
+      <button type="button" class="borg-truth-cell pending" data-validation="NOT_REPLAYED" onclick="borgSetExecutionFilter('NOT_REPLAYED')">
+        <span>Not classified</span><strong id="borgCountNotReplayed">—</strong><small>insufficient or not replayed</small>
+      </button>
+    </div>
     <div class="borg-strategy-controls" aria-label="Strategy filters and sorting">
       <div class="borg-filter-group" id="borgLifecycleFilters">
         <button type="button" class="borg-filter-chip active" data-filter="ALL" onclick="borgSetLifecycleFilter('ALL')">All <span id="borgCountAll">—</span></button>
@@ -1939,6 +1958,7 @@
           <option value="active_profit">Active + most profitable</option>
           <option value="current_2x">Current trial P&amp;L (2×)</option>
           <option value="pnl_24h">Last 24h P&amp;L (2×)</option>
+          <option value="execution">Full-depth execution truth</option>
           <option value="deployed">Most recently deployed</option>
           <option value="recent">Most recently active</option>
           <option value="evidence">Most independent markets</option>
@@ -1954,9 +1974,9 @@
             <th>Strategy / premise</th><th>Lifecycle</th><th>Fresh evidence</th>
             <th>Current 1×</th><th>Current 2×</th>
             <th>6h · 2×</th><th>24h · 2×</th><th>3d · 2×</th>
-            <th>Historical · 2×</th><th>Data A/B</th><th>Activity</th>
+            <th>Historical · 2×</th><th>L4 execution</th><th>Data A/B</th><th>Activity</th>
           </tr></thead>
-          <tbody id="borgSummaryBody"><tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:18px;">Loading strategy evidence ledger…</td></tr></tbody>
+          <tbody id="borgSummaryBody"><tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:18px;">Loading strategy evidence ledger…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -3702,6 +3722,7 @@
   let _borgLoading = false;
   let _borgSummaryData = [];
   let _borgLifecycleFilter = 'ALL';
+  let _borgExecutionFilter = 'ALL';
   let _borgSortDirection = 'desc';
   let _borgDossierStrategy = null;
   let _borgDossierTrigger = null;
@@ -3725,6 +3746,17 @@
   const _bLifecycleBadge = (lifecycle) => {
     const label = String(lifecycle || 'PAUSED').toUpperCase();
     return '<span class="borg-lifecycle ' + label.toLowerCase() + '">' + escapeHtml(label) + '</span>';
+  };
+  const _bValidationClass = (row) => row?.fullDepthValidation?.classification || 'NOT_REPLAYED';
+  const _bValidationBadge = (validation) => {
+    if (!validation) return '<span class="borg-validation not-replayed" title="No bounded causal full-depth replay has classified this exact strategy cohort.">not replayed</span>';
+    const state = String(validation.classification || 'UNSCOREABLE').toUpperCase();
+    const labels = {
+      ROBUST_POSITIVE: 'robust +', FRAGILE_POSITIVE: 'fragile +',
+      EXECUTION_NEGATIVE: 'negative', INSUFFICIENT: 'insufficient', UNSCOREABLE: 'unscoreable',
+    };
+    return '<span class="borg-validation ' + state.toLowerCase().replaceAll('_', '-') + '" title="' +
+      escapeHtml(validation.reason || '') + '">' + escapeHtml(labels[state] || state.replaceAll('_', ' ').toLowerCase()) + '</span>';
   };
   const _bExecutionBadge = (state, detail = '') => {
     const value = String(state || 'PENDING').toUpperCase();
@@ -3791,6 +3823,15 @@
     borgRenderStrategyLedger();
   }
 
+  function borgSetExecutionFilter(filter) {
+    _borgExecutionFilter = String(filter || 'ALL').toUpperCase();
+    try { localStorage.setItem('borgExecutionFilter', _borgExecutionFilter); } catch (_) {}
+    document.querySelectorAll('#borgExecutionFilters [data-validation]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.validation === _borgExecutionFilter);
+    });
+    borgRenderStrategyLedger();
+  }
+
   function borgSortChanged() {
     const select = document.getElementById('borgStrategySort');
     try { localStorage.setItem('borgStrategySort', select?.value || 'active_profit'); } catch (_) {}
@@ -3810,8 +3851,12 @@
       const filter = localStorage.getItem('borgLifecycleFilter');
       const sort = localStorage.getItem('borgStrategySort');
       const direction = localStorage.getItem('borgSortDirection');
+      const executionFilter = localStorage.getItem('borgExecutionFilter');
       if (['ALL', 'LIVE', 'TESTING', 'STALE', 'PAUSED', 'DEAD'].includes(filter)) _borgLifecycleFilter = filter;
       if (direction === 'asc' || direction === 'desc') _borgSortDirection = direction;
+      if (['ALL', 'ROBUST_POSITIVE', 'FRAGILE_POSITIVE', 'EXECUTION_NEGATIVE', 'NOT_REPLAYED'].includes(executionFilter)) {
+        _borgExecutionFilter = executionFilter;
+      }
       const select = document.getElementById('borgStrategySort');
       if (select && [...select.options].some((option) => option.value === sort)) select.value = sort;
     } catch (_) {}
@@ -3819,6 +3864,9 @@
     if (directionButton) directionButton.textContent = _borgSortDirection === 'desc' ? '↓ DESC' : '↑ ASC';
     document.querySelectorAll('#borgLifecycleFilters .borg-filter-chip').forEach((button) => {
       button.classList.toggle('active', button.dataset.filter === _borgLifecycleFilter);
+    });
+    document.querySelectorAll('#borgExecutionFilters [data-validation]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.validation === _borgExecutionFilter);
     });
   }
 
@@ -3838,10 +3886,35 @@
       const element = document.getElementById(id);
       if (element) element.textContent = counts[key];
     }
+    const validationCounts = {
+      ROBUST_POSITIVE: 0, FRAGILE_POSITIVE: 0, EXECUTION_NEGATIVE: 0, NOT_REPLAYED: 0,
+    };
+    for (const row of _borgSummaryData) {
+      const state = _bValidationClass(row);
+      if (Object.hasOwn(validationCounts, state)) validationCounts[state] += 1;
+      else validationCounts.NOT_REPLAYED += 1;
+    }
+    const validationCountIds = {
+      ROBUST_POSITIVE: 'borgCountRobust', FRAGILE_POSITIVE: 'borgCountFragile',
+      EXECUTION_NEGATIVE: 'borgCountExecutionNegative', NOT_REPLAYED: 'borgCountNotReplayed',
+    };
+    for (const [state, id] of Object.entries(validationCountIds)) {
+      const element = document.getElementById(id);
+      if (element) element.textContent = validationCounts[state];
+    }
+    const validationGeneratedAt = _borgSummaryData
+      .map((row) => row.executionValidationGeneratedAt).find(Boolean);
+    const validationStamp = document.getElementById('borgExecutionStamp');
+    if (validationStamp) validationStamp.textContent = validationGeneratedAt
+      ? 'replayed ' + _bAgeFromDate(validationGeneratedAt) : 'replay report pending';
 
     const search = String(document.getElementById('borgStrategySearch')?.value || '').trim().toLowerCase();
     const visible = _borgSummaryData.filter((row) => {
       if (_borgLifecycleFilter !== 'ALL' && String(row.lifecycle).toUpperCase() !== _borgLifecycleFilter) return false;
+      const validation = _bValidationClass(row);
+      if (_borgExecutionFilter !== 'ALL' && validation !== _borgExecutionFilter
+        && !(_borgExecutionFilter === 'NOT_REPLAYED'
+          && ['INSUFFICIENT', 'UNSCOREABLE', 'NOT_REPLAYED'].includes(validation))) return false;
       if (!search) return true;
       return [
         row.strategy, row.premise, row.priorOutcome, row.outcome, row.current_trial_family,
@@ -3860,6 +3933,13 @@
       }
       if (sort === 'current_2x') return (number(left, 'current_pnl_2x') - number(right, 'current_pnl_2x')) * direction;
       if (sort === 'pnl_24h') return (number(left, 'pnl_2x_24h') - number(right, 'pnl_2x_24h')) * direction;
+      if (sort === 'execution') {
+        const rank = (row) => Number(row.fullDepthValidation?.classRank ?? 9);
+        const classOrder = rank(left) - rank(right);
+        if (classOrder) return classOrder;
+        return (Number(left.fullDepthValidation?.worstPnl2xOneTick || 0)
+          - Number(right.fullDepthValidation?.worstPnl2xOneTick || 0)) * direction;
+      }
       if (sort === 'deployed') return (_bTimestamp(left.deployed_at) - _bTimestamp(right.deployed_at)) * direction;
       if (sort === 'recent') return (_bTimestamp(left.last_activity_at) - _bTimestamp(right.last_activity_at)) * direction;
       if (sort === 'evidence') return (number(left, 'current_eligible_markets') - number(right, 'current_eligible_markets')) * direction;
@@ -3872,7 +3952,7 @@
         counts.STALE + ' stale · ' + counts.DEAD + ' dead';
     }
     if (!visible.length) {
-      sb.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">No strategies match this lifecycle/search filter.</td></tr>';
+      sb.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:24px;">No strategies match the current lifecycle, execution and search filters.</td></tr>';
       return;
     }
 
@@ -3918,6 +3998,9 @@
           ? '<div class="borg-cell-sub">no action · ' + gateInfo.noActionEvaluations + ' evals</div>'
           : '';
       const premise = String(row.premise || '');
+      const validation = row.fullDepthValidation || null;
+      const profile250 = validation?.profiles?.find((profile) => Number(profile.latencyMs) === 250)
+        || validation?.profiles?.[0] || null;
       const shortPremise = premise.length > 128 ? premise.slice(0, 125) + '…' : premise;
       return '<tr class="borg-strategy-row is-' + lifecycle.toLowerCase() + '" tabindex="0" role="button" ' +
         'data-strategy="' + escapeHtml(row.strategy) + '" aria-label="Open evidence dossier for ' + escapeHtml(row.strategy) + '">' +
@@ -3936,6 +4019,13 @@
         horizonCell(row, '3d', 'Last 3 days') +
         pnlCell(row.eligible_pnl_2x, historicalFills,
           'Historical diagnostic only · ' + historicalFills + ' eligible fills / ' + number(row, 'eligible_markets') + ' markets') +
+        '<td class="borg-validation-cell">' + _bValidationBadge(validation) +
+          '<div class="borg-cell-sub">' + (validation
+            ? Number(validation.minimumScoreableMarkets || 0) + 'm · min 2× ' + _bMoney(Number(validation.worstPnl2x || 0))
+            : 'exact cohort not classified') + '</div>' +
+          '<div class="borg-cell-sub">' + (profile250
+            ? '250ms tick ' + _bMoney(Number(profile250.pnl2xOneTick || 0))
+            : 'L4 counterfactual only') + '</div></td>' +
         '<td>' + (quality == null ? '—' : quality + '%') +
           '<div class="borg-cell-sub">quality · fidelity ' + (fidelity == null ? '—' : fidelity + '%') + '</div>' +
           '<div class="borg-cell-sub">WAL ' + number(row, 'wal_eligible_fills') + ' fill · ' +
@@ -3967,6 +4057,14 @@
     const evidence = data.evidence || {};
     const halves = data.chronologicalHalves || {};
     const executionReplay = data.executionReplay || [];
+    const fullDepth = data.fullDepthValidation || summaryRow?.fullDepthValidation || null;
+    const historicalFullDepth = data.historicalFullDepthValidation
+      || summaryRow?.historicalFullDepthValidation || null;
+    const fullDepthMissingReason = historicalFullDepth
+      ? 'A prior ' + String(historicalFullDepth.classification || 'unclassified').replaceAll('_', ' ').toLowerCase() +
+        ' replay exists for ' + String(historicalFullDepth.experimentId || 'an older experiment') +
+        ', but it is not attached to this newer frozen identity.'
+      : 'No bounded fleet replay is available for this exact cohort.';
     const markets = Number(evidence.independent_markets ?? summaryRow?.current_eligible_markets ?? 0);
     const fills = Number(evidence.eligible_fills ?? summaryRow?.current_eligible_fills ?? 0);
     const days = Number(evidence.utc_days || 0);
@@ -4025,6 +4123,16 @@
       '</td><td style="color:' + _bPnlColor(Number(row.pnl_2x || 0)) + ';">' +
       _bMoney(Number(row.pnl_2x || 0)) + '</td></tr>').join('')
       : emptyRows(7, 'No immutable WAL-arrival replay rows exist for this fresh cohort yet');
+    const fullDepthRows = fullDepth?.profiles?.length ? fullDepth.profiles.map((profile) =>
+      '<tr><td>' + Number(profile.latencyMs) + 'ms</td><td>' + Number(profile.scoreableMarkets || 0) +
+      '</td><td>' + Number(profile.fills || 0) + '</td><td>' + Number(profile.provenNonfills || 0) +
+      '</td><td>' + Number(profile.coveragePct || 0).toFixed(1) + '%</td><td style="color:' +
+      _bPnlColor(Number(profile.pnl2x || 0)) + ';">' + _bMoney(Number(profile.pnl2x || 0)) +
+      '</td><td style="color:' + _bPnlColor(Number(profile.pnl2xOneTick || 0)) + ';">' +
+      _bMoney(Number(profile.pnl2xOneTick || 0)) + '</td><td>' +
+      _bMoney(Number(profile.pnl2xHalves?.first || 0)) + ' / ' +
+      _bMoney(Number(profile.pnl2xHalves?.second || 0)) + '</td></tr>').join('')
+      : emptyRows(8, 'This exact strategy cohort has not been classified by the bounded causal L4 replay');
 
     const prior = data.priorOutcome
       ? '<div class="borg-dossier-card"><div class="borg-dossier-label">Earlier version / concentration warning</div>' +
@@ -4072,6 +4180,13 @@
         '</div><div class="borg-dossier-copy muted" style="margin-top:8px;">A proved non-fill has valid A/B tape showing the quote or capacity was unavailable. Missing tape is not a non-fill and contributes no P&amp;L.</div>' +
         '<div style="overflow:auto;margin-top:10px;"><table class="borg-dossier-table"><thead><tr><th>Arrival</th><th>Intents</th><th>Eligible fills</th><th>Proved no-fill</th><th>Unscoreable</th><th>Low quality</th><th>2× P&amp;L</th></tr></thead><tbody>' +
           replayRows + '</tbody></table></div></section>' +
+      '<section class="borg-dossier-section borg-full-depth-truth"><div class="borg-dossier-label">Full-depth execution truth · counterfactual L4</div>' +
+        '<div class="borg-full-depth-verdict">' + _bValidationBadge(fullDepth) +
+          '<div><strong>' + escapeHtml(fullDepth?.reason || fullDepthMissingReason) + '</strong>' +
+          '<p>' + escapeHtml(fullDepth?.guardrail || 'Not replayed is not a pass or a fail. Live promotion still requires fresh independent evidence and authenticated fills.') + '</p></div></div>' +
+        '<div style="overflow:auto;margin-top:10px;"><table class="borg-dossier-table"><thead><tr><th>Arrival</th><th>Markets</th><th>Fills</th><th>No-fill</th><th>Coverage</th><th>2× P&amp;L</th><th>+ one tick</th><th>Half A / B</th></tr></thead><tbody>' +
+          fullDepthRows + '</tbody></table></div>' +
+        '<div class="borg-dossier-copy muted" style="margin-top:9px;">This is causal raw-book depth replay, not L5 exchange acknowledgement. It validates whether displayed depth supported the frozen decision after latency and costs; it does not certify hidden liquidity, order rejection, queue priority or live profitability.</div></section>' +
       '<section class="borg-dossier-section"><div class="borg-dossier-columns">' +
         '<div class="borg-dossier-card"><div class="borg-dossier-label">' + (lifecycle === 'DEAD' ? 'Why the exact rule failed' : 'Current disposition') + '</div>' +
           '<div class="borg-dossier-copy">' + escapeHtml(data.outcome || summaryRow?.outcome || 'No decision yet.') + '</div></div>' +
