@@ -33,8 +33,12 @@ const {
   TERMINAL_CARRY_V1_EXPERIMENT_ID,
 } =
   require('../../borg/crossvenue/terminal-carry');
-const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
-const { ORDERED_STRIKE_EVIDENCE_START, ORDERED_STRIKE_EXPERIMENT_ID } =
+const {
+  ORDERED_STRIKE_EVIDENCE_START,
+  ORDERED_STRIKE_EXPERIMENT_ID,
+  STRUCTURAL_BASE_EXPERIMENT_ID,
+  STRUCTURAL_VISIBLE_UNIVERSE_IDS,
+} =
   require('../../borg/structural/experiment');
 const PYTH_EXPERIMENT_ID = 'pyth-resolver-boundary-transfer-v4-frozen-observation-window';
 
@@ -1666,9 +1670,10 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
                          count(*)::int catalog_candidates,
                          count(*) FILTER (WHERE active)::int subscribed_candidates
                     FROM borg_structural_candidates
-                   WHERE refreshed_at>now()-interval '15 minutes' AND universe_id=$1
+                   WHERE refreshed_at>now()-interval '15 minutes'
+                     AND universe_id=ANY($1::text[])
                    GROUP BY universe_id,universe_class,structure_type
-                   ORDER BY universe_class,structure_type`, [STRUCTURAL_EXPERIMENT_ID]),
+                   ORDER BY universe_class,structure_type`, [STRUCTURAL_VISIBLE_UNIVERSE_IDS]),
         pool.query(`SELECT e.structure_type,e.latency_ms,count(*)::int evaluations,
                          count(*) FILTER (WHERE pass_proof)::int proved_evaluations,
                          count(*) FILTER (WHERE economic_candidate AND pass_proof)::int economic_candidates,
@@ -1680,10 +1685,10 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
                          max(evaluated_at) latest
                     FROM borg_structural_evaluations e
                     JOIN borg_structural_candidates c USING (candidate_id)
-                   WHERE c.universe_id=$1
+                   WHERE c.universe_id=ANY($1::text[])
                      AND (e.economic_candidate OR e.qualified)
                    GROUP BY e.structure_type,e.latency_ms ORDER BY e.structure_type,e.latency_ms`,
-          [STRUCTURAL_EXPERIMENT_ID]),
+          [STRUCTURAL_VISIBLE_UNIVERSE_IDS]),
         pool.query(`SELECT structure_type,latency_ms,count(*)::int quotes,
                            count(*) FILTER (WHERE status='RESTING')::int resting,
                            count(*) FILTER (WHERE filled_at IS NOT NULL)::int fills,
@@ -1713,8 +1718,9 @@ router.get('/structural/summary', authMiddleware, async (req, res) => {
       const ageSec = hb ? Math.max(0, Math.round((Date.now() - new Date(hb.beat_at).getTime()) / 1000)) : null;
       return {
         alive: ageSec != null && ageSec < 30, heartbeatAt: hb?.beat_at || null,
-        experimentId: STRUCTURAL_EXPERIMENT_ID,
-        contract: 'Frozen V5 content-addressed rule universe. A bundle qualifies only when its doubled-cost displayed profit remains positive after reserving the worst executable proper-subset fill unwind across the bundle. The passive arm consumes public prints behind frozen queue-ahead and immediately crosses every partial hedge; it is C-grade until authenticated queue and cancel acknowledgements exist.',
+        experimentId: STRUCTURAL_BASE_EXPERIMENT_ID,
+        universeIds: STRUCTURAL_VISIBLE_UNIVERSE_IDS,
+        contract: 'Frozen content-addressed rule universes, including cross-event physical sports floors. A bundle qualifies only when its doubled-cost displayed profit remains positive after reserving the worst executable proper-subset fill unwind across the bundle. The passive arm consumes public prints behind frozen queue-ahead and immediately crosses every partial hedge; it is C-grade until authenticated queue and cancel acknowledgements exist.',
         candidates: candidates.rows, rows: rows.rows, passive: passive.rows,
         orderedStrike: {
           experimentId: ORDERED_STRIKE_EXPERIMENT_ID,

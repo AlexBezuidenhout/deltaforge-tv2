@@ -19,6 +19,7 @@ const { pool, migrateStructural, insertRows, logEvent } = require('../recon/db')
 const {
   buildConditionGraph, evaluateCandidate, STRUCTURAL_UNIVERSE_VERSION,
 } = require('./condition-graph');
+const { buildPhysicalSportsCandidates } = require('./physical-event-graph');
 const {
   createPassiveQuoteState, proposePassiveQuotes, updatePassiveQuoteState,
 } = require('./passive-entry');
@@ -132,10 +133,7 @@ async function fetchEvents(options = {}) {
   for (let page = 0; page < eventPages; page += 1) {
     const offset = String(page * 100);
     requests.push({ ...common, offset, order: 'endDate', ascending: 'true' });
-    requests.push({
-      active: 'true', closed: 'false', limit: '100', offset,
-      order: 'volume24hr', ascending: 'false',
-    });
+    requests.push({ ...common, offset, order: 'volume24hr', ascending: 'false' });
   }
   // Explicit sports universe: broad ranking alone can crowd short-lived game
   // ladders out with political/crypto volume. Tag 1 is Polymarket's Sports
@@ -143,10 +141,8 @@ async function fetchEvents(options = {}) {
   for (let page = 0; page < sportsEventPages; page += 1) {
     const offset = String(page * 100);
     requests.push({ ...common, tag_id: '1', offset, order: 'endDate', ascending: 'true' });
-    requests.push({
-      active: 'true', closed: 'false', tag_id: '1', limit: '100', offset,
-      order: 'volume24hr', ascending: 'false',
-    });
+    requests.push({ ...common, tag_id: '1', offset,
+      order: 'volume24hr', ascending: 'false' });
   }
   const pages = await concurrentMap(requests,
     Math.max(1, Math.min(10, Number(options.concurrency || GAMMA_CONCURRENCY))),
@@ -259,7 +255,8 @@ function boundedPanel(candidates) {
   // crowd complete event sets or complement controls out of a bounded socket
   // budget. Selection is deterministic and independent of observed PnL.
   const typeOrder = [
-    'complete_mutually_exclusive_set', 'sports_total_ladder', 'sports_spread_ladder',
+    'sports_exact00_over05_floor', 'complete_mutually_exclusive_set',
+    'sports_total_ladder', 'sports_spread_ladder',
     'nested_threshold', 'disjoint_ranges', 'binary_complement',
   ];
   const groups = new Map(typeOrder.map((type) => [type, sorted.filter((candidate) =>
@@ -517,7 +514,11 @@ async function main() {
   });
 
   const refresh = async () => {
-    const graph = buildConditionGraph(await fetchEvents());
+    const events = await fetchEvents();
+    const graph = [
+      ...buildConditionGraph(events),
+      ...buildPhysicalSportsCandidates(events),
+    ];
     const panel = boundedPanel(graph);
     const catalog = boundedCatalog(graph, panel);
     await persistCandidates(catalog, panel);

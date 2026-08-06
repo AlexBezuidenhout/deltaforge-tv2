@@ -481,8 +481,11 @@ function evaluateCandidate(candidate, books, nowMs, options = {}) {
   const orphanSafeProfit2xUsd = orphanReserveUsd == null
     ? null : displayedProfit2xUsd - orphanReserveUsd;
   let bregman = null;
+  const booleanTerminalStates = candidate.payoffProof?.terminalStates?.length
+    && candidate.payoffProof.terminalStates.every((state) => candidate.legs.every((entry) =>
+      typeof state.values?.[entry.predicateId] === 'boolean'));
   if (passQuotes && legStates.every((entry) => entry.bid > 0 && entry.bid < 1)
-    && candidate.payoffProof?.terminalStates?.length) {
+    && booleanTerminalStates) {
     try {
       const statePayoffs = candidate.payoffProof.terminalStates.map((state) =>
         candidate.legs.map((entry) => {
@@ -539,6 +542,6 @@ function evaluateCandidate(candidate, books, nowMs, options = {}) {
 
 module.exports = {
   buildConditionGraph, evaluateCandidate, feePerShare, jsonArray, numericLabel,
-  rangeLabel, rulesFingerprint, sportsSpreadSemantic, sportsTotalSemantic,
+  leg, normalizedMarket, rangeLabel, rulesFingerprint, sportsSpreadSemantic, sportsTotalSemantic,
   thresholdOperator, thresholdSemantic, STRUCTURAL_UNIVERSE_VERSION,
 };

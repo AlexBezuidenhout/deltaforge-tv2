@@ -1,7 +1,7 @@
 'use strict';
 
 const H43_STRATEGY = 'H43_resolution_boundary_buffer';
-const STRUCTURAL_EXPERIMENT_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
+const { STRUCTURAL_VISIBLE_UNIVERSE_IDS } = require('../structural/experiment');
 const HEARTBEAT_COMPONENTS = Object.freeze([
   'allmarket_lab', 'crossvenue_lab', 'options_surface', 'pyth_boundary', 'structural_scanner',
 ]);
@@ -76,7 +76,7 @@ async function buildPriorityLaneStatus(pool, options = {}) {
                e.orphan_safe_profit_2x_usd
           FROM borg_structural_evaluations e
           JOIN borg_structural_candidates c USING(candidate_id)
-         WHERE c.universe_id=$1 AND e.evaluated_at >= $2
+         WHERE c.universe_id=ANY($1::text[]) AND e.evaluated_at >= $2
            AND (e.economic_candidate OR e.qualified)
       ), qualified_rows AS (
         SELECT candidate_id,evaluated_at,
@@ -99,7 +99,7 @@ async function buildPriorityLaneStatus(pool, options = {}) {
              max(orphan_safe_profit_2x_usd)
                FILTER (WHERE qualified)::float max_orphan_safe_profit_2x_usd,
              max(evaluated_at) latest
-        FROM positive`, [STRUCTURAL_EXPERIMENT_ID, epochStart])
+        FROM positive`, [STRUCTURAL_VISIBLE_UNIVERSE_IDS, epochStart])
       : Promise.resolve({ rows: [{}] }),
   ]);
 

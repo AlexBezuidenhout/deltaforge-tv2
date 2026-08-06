@@ -63,7 +63,7 @@ test('structural dashboard reports use sparse positive evidence instead of full 
   assert.match(report, /WITH positive AS MATERIALIZED/);
   assert.match(report, /e\.evaluated_at >= \$2/);
   assert.match(report, /e\.economic_candidate OR e\.qualified/);
-  assert.match(route, /WHERE c\.universe_id=\$1\s+AND \(e\.economic_candidate OR e\.qualified\)/);
+  assert.match(route, /WHERE c\.universe_id=ANY\(\$1::text\[\]\)\s+AND \(e\.economic_candidate OR e\.qualified\)/);
 });
 
 test('live lane status uses current heartbeats and sparse positive rows only', async () => {

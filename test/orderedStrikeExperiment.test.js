@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { summarizePassive } = require('../scripts/ordered-strike-report');
 const {
   ORDERED_STRIKE_EXPERIMENT_ID,
+  SPORTS_PHYSICAL_EXPERIMENT_ID,
   STRUCTURAL_BASE_EXPERIMENT_ID,
   structuralExperimentId,
 } = require('../borg/structural/experiment');
@@ -16,6 +17,7 @@ test('only ordered crypto strikes receive the fresh experiment identity', () => 
   assert.equal(structuralExperimentId('nested_threshold'), ORDERED_STRIKE_EXPERIMENT_ID);
   assert.equal(structuralExperimentId('sports_total_ladder'), STRUCTURAL_BASE_EXPERIMENT_ID);
   assert.equal(structuralExperimentId('binary_complement'), STRUCTURAL_BASE_EXPERIMENT_ID);
+  assert.equal(structuralExperimentId('sports_exact00_over05_floor'), SPORTS_PHYSICAL_EXPERIMENT_ID);
 });
 
 test('ordered-strike report parses PostgreSQL numeric strings and keeps halves explicit', () => {

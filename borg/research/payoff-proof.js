@@ -18,6 +18,7 @@ const RELATION_TYPES = Object.freeze({
   MUTUALLY_EXCLUSIVE: 'MUTUALLY_EXCLUSIVE',
   EXACTLY_ONE: 'EXACTLY_ONE',
   EXHAUSTIVE: 'EXHAUSTIVE',
+  EXPLICIT_TERMINAL_STATES: 'EXPLICIT_TERMINAL_STATES',
 });
 
 function canonical(value) {
@@ -106,4 +107,61 @@ function compilePayoffProof({ relationType, variables, legs }) {
   };
 }
 
-module.exports = { RELATION_TYPES, compilePayoffProof };
+/**
+ * Compile a proof when venue rules include fractional settlement states (for
+ * example, a 50/50 cancellation). Each predicate supplies the payout of its
+ * YES and NO token in every explicitly certified terminal state. This avoids
+ * forcing a non-binary settlement into a Boolean truth table.
+ */
+function compileExplicitPayoffProof({ variables, legs, terminalStates }) {
+  const orderedVariables = [...new Set((variables || []).map(String))];
+  if (!orderedVariables.length || orderedVariables.length !== (variables || []).length) {
+    throw new Error('explicit payoff proof requires unique predicate ids');
+  }
+  const normalizedLegs = (legs || []).map((leg) => ({
+    predicateId: String(leg.predicateId), outcome: String(leg.outcome || '').toUpperCase(),
+  }));
+  if (!normalizedLegs.length) throw new Error('explicit payoff proof requires at least one leg');
+  for (const leg of normalizedLegs) {
+    if (!orderedVariables.includes(leg.predicateId) || !['YES', 'NO'].includes(leg.outcome)) {
+      throw new Error(`invalid explicit payoff leg ${leg.predicateId}:${leg.outcome}`);
+    }
+  }
+  const states = (terminalStates || []).map((state, index) => {
+    const label = String(state?.label || `state_${index}`);
+    const outcomePayouts = {};
+    for (const variable of orderedVariables) {
+      const source = state?.outcomePayouts?.[variable];
+      const yes = Number(source?.YES);
+      const no = Number(source?.NO);
+      if (!(yes >= 0 && yes <= 1) || !(no >= 0 && no <= 1) ||
+          Math.abs(yes + no - 1) > 1e-9) {
+        throw new Error(`invalid complementary payouts for ${variable} in ${label}`);
+      }
+      outcomePayouts[variable] = { YES: yes, NO: no };
+    }
+    const payout = normalizedLegs.reduce((sum, leg) =>
+      sum + outcomePayouts[leg.predicateId][leg.outcome], 0);
+    return { label, outcomePayouts, payout };
+  });
+  if (!states.length) throw new Error('explicit payoff proof requires terminal states');
+  const payoffVector = states.map((state) => state.payout);
+  const guaranteedMinPayout = Math.min(...payoffVector);
+  const proofBody = {
+    version: 'explicit-payoff-proof-v1',
+    relationType: RELATION_TYPES.EXPLICIT_TERMINAL_STATES,
+    variables: orderedVariables,
+    legs: normalizedLegs,
+    terminalStates: states,
+    payoffVector,
+    guaranteedMinPayout,
+  };
+  return {
+    ...proofBody,
+    valid: Number.isFinite(guaranteedMinPayout),
+    proofHash: crypto.createHash('sha256')
+      .update(JSON.stringify(canonical(proofBody))).digest('hex'),
+  };
+}
+
+module.exports = { RELATION_TYPES, compileExplicitPayoffProof, compilePayoffProof };

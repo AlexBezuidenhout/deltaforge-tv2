@@ -1,0 +1,57 @@
+{
+  "experiment_id": "structural-sports-physical-floor-v1",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-06T09:26:54.000Z",
+  "frozen_at": "2026-08-06T09:26:54.000Z",
+  "evidence_started_at": "2026-08-06T09:26:54.000Z",
+  "phase": "pilot",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "certified_payoff_graph",
+  "strategy_version": "sports-physical-payoff-graph-v1",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "mechanism": "Join separate soccer Gamma events only by an exact venue fixture id and prove the worst-state payout of Exact Score 0-0 YES plus Total Goals Over 0.5, including the observed fractional cancellation settlements.",
+  "frozen_predicates": [
+    "same exact venue fixture id",
+    "same settlement timestamp",
+    "90 minutes plus stoppage time with extra time and penalties excluded",
+    "exact score 0-0 YES",
+    "total goals Over 0.5",
+    "exact score cancellation resolves 0-0",
+    "total cancellation resolves 50-50",
+    "identical official-statistics and fallback resolution policy"
+  ],
+  "required_gates": [
+    "explicit terminal-state payoff proof",
+    "content-addressed rule certification",
+    "fresh event-driven books",
+    "current per-market fee schedule",
+    "two-times fee stress",
+    "full equal-share FOK depth",
+    "positive capacity under a shared 500 USD bankroll",
+    "positive profit after worst proper-subset orphan unwind reserve"
+  ],
+  "promotion": {
+    "minimum_fresh_independent_markets": 300,
+    "minimum_calendar_days": 30,
+    "positive_both_chronological_halves": true,
+    "market_and_day_clustered_lower_bound_above_zero": true,
+    "paper_only_until_authenticated_fill_pilot": true
+  },
+  "provisional": [
+    "The payoff floor is deterministic only when every rule predicate certifies.",
+    "The bundle remains non-atomic and displayed unwind depth is not a fill guarantee.",
+    "No profitability claim is made before fresh forward observations."
+  ],
+  "strategy_bindings": [{
+    "strategy": "structural_sports_physical_floor_v1",
+    "family": "certified_payoff_graph",
+    "arm": "exact00_yes_plus_over05",
+    "phase": "pilot",
+    "min_independent_markets": 300,
+    "min_days": 30,
+    "primary_metric": "worst_state_profit_after_2x_costs_and_orphan_reserve"
+  }]
+}

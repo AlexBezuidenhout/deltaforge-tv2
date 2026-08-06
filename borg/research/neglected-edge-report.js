@@ -9,7 +9,8 @@ const {
 } = require('./opportunity-economics');
 
 const H43_EXPERIMENT_ID = 'research-h43-forward-v1';
-const STRUCTURAL_UNIVERSE_ID = 'structural-certified-payoff-graph-v5-orphan-reserve';
+const { STRUCTURAL_VISIBLE_UNIVERSE_IDS } = require('../structural/experiment');
+const STRUCTURAL_UNIVERSE_ID = STRUCTURAL_VISIBLE_UNIVERSE_IDS[0];
 const { CURRENT_CROSSVENUE_EXPERIMENT_ID: CROSSVENUE_EXPERIMENT_ID } =
   require('../crossvenue/experiment');
 const { OPTIONS_EVIDENCE_START, OPTIONS_EXPERIMENT_ID } =
@@ -216,7 +217,7 @@ async function buildNeglectedEdgeReport(pool, options = {}) {
                e.displayed_profit_2x_usd,e.orphan_safe_profit_2x_usd
           FROM borg_structural_evaluations e
           JOIN borg_structural_candidates c USING(candidate_id)
-         WHERE c.universe_id=$1 AND e.evaluated_at >= $2
+         WHERE c.universe_id=ANY($1::text[]) AND e.evaluated_at >= $2
            AND (e.economic_candidate OR e.qualified)
       ), qualified_rows AS (
         SELECT candidate_id,evaluated_at,
@@ -242,7 +243,7 @@ async function buildNeglectedEdgeReport(pool, options = {}) {
              max(orphan_safe_profit_2x_usd)
                FILTER (WHERE qualified)::float max_orphan_safe_profit_2x,
              max(evaluated_at) latest
-        FROM positive`, [STRUCTURAL_UNIVERSE_ID, structuralEvidenceStart])).rows[0];
+        FROM positive`, [STRUCTURAL_VISIBLE_UNIVERSE_IDS, structuralEvidenceStart])).rows[0];
 
     const structuralRows = includeCandidateRows ? (await client.query(`
       WITH latest_positive AS (
@@ -250,14 +251,14 @@ async function buildNeglectedEdgeReport(pool, options = {}) {
                e.*,c.atomic,c.end_date
           FROM borg_structural_evaluations e
           JOIN borg_structural_candidates c USING(candidate_id)
-         WHERE c.universe_id=$1 AND e.evaluated_at >= $2
+         WHERE c.universe_id=ANY($1::text[]) AND e.evaluated_at >= $2
            AND (e.economic_candidate OR e.qualified)
          ORDER BY e.candidate_id,e.evaluated_at DESC,e.id DESC
       )
       SELECT * FROM latest_positive
        ORDER BY economic_candidate DESC,residual_2x_per_bundle DESC NULLS LAST,
                 displayed_profit_2x_usd DESC NULLS LAST`,
-    [STRUCTURAL_UNIVERSE_ID, structuralEvidenceStart])).rows : [];
+    [STRUCTURAL_VISIBLE_UNIVERSE_IDS, structuralEvidenceStart])).rows : [];
 
     const crossvenue = (await client.query(`
       SELECT count(*)::int observations,count(DISTINCT match_id)::int pairs,
