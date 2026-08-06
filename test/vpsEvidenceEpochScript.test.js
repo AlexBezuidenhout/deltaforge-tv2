@@ -24,3 +24,15 @@ test('new evidence epochs default to the immutable deployed release identifier',
     /code_version="\$\{BORG_EPOCH_CODE_VERSION:-backlog-research-v\d+\}"/,
   );
 });
+
+test('epoch launch drains receipt-gated retention without terminating its oneshot', () => {
+  assert.match(script, /systemctl stop deltaforge-hot-retention\.timer/);
+  assert.match(script,
+    /while systemctl is-active --quiet deltaforge-hot-retention\.service/);
+  assert.match(script,
+    /refusing to start evidence epoch: hot retention failed before the boundary/);
+  assert.doesNotMatch(script,
+    /deltaforge-hot-retention\.timer deltaforge-hot-retention\.service/);
+  assert.match(script,
+    /if \[\[ "\$\{hot_retention_timer_drained\}" == true \]\]; then[\s\S]*enable --now deltaforge-hot-retention\.timer/);
+});

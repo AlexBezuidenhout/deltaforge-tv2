@@ -22,6 +22,7 @@ deployed_release="$(basename "$(readlink -f /opt/deltaforge/tv2/current)")"
 code_version="${BORG_EPOCH_CODE_VERSION:-${deployed_release}}"
 epoch_reason="${BORG_EPOCH_REASON:-exact-rule-structural-options-forward-after-runtime-repair}"
 maintenance_timers_drained=false
+hot_retention_timer_drained=false
 tmp_file=""
 preflight_report=""
 
@@ -31,6 +32,10 @@ restore_maintenance_timers() {
       deltaforge-google-drive-archive.timer \
       deltaforge-parquet-lake.timer >/dev/null 2>&1 || true
     maintenance_timers_drained=false
+  fi
+  if [[ "${hot_retention_timer_drained}" == true ]]; then
+    systemctl enable --now deltaforge-hot-retention.timer >/dev/null 2>&1 || true
+    hot_retention_timer_drained=false
   fi
 }
 
@@ -92,6 +97,25 @@ if (( available_kib < required_kib )); then
   exit 1
 fi
 
+# The retention worker may be waiting behind the uploader's shared flock when
+# an epoch launch begins. Stopping the oneshot with SIGTERM leaves systemd in a
+# failed state even though no retention rule failed. Stop future dispatches and
+# let the current receipt-gated pass finish before creating the epoch boundary.
+hot_retention_timer_drained=true
+systemctl stop deltaforge-hot-retention.timer
+retention_deadline="$(( $(date +%s) + ${BORG_EPOCH_RETENTION_DRAIN_TIMEOUT_SEC:-360} ))"
+while systemctl is-active --quiet deltaforge-hot-retention.service; do
+  if (( $(date +%s) >= retention_deadline )); then
+    echo "refusing to start evidence epoch: hot retention did not drain safely" >&2
+    exit 1
+  fi
+  sleep 2
+done
+if systemctl is-failed --quiet deltaforge-hot-retention.service; then
+  echo "refusing to start evidence epoch: hot retention failed before the boundary" >&2
+  exit 1
+fi
+
 # Drain every cohort-producing process before setting the timestamp. Otherwise
 # a timer or an old collector can finish shutting down after the new timestamp
 # and leak its final heartbeat/error into the successor trial.
@@ -101,7 +125,6 @@ systemctl stop \
   deltaforge-raw-archive.timer deltaforge-raw-archive.service \
   deltaforge-hot-partitions.timer deltaforge-hot-partitions.service \
   deltaforge-hot-db-prune.timer deltaforge-hot-db-prune.service \
-  deltaforge-hot-retention.timer deltaforge-hot-retention.service \
   deltaforge-cv-settle.timer deltaforge-cv-settle.service \
   deltaforge-db-snapshot.timer deltaforge-db-snapshot.service \
   deltaforge-health.timer deltaforge-health.service \
@@ -183,6 +206,7 @@ systemctl enable --now \
   deltaforge-hot-retention.timer \
   deltaforge-cv-settle.timer \
   deltaforge-db-snapshot.timer
+hot_retention_timer_drained=false
 
 # Do not make cohort validity depend on where startup lands within a five-minute
 # timer bucket. The archive heartbeat was seeded before the hot writers; score
