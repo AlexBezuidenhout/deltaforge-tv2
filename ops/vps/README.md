@@ -148,6 +148,9 @@ subscribes over two independent RTDS sockets to the documented
 the exact E18 payload plus source/publisher/local clocks, and records opening
 and closing boundary evidence only within the frozen three-second tolerance.
 It never substitutes Chainlink spot, Binance, or a locally reconstructed TWAP.
+The 15-second economic-source transport alarm tolerates normal quiet publisher
+intervals; it does not relax the three-second boundary timestamp or five-second
+source-to-receipt certification limits.
 
 `borg-equity-options.service` is a read-only, paper-only exact-expiry lane. It
 can discover standard option contracts and read licensed market data through

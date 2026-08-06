@@ -48,4 +48,10 @@ test('boundary records use nearest exact-source tick and fail closed when stale'
   const absent = boundaryRecord(market, 'OPEN', null, start + 500);
   assert.equal(absent.eligible, false);
   assert.equal(absent.reason, 'NO_EXACT_TWAP_WITHIN_TOLERANCE');
+
+  const delayed = boundaryRecord(market, 'OPEN', {
+    tick: { ...tick, receiveWallMs: start + 7000 }, distanceMs: 0,
+  }, start + 7100);
+  assert.equal(delayed.eligible, false);
+  assert.equal(delayed.reason, 'SOURCE_OR_RECEIPT_STALE');
 });

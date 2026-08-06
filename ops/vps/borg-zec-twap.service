@@ -14,8 +14,9 @@ Environment=NODE_ENV=production
 Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
 Environment=BORG_WAL_MIN_FREE_GB=20
 Environment=TWAP_MARKET_REFRESH_MS=60000
-Environment=TWAP_SOURCE_MAX_AGE_MS=5000
+Environment=TWAP_SOURCE_MAX_AGE_MS=15000
 Environment=TWAP_BOUNDARY_TOLERANCE_MS=3000
+Environment=TWAP_BOUNDARY_RECEIPT_MAX_AGE_MS=5000
 ExecStart=/usr/local/bin/node borg/resolver-twap/collector.js
 Restart=always
 RestartSec=5

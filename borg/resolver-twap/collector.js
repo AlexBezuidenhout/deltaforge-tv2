@@ -14,7 +14,6 @@ const {
   insertRows, logEvent, migrate, migrateEdgeExecution, pool,
 } = require('../recon/db');
 const TwapMultiplex = require('./multiplex');
-const { economicAgeMs } = require('./rtds');
 const {
   ZEC_TWAP_UNIVERSE, discoverZecTwapMarkets,
 } = require('./universe');
@@ -22,9 +21,17 @@ const {
 const RUN_ID = `twap:${os.hostname()}:${Date.now()}:${process.pid}`;
 const STARTED_AT = new Date().toISOString();
 const REFRESH_MS = Math.max(30_000, Number(process.env.TWAP_MARKET_REFRESH_MS || 60_000));
-const SOURCE_MAX_AGE_MS = Math.max(1000, Number(process.env.TWAP_SOURCE_MAX_AGE_MS || 5000));
+// Chainlink publishes both TWAP windows from one economic source. Short periods
+// with no new source timestamp are not repaired by reconnecting two sockets;
+// use the transport heartbeat horizon to detect an actual outage. This does
+// not relax boundary certification below, which has separate source-time and
+// receipt-lag limits.
+const SOURCE_MAX_AGE_MS = Math.max(5000,
+  Number(process.env.TWAP_SOURCE_MAX_AGE_MS || 15_000));
 const BOUNDARY_TOLERANCE_MS = Math.max(500,
   Number(process.env.TWAP_BOUNDARY_TOLERANCE_MS || 3000));
+const BOUNDARY_RECEIPT_MAX_AGE_MS = Math.max(500,
+  Number(process.env.TWAP_BOUNDARY_RECEIPT_MAX_AGE_MS || 5000));
 
 function marketValues(row) {
   return [
@@ -79,8 +86,10 @@ function nearestTick(history, targetMs, windowSeconds, toleranceMs) {
 
 function boundaryRecord(market, kind, tickMatch, observedAt = Date.now()) {
   const targetMs = kind === 'OPEN' ? market.windowStart.getTime() : market.windowEnd.getTime();
-  const eligible = Boolean(tickMatch && economicAgeMs(tickMatch.tick, observedAt)
-    <= Math.max(SOURCE_MAX_AGE_MS, Math.abs(observedAt - targetMs) + BOUNDARY_TOLERANCE_MS));
+  const receiptLagMs = tickMatch
+    ? tickMatch.tick.receiveWallMs - tickMatch.tick.sourceMs : null;
+  const eligible = Boolean(tickMatch && receiptLagMs >= 0
+    && receiptLagMs <= BOUNDARY_RECEIPT_MAX_AGE_MS);
   const reason = eligible ? 'EXACT_CHAINLINK_TWAP_NEAREST_BOUNDARY'
     : tickMatch ? 'SOURCE_OR_RECEIPT_STALE' : 'NO_EXACT_TWAP_WITHIN_TOLERANCE';
   const identity = `${ZEC_TWAP_UNIVERSE}|${market.conditionId}|${kind}`;
@@ -98,6 +107,8 @@ function boundaryRecord(market, kind, tickMatch, observedAt = Date.now()) {
       source: tickMatch?.tick.source || null,
       publisherMs: tickMatch?.tick.publisherMs || null,
       receiveWallMs: tickMatch?.tick.receiveWallMs || null,
+      receiptLagMs,
+      receiptMaxAgeMs: BOUNDARY_RECEIPT_MAX_AGE_MS,
       connectionEpoch: tickMatch?.tick.connectionEpoch || null,
       transportPath: tickMatch?.tick.transportPath ?? null,
       noSpotSubstitution: true,
