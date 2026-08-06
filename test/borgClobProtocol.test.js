@@ -114,6 +114,7 @@ test('CLOB accepts text PONG as healthy traffic without JSON parsing', () => {
 
 test('CLOB disconnects are durable gap counters and invalidate stale books', () => {
   const clob = new ClobRecon(() => 42);
+  clob.subscribe(['YES']);
   clob.connectionEpoch = 2;
   clob.books.set('YES', { bids: [[0.49, 10]], asks: [[0.51, 10]], at: Date.now() });
   clob._pendingSqlTouch.set('YES', []);
@@ -124,6 +125,13 @@ test('CLOB disconnects are durable gap counters and invalidate stale books', () 
   assert.equal(clob._pendingSqlTouch.size, 0);
   assert.equal(clob.eventBuf.at(-1)[3], 'connection_gap');
   assert.equal(clob.health().connectionGaps, 1);
+});
+
+test('an idle CLOB socket with no desired assets cannot create an evidence gap', () => {
+  const clob = new ClobRecon(() => null);
+  clob.connectionEpoch = 2;
+  assert.equal(clob._recordConnectionGap({ reason: 'idle_close' }), false);
+  assert.equal(clob.connectionGaps, 0);
 });
 
 test('CLOB REST validation lets an in-flight WS update win without a false gap', async () => {

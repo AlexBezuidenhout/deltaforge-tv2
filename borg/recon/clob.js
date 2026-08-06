@@ -185,9 +185,11 @@ class ClobRecon {
 
   _recordConnectionGap(detail = {}) {
     // A socket that never reached OPEN is startup unavailability, not a lost
-    // interval. Once an epoch has received frames, every disconnect creates an
+    // interval. An idle socket with zero desired assets also carries no market
+    // evidence, so its transport lifecycle cannot create a false data gap.
+    // Once an epoch has subscribed assets, every disconnect creates an
     // unobservable interval and must remain a non-zero evidence counter.
-    if (this.connectionEpoch <= 0) return false;
+    if (this.connectionEpoch <= 0 || this.subscribed.size === 0) return false;
     this.connectionGaps += 1;
     this.lastConnectionGapAt = new Date().toISOString();
     this._bufferEvent(null, 'connection_gap', null, null, null, detail);

@@ -122,6 +122,7 @@ async function main() {
   let lastTickAt = null;
   let blocker = 'STARTING';
   let stopping = false;
+  let clobStarted = false;
 
   const twap = new TwapMultiplex({
     symbols: ['zec/usd'], windows: [30, 60], pathCount: 2,
@@ -152,6 +153,14 @@ async function main() {
       [market.upToken, market.id], [market.downToken, market.id],
     ]));
     clob.subscribe([...tokenMarket.keys()]);
+    if (markets.length && !clobStarted) {
+      // The resolver feed is useful even between listings. Do not open empty
+      // CLOB sockets: Polymarket requires a market subscription to be the
+      // first application frame, and no executable book exists to preserve.
+      clobStarted = true;
+      const connected = await clob.connect();
+      if (!connected) await logEvent('WARN', 'zec_twap', 'initial CLOB connection is incomplete');
+    }
     blocker = markets.length ? 'COLLECTING' : 'NO_CURRENT_CERTIFIED_ZEC_TWAP_MARKETS';
   };
 
@@ -235,7 +244,7 @@ async function main() {
   };
 
   await refresh();
-  await Promise.all([twap.connect(), clob.connect()]);
+  await twap.connect();
   const timers = [
     setInterval(() => refresh().catch((error) => logEvent('ERROR', 'zec_twap', error.message)), REFRESH_MS),
     setInterval(() => flushTicks().catch((error) => logEvent('ERROR', 'zec_twap', error.message)), 1000),
