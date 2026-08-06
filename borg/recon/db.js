@@ -1506,7 +1506,24 @@ CREATE TABLE IF NOT EXISTS borg_twap_runtime (
 `;
 
 async function migrateEdgeExecution() {
-  await pool.query(EDGE_EXECUTION_SCHEMA);
+  // The ZEC and equity collectors are intentionally started together. Plain
+  // concurrent CREATE TABLE IF NOT EXISTS statements can still race while
+  // PostgreSQL creates their implicit composite types, producing a transient
+  // pg_type_typname_nsp_index violation. Serialize this additive migration on
+  // one transaction-scoped advisory lock; the lock is released on commit or
+  // rollback and never enters a strategy/order path.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('deltaforge:edge-execution-schema:v1'))");
+    await client.query(EDGE_EXECUTION_SCHEMA);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 // All-market pre-trade L2 and passive-maker laboratory. This schema is

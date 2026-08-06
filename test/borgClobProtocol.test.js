@@ -83,6 +83,27 @@ test('CLOB sends the required initial market message when discovery follows conn
   clob.close();
 });
 
+test('CLOB does not send PING before an initial market subscription', () => {
+  const sent = [];
+  const socket = {
+    readyState: WebSocket.OPEN,
+    send: (message) => sent.push(message),
+  };
+  const clob = new ClobRecon(() => null);
+  clob.ws = socket;
+
+  assert.equal(clob._sendHeartbeat(socket), false);
+  assert.deepEqual(sent, []);
+
+  clob.subscribe(['A']);
+  assert.equal(clob._sendHeartbeat(socket), true);
+  assert.deepEqual(JSON.parse(sent[0]), {
+    type: 'market', assets_ids: ['A'], custom_feature_enabled: true,
+  });
+  assert.equal(sent[1], 'PING');
+  clob.close();
+});
+
 test('CLOB accepts text PONG as healthy traffic without JSON parsing', () => {
   let appends = 0;
   const clob = new ClobRecon(() => null, { wal: { append: () => { appends += 1; return {}; } } });

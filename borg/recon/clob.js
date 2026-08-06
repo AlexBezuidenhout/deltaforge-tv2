@@ -139,12 +139,7 @@ class ClobRecon {
         // WebSocket control-frame ping. Ten seconds is the documented maximum
         // cadence; use 8s plus an immediate first heartbeat to tolerate event-
         // loop jitter under full-book bursts.
-        const heartbeat = () => {
-          if (this.ws === ws && ws.readyState === WebSocket.OPEN) {
-            ws.send('PING');
-            this.lastPingAt = Date.now();
-          }
-        };
+        const heartbeat = () => this._sendHeartbeat(ws);
         // The initial market subscription must be the first application
         // message. Collector discovery can populate IDs just after `open`, so
         // do not lead with PING on an as-yet unsubscribed connection.
@@ -173,6 +168,19 @@ class ClobRecon {
       });
       ws.on('error', () => { /* close follows */ });
     });
+  }
+
+  _sendHeartbeat(socket) {
+    // The venue requires the initial market subscription to be the first
+    // application frame. A capture-only lane can legitimately have no active
+    // markets for part of the day, so an idle socket must not lead with PING
+    // and trigger a 1008 invalid-subscription reconnect loop. Once discovery
+    // supplies IDs, subscribe() sends the initial frame and heartbeats begin.
+    if (this.ws !== socket || socket?.readyState !== WebSocket.OPEN
+        || !this._initialSubscriptionSent) return false;
+    socket.send('PING');
+    this.lastPingAt = Date.now();
+    return true;
   }
 
   _recordConnectionGap(detail = {}) {
