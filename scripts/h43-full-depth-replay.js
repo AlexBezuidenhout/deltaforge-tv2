@@ -240,6 +240,17 @@ function acquireArchiveLock(options = {}) {
   });
 }
 
+function assertRemoteRunIdentity(options = {}) {
+  if (options.source === 'local') return;
+  const uid = options.processUid ?? (typeof process.getuid === 'function' ? process.getuid() : null);
+  if (uid === 0) {
+    throw new Error(
+      'remote replay must run as the deltaforge service user, not root; '
+      + 'rclone may refresh OAuth state and root-lock the production config',
+    );
+  }
+}
+
 function rcloneCommon(configFile) {
   return [
     '--config', configFile,
@@ -434,7 +445,11 @@ async function stageRemoteSegments(segments, options) {
     remoteSegments.reduce((sum, segment) => sum + finite(segment.size, 0), 0),
     options.diskReserveBytes,
   );
-  const stageRoot = fs.mkdtempSync(path.join(options.cacheRoot, options.stagePrefix || 'h43-l4-'));
+  const persistentStage = Boolean(options.stageRoot);
+  const stageRoot = persistentStage
+    ? path.resolve(options.stageRoot)
+    : fs.mkdtempSync(path.join(options.cacheRoot, options.stagePrefix || 'h43-l4-'));
+  if (persistentStage) fs.mkdirSync(stageRoot, { recursive: true, mode: 0o700 });
   const listFile = path.join(stageRoot, 'selected.files');
   fs.writeFileSync(
     listFile,
@@ -465,10 +480,11 @@ async function stageRemoteSegments(segments, options) {
       stageRoot,
       stagedSegments: remoteSegments.length,
       stagedBytes: remoteSegments.reduce((sum, segment) => sum + finite(segment.size, 0), 0),
+      persistentStage,
       warning: result.stderr.trim() ? 'rclone emitted a warning during bounded staging' : null,
     };
   } catch (error) {
-    fs.rmSync(stageRoot, { recursive: true, force: true });
+    if (!persistentStage) fs.rmSync(stageRoot, { recursive: true, force: true });
     throw error;
   }
 }
@@ -725,6 +741,7 @@ async function main() {
     cacheRoot: arg('--cache-root', process.env.H43_REPLAY_CACHE_ROOT
       || path.join(os.tmpdir(), 'deltaforge-h43-replay')),
     diskReserveBytes: positiveInteger(arg('--disk-reserve-bytes'), 20 * 1024 ** 3),
+    stageRoot: arg('--stage-root', process.env.H43_REPLAY_STAGE_ROOT || null),
     streamRemote: flag('--stream-remote'),
     quiet: flag('--quiet'),
     archiveLockFile: arg('--archive-lock', process.env.DELTAFORGE_ARCHIVE_LOCK
@@ -767,6 +784,7 @@ async function main() {
       Math.min(...availableTimes) - options.lookbackMs - MAX_PREDECESSOR_AGE_MS,
       Math.max(...availableTimes) + maximumLatencyMs + options.tailMs,
     );
+    assertRemoteRunIdentity(options);
     const archiveLock = await acquireArchiveLock(options);
     let catalog;
     let selected;
@@ -823,7 +841,7 @@ async function main() {
     try {
       replayed = await replayOrders(orders, profiles, staged.segments, options);
     } finally {
-      removeStage(staged.stageRoot);
+      if (!staged.persistentStage) removeStage(staged.stageRoot);
     }
     const report = {
       format: 'h43-causal-full-depth-replay-v1',
@@ -920,6 +938,7 @@ async function main() {
       diagnostics: report.diagnostics,
       profiles: report.profiles,
     }, null, 2)}\n`);
+    if (staged.persistentStage) removeStage(staged.stageRoot);
   } finally {
     await pool.end();
   }
@@ -933,6 +952,7 @@ if (require.main === module) main().catch((error) => {
 module.exports = {
   MAX_PREDECESSOR_AGE_MS,
   acquireArchiveLock,
+  assertRemoteRunIdentity,
   atomicWrite,
   buildSegmentCatalog,
   coalesceWindows,

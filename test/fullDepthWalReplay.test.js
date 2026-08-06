@@ -15,6 +15,7 @@ const {
 } = require('../borg/research/full-depth-wal-replay');
 const {
   acquireArchiveLock,
+  assertRemoteRunIdentity,
   coalesceWindows,
   parseProfiles,
   parseSegmentStart,
@@ -212,4 +213,17 @@ test('archive lease releases cleanly before a second remote reader proceeds', as
   const second = await acquireArchiveLock(options);
   assert.equal(second.acquired, true);
   await second.release();
+});
+
+test('remote replay refuses root so OAuth refresh cannot lock out production', () => {
+  assert.throws(
+    () => assertRemoteRunIdentity({ source: 'remote', processUid: 0 }),
+    /service user, not root/,
+  );
+  assert.doesNotThrow(
+    () => assertRemoteRunIdentity({ source: 'remote', processUid: 1000 }),
+  );
+  assert.doesNotThrow(
+    () => assertRemoteRunIdentity({ source: 'local', processUid: 0 }),
+  );
 });

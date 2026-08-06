@@ -30,6 +30,7 @@ const {
 const {
   MAX_PREDECESSOR_AGE_MS,
   acquireArchiveLock,
+  assertRemoteRunIdentity,
   atomicWrite,
   buildSegmentCatalog,
   hasSegmentCoverage,
@@ -278,6 +279,7 @@ async function main() {
     cacheRoot: arg('--cache-root', process.env.BORG_FLEET_REPLAY_CACHE_ROOT
       || path.join(os.tmpdir(), 'deltaforge-borg-fleet-replay')),
     diskReserveBytes: positiveInteger(arg('--disk-reserve-bytes'), 20 * 1024 ** 3),
+    stageRoot: arg('--stage-root', process.env.BORG_FLEET_REPLAY_STAGE_ROOT || null),
     streamRemote: flag('--stream-remote'),
     quiet: flag('--quiet'),
     stagePrefix: 'borg-fleet-l4-',
@@ -326,6 +328,7 @@ async function main() {
       Math.min(...availableTimes) - options.lookbackMs - MAX_PREDECESSOR_AGE_MS,
       Math.max(...availableTimes) + maximumLatencyMs + options.tailMs,
     );
+    assertRemoteRunIdentity(options);
     const archiveLock = await acquireArchiveLock(options);
     let catalog;
     let selected;
@@ -382,7 +385,7 @@ async function main() {
     try {
       replayed = await replayOrders(orders, profiles, staged.segments, options);
     } finally {
-      removeStage(staged.stageRoot);
+      if (!staged.persistentStage) removeStage(staged.stageRoot);
     }
     const validation = buildFleetValidation(replayed.results, {
       profilesMs: profiles, minMarkets, minCoveragePct,
@@ -454,6 +457,7 @@ async function main() {
       outputFile: report.outputFile, counts: report.counts,
       archive: report.archive, ranking: report.ranking,
     }, null, 2)}\n`);
+    if (staged.persistentStage) removeStage(staged.stageRoot);
   } finally {
     await pool.end();
   }

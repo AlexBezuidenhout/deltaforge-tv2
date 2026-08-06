@@ -72,6 +72,13 @@ npm run replay:borg-fleet -- \
   --json-out=/var/lib/deltaforge/research-reports/borg-execution-validation.json
 ```
 
+On the VPS, invoke the command as the `deltaforge` service user. Never run a
+remote replay as root: rclone can refresh its OAuth token and rewrite the shared
+config with root-only ownership, locking out the production archive service.
+Large transfers may use `--stage-root=/var/lib/deltaforge/research-cache/<run>`;
+an interrupted download is then retained and checksum-resumed, while a complete
+replay removes the bounded stage after publishing its report.
+
 The process is read-only against PostgreSQL. Remote raw segments are copied to
 a bounded temporary directory only after the plan passes the byte and free-disk
 guards, then removed in a `finally` block. Missing archive rows remain
