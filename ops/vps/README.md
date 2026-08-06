@@ -142,6 +142,30 @@ dedicated `/opt/deltaforge/tv2/public-info-current` release pointer so it can be
 deployed without moving the shared application pointer or changing code under
 an existing evidence cohort.
 
+`borg-zec-twap.service` is a dedicated capture-only ZEC resolver observer. It
+subscribes over two independent RTDS sockets to the documented
+`crypto_prices_twap_thirty` and `crypto_prices_twap_sixty` topics, preserves
+the exact E18 payload plus source/publisher/local clocks, and records opening
+and closing boundary evidence only within the frozen three-second tolerance.
+It never substitutes Chainlink spot, Binance, or a locally reconstructed TWAP.
+
+`borg-equity-options.service` is a read-only, paper-only exact-expiry lane. It
+can discover standard option contracts and read licensed market data through
+an IBKR Client Portal endpoint, but the adapter exposes no order/account
+method. Without `IBKR_CLIENT_PORTAL_URL` it remains healthy and visibly
+`BLOCKED_NO_LICENSED_OPRA_ENDPOINT`. Optional exact daily-close endpoints use:
+
+```dotenv
+EQOPT_PYTH_FINAL_CLOSE_URL_TEMPLATE=https://provider.example/pyth/{symbol}/{date}
+EQOPT_PRIMARY_CLOSE_URL_TEMPLATE=https://provider.example/official/{symbol}/{date}
+EQOPT_EXACT_CLOSE_BEARER_TOKEN=replace_me
+```
+
+Responses qualify only when they self-identify as the final Pyth regular-
+session one-minute candle and official primary-listing close for the exact
+symbol/date and carry immutable evidence IDs. Broker last prices are retained
+as controls but never enter the 30-day settlement-basis bound.
+
 `borg-paired-maker.service` is an isolated condition-level paper experiment
 inspired by the observed two-sided inventory/merge mechanism of a large public
 Polymarket operation. It never copy-trades that wallet and has no authenticated
@@ -206,7 +230,7 @@ ssh deltaforge-vps 'systemctl status deltaforge-tv2 borg-collector'
 ssh deltaforge-vps 'systemctl status gla-paper'
 ssh deltaforge-vps 'systemctl status flow-boundary-canary'
 ssh deltaforge-vps 'systemctl status eth-g-late-canary'
-ssh deltaforge-vps 'systemctl status borg-allmarket borg-paired-maker borg-structural-scanner borg-pyth-boundary'
+ssh deltaforge-vps 'systemctl status borg-allmarket borg-paired-maker borg-structural-scanner borg-pyth-boundary borg-zec-twap borg-equity-options'
 ssh deltaforge-vps 'journalctl -u borg-collector -n 100 --no-pager'
 ssh deltaforge-vps 'systemctl list-timers borg-score.timer deltaforge-raw-archive.timer deltaforge-hot-partitions.timer deltaforge-health.timer'
 ssh deltaforge-vps 'cd /opt/deltaforge/tv2/current && npm run audit:runtime'
@@ -220,7 +244,7 @@ and waits for process stability plus real domain progress. A fresh epoch is
 fresh heartbeats, no sequence gaps, no persistence failures, complete health
 samples and at least 30 GiB free.
 
-Sealed VPS files are pruned only through the fail-closed off-host receipt
-policy; the iCloud copy is append-only. CSV is not used as an archival
+Sealed VPS files are pruned only through the fail-closed Google Drive receipt
+policy. CSV is not used as an archival
 optimization: compressed NDJSON preserves raw event fidelity and Parquet is the
 compact columnar backtest format.

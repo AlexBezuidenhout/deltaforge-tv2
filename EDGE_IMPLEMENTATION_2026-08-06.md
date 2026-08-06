@@ -191,27 +191,48 @@ npm run research:equity-options-readiness
 
 At 09:41 UTC on 6 August it found 11 certified SPY thresholds with a 4% fee coefficient and five-share venue minimum. It returned `TARGETS_READY_BUT_LICENSED_OPTIONS_ADAPTER_REQUIRED`: no OPRA adapter is configured and the basis sample is not ready. It did not score or invent PnL.
 
-## What should be implemented next
+## Implementation completion update
+
+The five items below are now implemented as a paper-only release candidate:
+
+- the v1 cross-event sports floor remains frozen and the separate v2 graph
+  adds exact-score implications for match result, BTTS and first scorer;
+- a read-only IBKR Client Portal adapter captures licensed OPRA quotes and
+  rejects delayed/frozen entitlement codes;
+- a daily source-basis ledger accepts only the exact final Pyth one-minute
+  candle and official primary-listing close; ordinary RTDS and broker-last
+  controls are persisted but cannot qualify;
+- a redundant ZEC observer consumes the documented Chainlink 30/60-second
+  TWAP topics with exact E18 values and explicit source/publisher/local clocks;
+- a shared execution-attribution table separates detection, simultaneous
+  executability, cost qualification, orphan safety, paper submission, partial
+  fill, full fill, cancellation and orphan states.
+
+All three successor manifests start from zero. OPRA and exact-close collection
+remain externally blocked until legitimate licensed endpoints are configured.
+That is a visible prerequisite, not a software-created profitability result.
+
+## Original implementation backlog (now addressed)
 
 ### 1. Event-driven sports forward experiment
 
-Deploy the new scanner in paper mode, preserve its frozen manifest and record every evaluated candidate, including zero-action rows. It needs authenticated current fee metadata, simultaneous market-channel books and queue-aware passive controls. The independent unit is `physical fixture × relation`, not a book tick. Stop after 300 independent fixtures or 30 days and report doubled-cost results in both chronological halves.
+Implemented in the structural scanner and frozen manifests. The independent unit remains `physical fixture × relation`, not a book tick.
 
 ### 2. Licensed equity-option adapter
 
-Use a legitimate OPRA source such as an eligible broker market-data subscription. Capture option bid/ask, displayed sizes, underlying NBBO, exchange/source timestamp, local receive/monotonic time, contract multiplier, adjustment state and connection epoch. Never automate a delayed webpage. Add a daily Pyth-versus-option-settlement basis table and freeze the bound before scoring the next day.
+Implemented as a read-only, entitlement-aware adapter and exact-source basis ledger. Legitimate external subscriptions/endpoints still have to be supplied by the operator.
 
 ### 3. Capture-only resolver rollout service
 
-Build a separate ZEC/TWAP observer so new assets cannot mutate frozen strategy universes or overload the core collector. The service must subscribe redundantly, test each economic source independently, reconnect on silent economic tails and preserve immutable raw frames. If an exact TWAP topic cannot be reproduced from the official interface, the experiment remains blocked rather than falling back to spot.
+Implemented as an isolated capture service using the now-documented direct TWAP topics. Spot substitution remains impossible by construction.
 
 ### 4. More physical identities, one at a time
 
-After the 0–0/Over-0.5 control is stable, add separately versioned rule compilers for exact score versus first scorer, exact score versus result/BTTS, and same-fixture spread implications. Every relation needs its own terminal-state table, cancellation proof and untouched cohort. AI can propose candidate mappings; deterministic code alone may certify a payoff.
+Exact score versus first scorer/result/BTTS is implemented as v2 with explicit cancellation states. Same-fixture spread implications remain a later, separately versioned hypothesis because score-to-spread settlement and push/cancellation rules need their own compiler.
 
 ### 5. Execution attribution
 
-For all new lanes, persist `detected`, `simultaneously executable`, `submitted`, `partially filled`, `fully filled`, `cancelled`, and `orphaned` as distinct states. Report opportunity half-life, maximum supported quantity, capital-duration return and adverse selection at 1/5/30 seconds. This is how a promising arithmetic anomaly becomes—or fails to become—a trading business.
+The canonical state ledger is implemented and exposed read-only in TV2. Fill markouts and capital-duration aggregation can only populate once forward paper submissions and fills exist.
 
 ## Promotion rule
 
@@ -221,7 +242,7 @@ After passing, begin with a 50-fill authenticated canary at $1–$2 per order. P
 
 ## Verification
 
-- `npm test`: **708 passed, 0 failed**.
+- `npm test`: **721 passed, 0 failed**.
 - JavaScript syntax checks: passed for all new and modified runtime modules.
 - `git diff --check`: passed.
 - Current sports and equity checks were read-only; no orders or external state changes were made.
@@ -238,3 +259,4 @@ After passing, begin with a 50-fill authenticated canary at $1–$2 per order. P
 - Interactive Brokers API and market-data subscriptions: https://ibkrcampus.com/campus/ibkr-api-page/cpapi-v1/ and https://ibkrcampus.com/campus/ibkr-api-page/market-data-subscriptions/
 - Pyth historical price-feed API: https://docs.pyth.network/price-feeds/pro/api/history
 - Chainlink Data Streams: https://docs.chain.link/data-streams
+- Polymarket Chainlink TWAP streams: https://docs.polymarket.com/market-data/chainlink-twap
