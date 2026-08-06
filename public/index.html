@@ -3416,13 +3416,13 @@
       if (lane.mechanismId === 'R07') return (e.scannedRules || 0) + ' rules · ' + (e.certifiedUnits || 0) + ' certified · $' + Number(e.capacityUsd || 0).toFixed(2) + ' capacity';
       if (lane.mechanismId === 'N09') return (e.proposals || 0) + ' proposals · ' + (e.crossEventProposals || 0) + ' novel cross-event · ' + (e.executable || 0) + ' executable';
       if (e.fills != null) return (e.fills || 0) + ' A/B fills · ' + (e.markets || 0) + ' markets · ' + _bMoney(e.pnl2x || 0) + ' at 2×';
-      if (lane.program === 'resolver_boundary_transfer') return (e.evaluations || 0) + ' evaluations · ' + (e.actions || 0) + ' actions · ' + (e.errors || 0) + ' errors';
+      if (lane.program === 'resolver_boundary_transfer') return (e.evaluations || 0) + ' evaluations · ' + (e.actions || 0) + ' actions · ' + (e.errors || 0) + ' errors · ZEC TWAP ' + (e.zecExactTwapCapture?.active ? 'live' : (e.zecExactTwapCapture?.blocker || 'blocked'));
       if (lane.program === 'certified_payoff_graph') return (e.candidates || 0)
         + ' subscribed · ' + (e.qualified || 0) + ' unique qualified candidates · '
         + (e.qualifiedEpisodes || 0) + ' independent episodes ('
         + (e.qualifiedObservations || 0) + ' overlapping rows)';
       if (lane.program === 'rule_aware_crossvenue') return (e.exactRuleMatches || 0) + ' exact pairs · ' + (e.hardMismatchMatches || 0) + ' hard vetoes · ' + (e.paperTradeLeads || 0) + ' eligible leads';
-      if (lane.program === 'options_implied_binary_residual') return (e.markets || 0) + ' targets · ' + (e.executable || 0) + ' executable marks';
+      if (lane.program === 'options_implied_binary_residual') return (e.markets || 0) + ' targets · ' + (e.executable || 0) + ' executable marks · equity arm ' + (e.equityExactExpiryArm?.ready ? 'ready' : (e.equityExactExpiryArm?.blocker || 'blocked'));
       return (e.selectedMarkets || 0) + ' frozen capture markets · ' + (e.decisions || 0) + ' quote decisions';
     };
     document.getElementById('priorityLanesBody').innerHTML = (priority.lanes || []).map((lane) => {

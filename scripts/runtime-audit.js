@@ -11,6 +11,7 @@ const { riskWindowFloor } = require('../src/bot/PortfolioRiskPolicy');
 const BASE_REQUIRED_HEARTBEATS = Object.freeze([
   'main_bot', 'george_bot', 'structural_scanner', 'options_surface',
   'pyth_boundary', 'crossvenue_lab', 'allmarket_lab', 'public_info_collector',
+  'equity_options_lab', 'zec_twap_collector',
 ]);
 const OPTIONAL_EXECUTOR_HEARTBEATS = Object.freeze([
   'gla_live', 'flow_boundary_canary', 'h53_live', 'eth_g_late_live',
@@ -203,10 +204,12 @@ async function main() {
     for (const component of [
       'structural_scanner', 'options_surface', 'pyth_boundary', 'crossvenue_lab',
       'allmarket_lab', 'public_info_collector',
+      'equity_options_lab', 'zec_twap_collector',
     ]) {
       const beat = beatByName[component];
       if (beat && (beat.meta?.paperOnly !== true || beat.meta?.walletLoaded !== false
-          || (['pyth_boundary', 'crossvenue_lab', 'allmarket_lab', 'public_info_collector']
+          || (['pyth_boundary', 'crossvenue_lab', 'allmarket_lab', 'public_info_collector',
+            'equity_options_lab', 'zec_twap_collector']
             .includes(component)
             && beat.meta?.liveOrderPath !== false))) {
         critical.push(`${component} violated its paper-only runtime contract`);
@@ -248,6 +251,24 @@ async function main() {
         critical.push('pyth_boundary RTDS transport is disconnected');
       } else if (feedState === 'CONNECTED_NO_RECENT_TICK') {
         warnings.push(`pyth_boundary has ${number(beatByName.pyth_boundary.meta?.marketsInWindow)} in-window markets but no recent usable tick`);
+      }
+    }
+    if (beatByName.equity_options_lab) {
+      const meta = beatByName.equity_options_lab.meta || {};
+      if (meta.licensedEndpointConfigured !== true) {
+        warnings.push('equity_options_lab is capture-only blocked: no licensed OPRA endpoint configured');
+      } else if (meta.authReady !== true) {
+        critical.push('equity_options_lab has an OPRA endpoint but no ready authenticated market-data session');
+      }
+    }
+    if (beatByName.zec_twap_collector) {
+      const meta = beatByName.zec_twap_collector.meta || {};
+      const coverage = Object.values(meta.feed?.coverage || {});
+      if (number(meta.markets) > 0 && (!coverage.length
+          || coverage.some((row) => number(row?.freshPaths) < 1))) {
+        critical.push('zec_twap_collector lacks fresh exact TWAP coverage for an active market');
+      } else if (number(meta.markets) === 0) {
+        warnings.push('zec_twap_collector is live but no current certified ZEC TWAP market exists');
       }
     }
     if (beatByName.crossvenue_lab

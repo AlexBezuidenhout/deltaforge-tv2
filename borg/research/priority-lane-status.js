@@ -4,6 +4,7 @@ const H43_STRATEGY = 'H43_resolution_boundary_buffer';
 const { STRUCTURAL_VISIBLE_UNIVERSE_IDS } = require('../structural/experiment');
 const HEARTBEAT_COMPONENTS = Object.freeze([
   'allmarket_lab', 'crossvenue_lab', 'options_surface', 'pyth_boundary', 'structural_scanner',
+  'equity_options_lab', 'zec_twap_collector',
 ]);
 
 function finite(value, fallback = 0) {
@@ -113,6 +114,8 @@ async function buildPriorityLaneStatus(pool, options = {}) {
   const crossMeta = heartbeats.crossvenue_lab?.meta || {};
   const optionsMeta = heartbeats.options_surface?.meta || {};
   const pythMeta = heartbeats.pyth_boundary?.meta || {};
+  const equityOptionsMeta = heartbeats.equity_options_lab?.meta || {};
+  const zecTwapMeta = heartbeats.zec_twap_collector?.meta || {};
   const allMarketMeta = allMarket?.meta || {};
   const h43State = collectorState(
     allMarket, now.getTime(), epochId, allMarketMeta.lastEventAt,
@@ -142,6 +145,21 @@ async function buildPriorityLaneStatus(pool, options = {}) {
     && finite(pythMeta.hermes?.metrics?.connectionGaps) === 0
     && finite(pythMeta.hermes?.metrics?.reconfigurationGaps) === 0
     && finite(pythMeta.hermes?.metrics?.parseErrors) === 0;
+  const zecTwapState = collectorState(
+    heartbeats.zec_twap_collector, now.getTime(), epochId,
+    zecTwapMeta.lastTickAt || heartbeats.zec_twap_collector?.beat_at,
+    { maxProgressAgeSec: 30 },
+  );
+  const zecCoverage = Object.values(zecTwapMeta.feed?.coverage || {});
+  const zecTwapActive = zecTwapState.active && zecCoverage.length > 0
+    && zecCoverage.every((row) => finite(row?.freshPaths) > 0)
+    && finite(zecTwapMeta.feed?.coverageGaps) === 0;
+  const equityOptionsState = collectorState(
+    heartbeats.equity_options_lab, now.getTime(), epochId,
+    heartbeats.equity_options_lab?.beat_at,
+  );
+  const equityOptionsReady = equityOptionsState.active
+    && equityOptionsMeta.blocker === 'READY_PAPER_EVALUATION';
   const fairCaptureState = collectorState(
     allMarket, now.getTime(), epochId, allMarketMeta.lastEventAt,
   );
@@ -184,6 +202,13 @@ async function buildPriorityLaneStatus(pool, options = {}) {
           hermes: pythMeta.hermes || null,
           diagnosticRtds: pythMeta.diagnosticRtds || null,
           liveness: pythState,
+        },
+        zecExactTwapCapture: {
+          active: zecTwapActive, captureOnly: true,
+          blocker: zecTwapMeta.blocker || null,
+          markets: finite(zecTwapMeta.markets), ticks: finite(zecTwapMeta.ticks),
+          boundaries: finite(zecTwapMeta.boundaries), lastTickAt: zecTwapMeta.lastTickAt || null,
+          coverage: zecTwapMeta.feed?.coverage || null, liveness: zecTwapState,
         },
       },
       nextTest: 'Preserve H43 unchanged; require causal A/B scoring at 100/250/500ms and the frozen 300-market promotion read.',
@@ -258,6 +283,18 @@ async function buildPriorityLaneStatus(pool, options = {}) {
         persistenceErrors: finite(optionsMeta.persistenceErrors),
         parseErrors: finite(optionsMeta.parseErrors), refreshErrors: finite(optionsMeta.refreshErrors),
         liveness: optionsState,
+        equityExactExpiryArm: {
+          active: equityOptionsState.active, ready: equityOptionsReady,
+          blocker: equityOptionsMeta.blocker || null,
+          licensedEndpointConfigured: equityOptionsMeta.licensedEndpointConfigured === true,
+          authReady: equityOptionsMeta.authReady === true,
+          targets: finite(equityOptionsMeta.targets),
+          contracts: finite(equityOptionsMeta.contracts),
+          liveEntitledContracts: finite(equityOptionsMeta.liveEntitledContracts),
+          basisSamples: finite(equityOptionsMeta.basisSamples),
+          evaluations: finite(equityOptionsMeta.evaluations),
+          liveness: equityOptionsState,
+        },
       },
       nextTest: 'Use exact-expiry or bounded-interpolation targets only; subtract hedge cost and residual CVaR from the lower-bound edge.',
     },

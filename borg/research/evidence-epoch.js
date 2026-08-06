@@ -19,6 +19,8 @@ const REQUIRED_FAST_COMPONENTS = Object.freeze([
   'options_surface',
   'pyth_boundary',
   'structural_scanner',
+  'equity_options_lab',
+  'zec_twap_collector',
   'main_bot',
   'george_bot',
 ]);
@@ -30,6 +32,7 @@ const DOMAIN_PROGRESS_FIELDS = Object.freeze({
   crossvenue_lab: 'lastEvaluationAt',
   options_surface: 'lastEventAt',
   structural_scanner: 'lastPersistedAt',
+  zec_twap_collector: 'lastTickAt',
 });
 
 function finite(value, fallback = null) {

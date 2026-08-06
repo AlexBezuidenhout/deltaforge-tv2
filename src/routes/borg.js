@@ -50,6 +50,77 @@ router.get('/research/priority-lanes', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.get('/research/execution-attribution', authMiddleware, async (req, res) => {
+  try {
+    const hours = Math.max(1, Math.min(24 * 30, parseInt(req.query.hours, 10) || 24));
+    const [summary, recent] = await Promise.all([
+      pool.query(`SELECT experiment_id,stage,count(*)::int observations,
+                         count(DISTINCT opportunity_id)::int opportunities,
+                         sum(conservative_pnl_usd)::float conservative_pnl_usd,
+                         max(observed_at) latest
+                    FROM borg_execution_attribution
+                   WHERE observed_at>now()-($1::text||' hours')::interval
+                   GROUP BY experiment_id,stage ORDER BY experiment_id,stage`, [hours]),
+      pool.query(`SELECT attribution_id,experiment_id,opportunity_id,instrument_group_id,
+                         observed_at,stage,latency_ms,quantity::float,
+                         conservative_pnl_usd::float,data_quality_grade,
+                         execution_fidelity_grade,paper_only,detail
+                    FROM borg_execution_attribution
+                   ORDER BY observed_at DESC LIMIT 100`),
+    ]);
+    res.json({ paperOnly: true, hours, summary: summary.rows, recent: recent.rows,
+      warning: 'Detected, executable, qualified, submitted and filled are distinct evidence stages. Never sum overlapping observations as portfolio PnL.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/research/equity-options', authMiddleware, async (req, res) => {
+  try {
+    const [heartbeat, runtime, basis, evaluations] = await Promise.all([
+      pool.query(`SELECT beat_at,meta FROM system_heartbeats
+                   WHERE component='equity_options_lab'`),
+      pool.query(`SELECT * FROM borg_eqopt_runtime ORDER BY started_at DESC LIMIT 1`),
+      pool.query(`SELECT symbol,count(*) FILTER (WHERE qualifying)::int qualifying_days,
+                         count(*)::int all_samples,max(trade_date) latest_day,
+                         max(abs(basis_usd)) FILTER (WHERE qualifying)::float max_abs_basis_usd
+                    FROM borg_eqopt_basis_samples GROUP BY symbol ORDER BY symbol`),
+      pool.query(`SELECT evaluation_id,observed_at,condition_id,symbol,strike::float,
+                         expiry_at,side,contracts,token_shares::float,synchronized,
+                         live_entitled,basis_ready,costs_known,displayed_depth_supported,
+                         orphan_safe,qualified,stressed_profit_usd::float,
+                         orphan_safe_profit_usd::float,capital_required_usd::float,
+                         barrier,data_quality_grade,execution_fidelity_grade
+                    FROM borg_eqopt_evaluations ORDER BY observed_at DESC LIMIT 100`),
+    ]);
+    res.json({ paperOnly: true, liveOrderPath: false,
+      heartbeat: heartbeat.rows[0] || null, runtime: runtime.rows[0] || null,
+      basis: basis.rows, evaluations: evaluations.rows,
+      warning: 'The arm cannot qualify without live-entitled OPRA depth and 30 exact Pyth/final-primary-close days. Diagnostic broker last prices never count.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/research/zec-twap', authMiddleware, async (req, res) => {
+  try {
+    const [heartbeat, runtime, coverage, boundaries] = await Promise.all([
+      pool.query(`SELECT beat_at,meta FROM system_heartbeats
+                   WHERE component='zec_twap_collector'`),
+      pool.query(`SELECT * FROM borg_twap_runtime ORDER BY started_at DESC LIMIT 1`),
+      pool.query(`SELECT symbol,window_seconds,count(*)::int ticks,
+                         count(DISTINCT transport_path)::int transport_paths,
+                         max(source_ts) latest_source_ts,max(received_at) latest_received_at
+                    FROM borg_twap_ticks WHERE received_at>now()-interval '24 hours'
+                   GROUP BY symbol,window_seconds ORDER BY symbol,window_seconds`),
+      pool.query(`SELECT boundary_id,condition_id,slug,boundary_kind,target_at,
+                         observed_at,source_ts,exact_value::float,distance_ms::float,
+                         eligible,reason,detail
+                    FROM borg_twap_boundaries ORDER BY target_at DESC LIMIT 100`),
+    ]);
+    res.json({ paperOnly: true, captureOnly: true, noSpotSubstitution: true,
+      heartbeat: heartbeat.rows[0] || null, runtime: runtime.rows[0] || null,
+      coverage: coverage.rows, boundaries: boundaries.rows,
+      warning: 'This is exact Chainlink TWAP evidence collection, not a trading signal or profitability claim.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.get('/research/edge-incubator', authMiddleware, async (req, res) => {
   try {
     const value = await dashboardReports.get('edge-incubator-v1', 10_000,
