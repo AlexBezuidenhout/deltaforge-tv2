@@ -45,6 +45,66 @@ day span, positive chronological halves under the registered primary metric,
 multiple-testing correction, shared-capital capacity, and a 50-fill
 authenticated live pilot.
 
+## Completed fleet replay — 6 August 2026
+
+The corrected `borg-wal-full-depth-v2` replay evaluated every BORG cohort that
+had either looked promising or had enough paper history to justify an
+execution audit. The source interval was 26 July through 6 August 2026. It read
+1,548 selected raw-WAL segments (8.24 GiB compressed; 85,729,208 records) with
+zero malformed records, segment failures or sequence gaps. The published
+report is
+`/var/lib/deltaforge/research-reports/borg-execution-validation.json` on the
+VPS.
+
+| Exact frozen cohort | Intended markets | Minimum scoreable | Minimum coverage | Worst 2x-cost P&L | Worst 2x + one-tick P&L | L4 result |
+|---|---:|---:|---:|---:|---:|---|
+| `H54_dynamic_ofi_resolver_confirm` / `research-v7-h54-h63-paper-v1` / `resolver_and_venue_confirmed` | 30 | 27 | 90.0% | +$52.41 | +$49.94 | `ROBUST_POSITIVE` |
+| `H43_resolution_boundary_buffer` / `research-h43-forward-v1` / `baseline` | 38 | 37 | 97.4% | -$19.85 | -$24.51 | `EXECUTION_NEGATIVE` |
+| `NEXT_H7_btc_oracle_confirm_v1` / `worthy-paper-forward-2026-08-03-v1` | 32 | 30 | 93.8% | -$22.71 | -$25.48 | `EXECUTION_NEGATIVE` |
+| `NEXT_H54_dynamic_ofi_resolver_confirm_v1` / `worthy-paper-forward-2026-08-03-v1` | 29 | 27 | 93.1% | -$24.73 | -$27.36 | `EXECUTION_NEGATIVE` |
+| `H71_token_elasticity_residual` / `research-v8-h64-h73-paper-v1` | 109 | 108 | 99.1% | -$18.89 | -$29.27 | `EXECUTION_NEGATIVE` |
+| `FWD_H7_btc_oracle_confirm_v1` / `promising-paper-forward-2026-07-25-v1` | 127 | 124 | 97.6% | -$74.63 | -$85.30 | `EXECUTION_NEGATIVE` |
+| `FWD_H45_threshold_distance_velocity_v1` / `promising-paper-forward-2026-07-25-v1` | 355 | 120 | 33.8% | -$5.88 | -$16.05 | `INSUFFICIENT` |
+| `H59_resolver_cross_persistence` / `research-v7-h54-h63-paper-v1` | 138 | 26 | 18.8% | -$36.90 | -$39.36 | `INSUFFICIENT` |
+
+“Worst” means the least favourable result across the registered 100, 250 and
+500 millisecond profiles. It is not the original paper score.
+
+### What survived, and what did not
+
+`H54_dynamic_ofi_resolver_confirm` is the only execution survivor. Its detailed
+results were:
+
+| Latency | Scoreable markets | Fills / non-fills | Filled notional | 2x-cost P&L | 2x + one-tick P&L | Stressed first / second half |
+|---:|---:|---:|---:|---:|---:|---:|
+| 100 ms | 27 | 25 / 2 | $123.99 | +$73.93 | +$71.23 | +$26.64 / +$44.59 |
+| 250 ms | 27 | 24 / 3 | $128.79 | +$69.24 | +$66.54 | +$29.29 / +$37.25 |
+| 500 ms | 27 | 23 / 4 | $117.51 | +$52.41 | +$49.94 | +$13.46 / +$36.49 |
+
+This is encouraging but not proof of a deployable edge. At 250 ms, BTC
+contributed $49.60 of the $69.24 doubled-cost P&L, while XRP lost $2.81. Two
+UTC days contributed $51.20, roughly 74% of total P&L. More importantly, the
+fresh, separately identified `NEXT_H54` successor is execution-negative. The
+correct decision is therefore to preserve H54 as a frozen research hypothesis,
+not tune it, annualise it, or send it live. It needs a newly registered forward
+cohort and the full promotion sample before capital is considered.
+
+H43 and every adequately covered H7/H71 cohort fail after causal depth and
+costs. H45 and H59 do not have enough raw-book coverage to support a conclusion;
+their missing observations are not silently treated as non-fills.
+
+### Corrected stress invariant
+
+An earlier v1 report was quarantined after review found that shifting a book
+and re-walking it through the original limit could reduce the executed quantity
+on losing trades. That model could make “adverse” stress improve P&L by assuming
+the least attractive shares disappeared. Version 2 instead preserves every
+executed quantity and worsens its price by one tick. It rejects a replay if
+stressed P&L improves at the total or chronological-half level. The completed
+fleet report has zero such invariant violations. The invalid report remains
+quarantined as
+`borg-execution-validation.invalid-nonmonotone-v1.json` for auditability.
+
 ## Running the validator
 
 Inventory the database without listing or downloading raw archives:
