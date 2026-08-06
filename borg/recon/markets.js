@@ -18,7 +18,7 @@
  * 0/1. Record the outcome and WHEN WE SAW IT (resolution latency matters).
  */
 const { pool, logEvent } = require('./db');
-const { selectResearchMarkets } = require('./research-universe');
+const { resolutionSource, selectResearchMarkets } = require('./research-universe');
 
 const GAMMA = 'https://gamma-api.polymarket.com';
 
@@ -56,6 +56,22 @@ function usesChainlinkResolver(rec) {
   const source = String(rec?.resolution_source || '');
   return /chainlink/i.test(source)
     || (rec?.market_type === 'direction_5m' && source === 'polymarket_crypto_5m');
+}
+
+/**
+ * Returns an RTDS source only when that stream is economically identical to
+ * the contract resolver. A spot tick is not a 30/60-second TWAP. Returning
+ * null deliberately leaves resolver_open unavailable until a direct,
+ * certified TWAP feed exists.
+ */
+function resolverRtdsSource(rec) {
+  const source = String(rec?.resolution_source || '').toLowerCase();
+  if (/chainlink_twap_(?:30|60)s/.test(source)) return null;
+  if (source === 'chainlink' || source === 'chainlink_rtds_15m' ||
+      (rec?.market_type === 'direction_5m' && source === 'polymarket_crypto_5m')) {
+    return 'chainlink';
+  }
+  return null;
 }
 
 class MarketsRecon {
@@ -170,6 +186,7 @@ class MarketsRecon {
         if (typeof outcomes === 'string') { try { outcomes = JSON.parse(outcomes); } catch (_) { outcomes = []; } }
         const upIdx = outcomes.findIndex((o) => /up/i.test(o));
         const downIdx = outcomes.findIndex((o) => /down/i.test(o));
+        const detectedResolutionSource = resolutionSource(null, m, 'direction_5m');
         const rec = {
           slug,
           asset: a.asset,
@@ -191,7 +208,8 @@ class MarketsRecon {
           negative_label: 'DOWN',
           positive_outcome_index: upIdx >= 0 ? upIdx : 0,
           negative_outcome_index: downIdx >= 0 ? downIdx : 1,
-          resolution_source: 'polymarket_crypto_5m',
+          resolution_source: detectedResolutionSource === 'unknown'
+            ? 'polymarket_crypto_5m' : detectedResolutionSource,
           accepting_orders: m.acceptingOrders !== false && m.closed !== true,
           raw: m,
         };
@@ -202,7 +220,8 @@ class MarketsRecon {
                positive_outcome_index, negative_outcome_index, resolution_source, accepting_orders, raw)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
              ON CONFLICT (slug) DO UPDATE SET raw = EXCLUDED.raw, asset = EXCLUDED.asset,
-               accepting_orders = EXCLUDED.accepting_orders
+               accepting_orders = EXCLUDED.accepting_orders,
+               resolution_source = EXCLUDED.resolution_source
              RETURNING id, binance_open, binance_open_src, binance_close, binance_close_src,
                chainlink_open, chainlink_open_src, outcome`,
             [rec.slug, rec.asset, rec.gamma_id, rec.condition_id, rec.question, rec.window_start,
@@ -297,6 +316,19 @@ class MarketsRecon {
           chainlink_open_src: row.chainlink_open_src,
           outcome: row.outcome,
         });
+        if (!resolverRtdsSource(rec) && /^chainlink_twap_/.test(rec.resolution_source || '') &&
+            rec.chainlink_open_src === 'chainlink_rtds_nearest_3s') {
+          // Repair evidence contaminated by the historical spot-for-TWAP
+          // substitution. Do not silently carry it into a fresh cohort.
+          rec.chainlink_open = null;
+          rec.chainlink_open_src = null;
+          await pool.query(
+            'UPDATE borg_markets SET chainlink_open=NULL, chainlink_open_src=NULL WHERE id=$1',
+            [rec.id],
+          );
+          await logEvent('WARN', 'research_markets',
+            `cleared non-identical spot resolver evidence for ${rec.slug}`);
+        }
         this.bySlug.set(rec.slug, rec);
         if (!existed) await logEvent('INFO', 'research_markets',
           `discovered ${rec.market_type} ${rec.slug} (id ${rec.id})`, {
@@ -321,10 +353,11 @@ class MarketsRecon {
       const startMs = rec.window_start.getTime();
       const endMs = rec.window_end.getTime();
       const isDirection = String(rec.market_type || 'direction_5m').startsWith('direction_');
-      if (isDirection && usesChainlinkResolver(rec)
+      const rtdsSource = resolverRtdsSource(rec);
+      if (isDirection && rtdsSource
           && rec.chainlink_open_src !== 'chainlink_rtds_nearest_3s'
           && now >= startMs && now - startMs <= 20 * 60 * 1000) {
-        const resolverOpen = this.rtds?.getPriceAtMs(rec.asset, startMs, 3000, 'chainlink');
+        const resolverOpen = this.rtds?.getPriceAtMs(rec.asset, startMs, 3000, rtdsSource);
         if (resolverOpen != null) {
           rec.chainlink_open = resolverOpen;
           rec.chainlink_open_src = 'chainlink_rtds_nearest_3s';
@@ -343,11 +376,14 @@ class MarketsRecon {
           rec.binance_open_src = rec.binance_open != null ? 'kline_backfill' : null;
         }
         if (rec.binance_open != null) {
-          const rtdsOpen = usesChainlinkResolver(rec)
-            ? this.rtds?.getPriceAtMs(rec.asset, startMs, 3000, 'chainlink') : null;
-          const controlOpen = rec.asset === 'btc' ? this.chainlink.getPriceAtMs(startMs) : null;
-          const clOpen = rec.chainlink_open ?? rtdsOpen ?? controlOpen;
-          const clOpenSrc = rec.chainlink_open_src
+          const rtdsOpen = rtdsSource
+            ? this.rtds?.getPriceAtMs(rec.asset, startMs, 3000, rtdsSource) : null;
+          const controlOpen = rtdsSource && rec.asset === 'btc'
+            ? this.chainlink.getPriceAtMs(startMs) : null;
+          const existingResolverOpen = rtdsSource ? rec.chainlink_open : null;
+          const existingResolverOpenSrc = rtdsSource ? rec.chainlink_open_src : null;
+          const clOpen = existingResolverOpen ?? rtdsOpen ?? controlOpen;
+          const clOpenSrc = existingResolverOpenSrc
             ?? (rtdsOpen != null ? 'chainlink_rtds_nearest_3s'
               : controlOpen != null ? 'mainnet_push_control' : null);
           rec.chainlink_open = clOpen;
@@ -508,4 +544,5 @@ class MarketsRecon {
 
 module.exports = MarketsRecon;
 module.exports.usesChainlinkResolver = usesChainlinkResolver;
+module.exports.resolverRtdsSource = resolverRtdsSource;
 module.exports.buildResearchEventsUrl = buildResearchEventsUrl;

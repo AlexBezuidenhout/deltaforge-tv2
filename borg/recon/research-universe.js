@@ -23,6 +23,8 @@ const ASSET_NAMES = Object.freeze({
   bnb: 'bnb',
   hype: 'hype',
   hyperliquid: 'hype',
+  zcash: 'zec',
+  zec: 'zec',
 });
 
 const DEFAULT_HOURLY_ASSETS = Object.freeze(['btc', 'eth', 'sol', 'xrp']);
@@ -93,10 +95,16 @@ function directionMarketType(slug) {
 }
 
 function resolutionSource(event, market, type) {
-  if (type === 'direction_1h') return 'binance_1h_candle';
-  if (type === 'direction_15m') return 'chainlink_rtds_15m';
   const text = `${event?.description || ''} ${market?.description || ''} ${
     event?.resolutionSource || ''} ${market?.resolutionSource || ''}`.toLowerCase();
+  const twap = text.match(/twap[-_\s]*(30|60)\s*(?:s|sec|second)/i)
+    || text.match(/(30|60)\s*(?:s|sec|second)s?\b[^.]{0,120}\btwap\b/i)
+    || text.match(/\btwap\b[^.]{0,120}(30|60)\s*(?:s|sec|second)/i);
+  if (/\bchainlink\b|data\.chain\.link/.test(text) && twap) {
+    return `chainlink_twap_${twap[1]}s`;
+  }
+  if (type === 'direction_1h') return 'binance_1h_candle';
+  if (type === 'direction_15m') return 'chainlink_rtds_15m';
   if (/\bbinance\b/.test(text)) {
     if (/\b1\s*(?:hour|hr)\b/.test(text)) return 'binance_1h_close';
     if (/\b1\s*(?:minute|min)\b/.test(text)) return 'binance_1m_close';

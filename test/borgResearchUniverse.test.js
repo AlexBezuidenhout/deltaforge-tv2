@@ -2,8 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  assetFromTitle,
   numericLabel,
   rangeLabel,
+  resolutionSource,
   selectResearchMarkets,
 } = require('../borg/recon/research-universe');
 
@@ -33,6 +35,20 @@ test('numeric and range labels parse token-scale strikes without BTC/token-price
   assert.deepEqual(rangeLabel('64,000-66,000'), { lower: 64000, upper: 66000 });
   assert.deepEqual(rangeLabel('<58,000'), { lower: null, upper: 58000 });
   assert.deepEqual(rangeLabel('>72,000'), { lower: 72000, upper: null });
+});
+
+test('research universe recognizes ZEC and distinguishes Chainlink TWAP from spot', () => {
+  assert.equal(assetFromTitle('Zcash Up or Down - August 6'), 'zec');
+  assert.equal(assetFromTitle('ZEC Up or Down - August 6'), 'zec');
+  assert.equal(resolutionSource(null, {
+    resolutionSource: 'https://data.chain.link/streams/zec-usd-twap-30s-streams',
+  }, 'direction_5m'), 'chainlink_twap_30s');
+  assert.equal(resolutionSource(null, {
+    description: 'This resolves using the Chainlink TWAP of the 60 seconds before expiry.',
+  }, 'direction_15m'), 'chainlink_twap_60s');
+  assert.equal(resolutionSource(null, {
+    resolutionSource: 'https://data.chain.link/streams/zec-usd',
+  }, 'direction_15m'), 'chainlink_rtds_15m');
 });
 
 test('bounded universe selects current+next hourly and the frozen wider near-spot daily panel', () => {

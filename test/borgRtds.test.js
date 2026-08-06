@@ -7,6 +7,7 @@ const RtdsMultiplex = require('../borg/recon/rtds-multiplex');
 
 test('RTDS Chainlink parser records source/receive clocks and divergence', () => {
   const order = [];
+  const now = Date.now();
   const feed = new RtdsRecon(() => {}, {
     assets: ['btc'],
     wal: { append: () => {
@@ -17,13 +18,13 @@ test('RTDS Chainlink parser records source/receive clocks and divergence', () =>
   });
   feed.connectionEpoch = 2;
   feed._onMessage(Buffer.from(JSON.stringify({
-    topic: 'crypto_prices_chainlink', type: 'update', timestamp: 1770000000120,
-    payload: { symbol: 'BTC/USD', timestamp: 1770000000100, value: '60000.25' },
+    topic: 'crypto_prices_chainlink', type: 'update', timestamp: now,
+    payload: { symbol: 'BTC/USD', timestamp: now - 20, value: '60000.25' },
   })));
   assert.deepEqual(order, ['wal', 'callback']);
   const rows = feed.drainRows();
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].sourceMs, 1770000000100);
+  assert.equal(rows[0].sourceMs, now - 20);
   assert.equal(rows[0].value, 60000.25);
   assert.equal(rows[0].eventSequence, 9);
   assert.equal(rows[0].walEventId, 'rtds:1');
@@ -31,17 +32,39 @@ test('RTDS Chainlink parser records source/receive clocks and divergence', () =>
   assert.ok(divergence.absBps > 0.9 && divergence.absBps < 1.1);
 });
 
-test('RTDS ignores unsupported symbols and accepts text PONG', () => {
+test('RTDS accepts configured expanded symbols, rejects unconfigured symbols and does not count PONG as data', () => {
   let writes = 0;
   const feed = new RtdsRecon(() => {}, {
-    assets: ['btc'], wal: { append: () => { writes += 1; return {}; } },
+    assets: ['btc', 'zec'], wal: { append: () => { writes += 1; return {}; } },
   });
   feed._onMessage(Buffer.from('PONG'));
+  assert.equal(feed.lastMsgAt, 0, 'transport keepalive is not economic freshness');
+  assert.ok(feed.lastFrameAt > 0);
   feed._onMessage(Buffer.from(JSON.stringify({
-    topic: 'crypto_prices_chainlink', payload: { symbol: 'DOGE/USD', value: 1 },
+    topic: 'crypto_prices_chainlink', payload: {
+      symbol: 'ZEC/USD', timestamp: Date.now(), value: 503.25,
+    },
   })));
-  assert.equal(writes, 2);
-  assert.equal(feed.drainRows().length, 0);
+  feed._onMessage(Buffer.from(JSON.stringify({
+    topic: 'crypto_prices_chainlink', payload: {
+      symbol: 'AVAX/USD', timestamp: Date.now(), value: 25,
+    },
+  })));
+  assert.equal(writes, 3);
+  const rows = feed.drainRows();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].asset, 'zec');
+  assert.equal(feed.getPrice('zec'), 503.25);
+});
+
+test('RTDS fails closed when a replayed source timestamp arrives on time', () => {
+  const feed = new RtdsRecon(() => {}, { assets: ['btc'] });
+  feed._onMessage(Buffer.from(JSON.stringify({
+    topic: 'crypto_prices_chainlink',
+    payload: { symbol: 'btc/usd', timestamp: Date.now() - 60_000, value: 60000 },
+  })));
+  assert.equal(feed.getPrice('btc', 10_000), null);
+  assert.ok(feed.getAgeMs('btc') >= 59_000);
 });
 
 test('RTDS records the separately transported Binance topic without replacing Chainlink state', () => {
@@ -151,5 +174,22 @@ test('redundant RTDS keeps coverage through one reconnect and records simultaneo
   assert.equal(health.coverageGaps, 1);
   assert.equal(health.coveredAssets, 0);
   assert.equal(walRecords.some((row) => row.raw?.type === 'coverage_gap'), true);
+  feed.close();
+});
+
+test('redundant RTDS reports per-asset economic coverage instead of any-frame liveness', () => {
+  const feed = new RtdsMultiplex(() => {}, {
+    assets: ['btc', 'zec'], pathCount: 2, coverageMaxAgeMs: 10_000,
+  });
+  const frame = Buffer.from(JSON.stringify({
+    topic: 'crypto_prices_chainlink',
+    payload: { symbol: 'btc/usd', timestamp: Date.now(), value: 60000 },
+  }));
+  for (const path of feed.feeds) path._onMessage(frame);
+  const health = feed.health();
+  assert.equal(health.assetCoverage.btc.freshPaths, 2);
+  assert.equal(health.assetCoverage.zec.freshPaths, 0);
+  assert.equal(health.coveredAssets, 1);
+  assert.equal(feed.getPrice('zec'), null);
   feed.close();
 });

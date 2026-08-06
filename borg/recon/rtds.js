@@ -11,7 +11,24 @@
 const WebSocket = require('ws');
 
 const WS_URL = 'wss://ws-live-data.polymarket.com';
-const SUPPORTED = ['btc', 'eth', 'sol', 'xrp'];
+// RTDS publishes more symbols than the four originally documented by
+// Polymarket. Keep the default explicit and auditable, but do not use it as a
+// parser allow-list: the collector's asset_config is the authority. This lets
+// newly observed resolver symbols be captured without pretending that an
+// unrelated symbol is a configured trading asset.
+const DEFAULT_ASSETS = Object.freeze([
+  'btc', 'eth', 'sol', 'xrp', 'bnb', 'doge', 'hype', 'zec',
+]);
+const ASSET_ALIASES = Object.freeze({
+  bitcoin: 'btc',
+  ethereum: 'eth',
+  solana: 'sol',
+  ripple: 'xrp',
+  dogecoin: 'doge',
+  binancecoin: 'bnb',
+  hyperliquid: 'hype',
+  zcash: 'zec',
+});
 const HISTORY_RETENTION_MS = 20 * 60 * 1000;
 
 function epochMs(value) {
@@ -22,11 +39,31 @@ function epochMs(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function normalizeAsset(symbol) {
+function normalizeAsset(symbol, allowedAssets = DEFAULT_ASSETS) {
   const value = String(symbol || '').toLowerCase().replace(/[^a-z]/g, '');
-  if (value.includes('bitcoin')) return 'btc';
-  if (value.includes('ethereum')) return 'eth';
-  return SUPPORTED.find((asset) => value.startsWith(asset)) || null;
+  if (!value) return null;
+  const allowed = new Set(Array.from(allowedAssets || []).map((asset) =>
+    String(asset || '').toLowerCase()).filter(Boolean));
+  for (const [name, asset] of Object.entries(ASSET_ALIASES)) {
+    if (value.startsWith(name) && allowed.has(asset)) return asset;
+  }
+  return [...allowed]
+    .sort((left, right) => right.length - left.length)
+    .find((asset) => value === asset || value.startsWith(`${asset}usd`)) || null;
+}
+
+/**
+ * A quote is only fresh when both its transport arrival and source timestamp
+ * are fresh. Receive-only checks silently bless delayed/replayed resolver
+ * frames after a reconnect, which is exactly when boundary strategies are
+ * most exposed to false evidence.
+ */
+function tickAgeMs(tick, now = Date.now()) {
+  if (!tick || !Number.isFinite(Number(tick.receiveWallMs)) ||
+      !Number.isFinite(Number(tick.sourceMs))) return Infinity;
+  const receiveAge = Math.max(0, now - Number(tick.receiveWallMs));
+  const sourceAge = Math.max(0, now - Number(tick.sourceMs));
+  return Math.max(receiveAge, sourceAge);
 }
 
 class RtdsRecon {
@@ -36,8 +73,13 @@ class RtdsRecon {
     this.onMarketEvent = options.onMarketEvent || (() => {});
     this.onConnectionGap = options.onConnectionGap || (() => {});
     this.transportPath = Number.isInteger(options.transportPath) ? options.transportPath : 0;
-    this.assets = new Set((options.assets || SUPPORTED).filter((asset) => SUPPORTED.includes(asset)));
+    this.assets = new Set((options.assets || DEFAULT_ASSETS)
+      .map((asset) => String(asset || '').toLowerCase().trim())
+      .filter(Boolean));
     this.ws = null;
+    this.lastFrameAt = 0;
+    // Backward-compatible name: this is now the last accepted economic data
+    // tick, not merely the last PONG/control frame.
     this.lastMsgAt = 0;
     this.connectionEpoch = 0;
     this.connectionGaps = 0;
@@ -77,7 +119,8 @@ class RtdsRecon {
         this._reconnectDelay = 1000;
         this.connectionEpoch += 1;
         this.frameSequence = 0;
-        this.lastMsgAt = Date.now();
+        this.lastFrameAt = Date.now();
+        this.lastMsgAt = 0;
         ws.send(JSON.stringify({
           action: 'subscribe',
           subscriptions: [
@@ -99,7 +142,8 @@ class RtdsRecon {
           reason: 'ws_close',
           code,
           closeReason: reason?.toString() || null,
-          lastMessageAgeMs: this.lastMsgAt ? Date.now() - this.lastMsgAt : null,
+          lastDataAgeMs: this.lastMsgAt ? Date.now() - this.lastMsgAt : null,
+          lastFrameAgeMs: this.lastFrameAt ? Date.now() - this.lastFrameAt : null,
         };
         this._recordConnectionGap(detail);
         this.onGap('rtds', `RTDS socket closed (${code}) — reconnecting`);
@@ -149,6 +193,7 @@ class RtdsRecon {
     // Historical rows remain available for explicitly timestamped analysis;
     // only the current-state cache is invalidated.
     this.latest.clear();
+    this.lastFrameAt = 0;
     this.lastMsgAt = 0;
     this.onConnectionGap({
       transportPath: this.transportPath,
@@ -166,6 +211,16 @@ class RtdsRecon {
       connectionGaps: this.connectionGaps,
       lastConnectionGapAt: this.lastConnectionGapAt,
       lastMessageAgeMs: this.lastMsgAt > 0 ? Math.max(0, now - this.lastMsgAt) : null,
+      lastFrameAgeMs: this.lastFrameAt > 0 ? Math.max(0, now - this.lastFrameAt) : null,
+      assetFreshness: Object.fromEntries([...this.assets].map((asset) => {
+        const tick = this.latest.get(`chainlink:${asset}`);
+        const ageMs = tickAgeMs(tick, now);
+        return [asset, {
+          ageMs: Number.isFinite(ageMs) ? ageMs : null,
+          receiveAgeMs: tick ? Math.max(0, now - tick.receiveWallMs) : null,
+          sourceAgeMs: tick?.sourceMs != null ? Math.max(0, now - tick.sourceMs) : null,
+        }];
+      })),
       frames: this.frameCount,
       frameBytes: this.frameBytes,
       framesPerSecond: this.startedAt < now
@@ -189,7 +244,7 @@ class RtdsRecon {
       receive_wall_timestamp_ms: receiveWallMs, receive_monotonic_ns: receiveMonoNs,
       connection_epoch: this.connectionEpoch,
     };
-    this.lastMsgAt = receiveWallMs;
+    this.lastFrameAt = receiveWallMs;
     if (raw.toString() === 'PONG') return;
     let message;
     try { message = JSON.parse(raw); } catch (_) { return; }
@@ -200,7 +255,7 @@ class RtdsRecon {
     }
     for (const tick of Array.isArray(payload) ? payload : [payload]) {
       if (!tick || typeof tick !== 'object') continue;
-      const asset = normalizeAsset(tick.symbol);
+      const asset = normalizeAsset(tick.symbol, this.assets);
       const value = parseFloat(tick.value ?? tick.price);
       if (!asset || !this.assets.has(asset) || !(value > 0)) continue;
       const sourceMs = epochMs(tick.timestamp ?? message.timestamp);
@@ -218,6 +273,7 @@ class RtdsRecon {
       };
       const key = `${sourceKey}:${asset}`;
       this.latest.set(key, row);
+      this.lastMsgAt = receiveWallMs;
       const history = this.history.get(key) || [];
       history.push({
         at: sourceMs || receiveWallMs,
@@ -240,8 +296,12 @@ class RtdsRecon {
 
   getPrice(asset, maxAgeMs = 10000, source = 'chainlink') {
     const tick = this.latest.get(`${source}:${asset}`);
-    if (!tick || Date.now() - tick.receiveWallMs > maxAgeMs) return null;
+    if (!this.isTickFresh(tick, maxAgeMs)) return null;
     return tick.value;
+  }
+
+  isTickFresh(tick, maxAgeMs = 10000, now = Date.now()) {
+    return tickAgeMs(tick, now) <= maxAgeMs;
   }
 
   getBinancePrice(asset, maxAgeMs = 10000) {
@@ -250,7 +310,8 @@ class RtdsRecon {
 
   getAgeMs(asset, source = 'chainlink') {
     const tick = this.latest.get(`${source}:${asset}`);
-    return tick ? Math.max(0, Date.now() - tick.receiveWallMs) : null;
+    const age = tickAgeMs(tick);
+    return Number.isFinite(age) ? age : null;
   }
 
   getPriceAtMs(asset, targetMs, toleranceMs = 3000, source = 'chainlink') {
@@ -298,7 +359,7 @@ class RtdsRecon {
       absBps: Math.abs(venue - chainlink) / chainlink * 10000,
       chainlinkSourceMs: tick.sourceMs,
       chainlinkReceiveMs: tick.receiveWallMs,
-      ageMs: Date.now() - tick.receiveWallMs,
+      ageMs: tickAgeMs(tick),
     };
   }
 
@@ -314,14 +375,20 @@ class RtdsRecon {
   }
 
   checkStale(maxAgeMs = 15000) {
-    const stale = !this.lastMsgAt || Date.now() - this.lastMsgAt > maxAgeMs;
+    const now = Date.now();
+    const staleAssets = [...this.assets].filter((asset) =>
+      !this.isTickFresh(this.latest.get(`chainlink:${asset}`), maxAgeMs, now));
+    const stale = staleAssets.length > 0;
     if (stale && !this._reconnectTimer) {
       this._recordConnectionGap({
         reason: 'stale_timeout',
         maxAgeMs,
-        lastMessageAgeMs: this.lastMsgAt ? Date.now() - this.lastMsgAt : null,
+        staleAssets,
+        lastDataAgeMs: this.lastMsgAt ? now - this.lastMsgAt : null,
+        lastFrameAgeMs: this.lastFrameAt ? now - this.lastFrameAt : null,
       });
-      this.onGap('rtds', `Chainlink socket silent >${Math.round(maxAgeMs / 1000)}s — forcing reconnect`);
+      this.onGap('rtds', `Chainlink economic feed stale for ${staleAssets.join(',')} ` +
+        `>${Math.round(maxAgeMs / 1000)}s — forcing reconnect`);
       const dead = this.ws;
       this.ws = null;
       try { dead?.terminate(); } catch (_) {}
@@ -342,3 +409,5 @@ class RtdsRecon {
 
 module.exports = RtdsRecon;
 module.exports.normalizeAsset = normalizeAsset;
+module.exports.tickAgeMs = tickAgeMs;
+module.exports.DEFAULT_ASSETS = DEFAULT_ASSETS;

@@ -688,7 +688,8 @@ const initDB = async () => {
         ('bnb',  'bnb-updown-5m',  'BNBUSDT',  'binance', NULL,  '0x14e613AC84a31f709eadbdF89C6CC390fDc9540A', true,  true,  true),
         ('doge', 'doge-updown-5m', 'DOGEUSDT', 'binance', NULL,  NULL, true,  false, true),
         ('xrp',  'xrp-updown-5m',  'XRPUSDT',  'binance', NULL,  NULL, true,  false, true),
-        ('hype', 'hype-updown-5m', NULL,       'hyperliquid', 'HYPE', NULL, false, false, true)
+        ('hype', 'hype-updown-5m', NULL,       'hyperliquid', 'HYPE', NULL, false, false, true),
+        ('zec',  'zec-updown-5m',  'ZECUSDT',  'binance', NULL, NULL, false, false, true)
       ON CONFLICT (asset) DO NOTHING;
 
       -- Process supervision: every long-running component upserts its row;

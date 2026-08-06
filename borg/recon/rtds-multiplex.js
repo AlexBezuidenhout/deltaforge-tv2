@@ -10,13 +10,16 @@
 'use strict';
 
 const RtdsRecon = require('./rtds');
+const { DEFAULT_ASSETS, tickAgeMs } = require('./rtds');
 
 class RtdsMultiplex {
   constructor(onGap, options = {}) {
     this.onGap = onGap || (() => {});
     this.wal = options.wal || null;
     this.onMarketEvent = options.onMarketEvent || (() => {});
-    this.assets = [...new Set(options.assets || ['btc', 'eth', 'sol', 'xrp'])];
+    this.assets = [...new Set((options.assets || DEFAULT_ASSETS)
+      .map((asset) => String(asset || '').toLowerCase().trim())
+      .filter(Boolean))];
     this.pathCount = Math.max(2, Math.min(4, Math.trunc(Number(
       options.pathCount ?? process.env.BORG_RTDS_PATHS ?? 2,
     ) || 2)));
@@ -66,7 +69,7 @@ class RtdsMultiplex {
     return this.feeds
       .filter((feed) => feed.transportPath !== excluded)
       .map((feed) => feed.latest.get(`${source}:${asset}`))
-      .filter((tick) => tick && now - tick.receiveWallMs <= maxAgeMs)
+      .filter((tick) => tickAgeMs(tick, now) <= maxAgeMs)
       .sort((left, right) => right.receiveWallMs - left.receiveWallMs)[0] || null;
   }
 
@@ -98,7 +101,8 @@ class RtdsMultiplex {
 
   getAgeMs(asset, source = 'chainlink') {
     const tick = this._freshTick(asset, source, Number.MAX_SAFE_INTEGER);
-    return tick ? Math.max(0, Date.now() - tick.receiveWallMs) : null;
+    const age = tickAgeMs(tick);
+    return Number.isFinite(age) ? age : null;
   }
 
   _history(asset, source = 'chainlink') {
@@ -153,7 +157,7 @@ class RtdsMultiplex {
       absBps: Math.abs(venue - tick.value) / tick.value * 10000,
       chainlinkSourceMs: tick.sourceMs,
       chainlinkReceiveMs: tick.receiveWallMs,
-      ageMs: Date.now() - tick.receiveWallMs,
+      ageMs: tickAgeMs(tick),
     };
   }
 
@@ -182,8 +186,13 @@ class RtdsMultiplex {
     const assetCoverage = Object.fromEntries(this.assets.map((asset) => [asset, {
       freshPaths: this.feeds.filter((feed) => {
         const tick = feed.latest.get(`chainlink:${asset}`);
-        return tick && now - tick.receiveWallMs <= this.coverageMaxAgeMs;
+        return tickAgeMs(tick, now) <= this.coverageMaxAgeMs;
       }).length,
+      freshestAgeMs: (() => {
+        const ages = this.feeds.map((feed) =>
+          tickAgeMs(feed.latest.get(`chainlink:${asset}`), now)).filter(Number.isFinite);
+        return ages.length ? Math.min(...ages) : null;
+      })(),
       paths: this.pathCount,
     }]));
     return {
