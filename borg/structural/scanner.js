@@ -15,11 +15,17 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 
 const ClobMultiplex = require('../recon/clob-multiplex');
 const RawWal = require('../recon/wal');
-const { pool, migrateStructural, insertRows, logEvent } = require('../recon/db');
+const {
+  pool, migrateEdgeExecution, migrateStructural, insertRows, logEvent,
+} = require('../recon/db');
 const {
   buildConditionGraph, evaluateCandidate, STRUCTURAL_UNIVERSE_VERSION,
 } = require('./condition-graph');
 const { buildPhysicalSportsCandidates } = require('./physical-event-graph');
+const { buildExpandedPhysicalCandidates } = require('./physical-event-graph-v2');
+const {
+  attributionEvent, attributionRow, passiveTransitionStage, structuralEvaluationStage,
+} = require('../research/execution-attribution');
 const {
   createPassiveQuoteState, proposePassiveQuotes, updatePassiveQuoteState,
 } = require('./passive-entry');
@@ -256,6 +262,8 @@ function boundedPanel(candidates) {
   // budget. Selection is deterministic and independent of observed PnL.
   const typeOrder = [
     'sports_exact00_over05_floor', 'complete_mutually_exclusive_set',
+    'sports_exact_score_match_result_floor',
+    'sports_exact_score_btts_floor', 'sports_exact_score_first_scorer_floor',
     'sports_total_ladder', 'sports_spread_ladder',
     'nested_threshold', 'disjoint_ranges', 'binary_complement',
   ];
@@ -350,7 +358,7 @@ async function persistCandidates(catalog, panel) {
 }
 
 async function main() {
-  await migrateStructural();
+  await migrateStructural(); await migrateEdgeExecution();
   const abandoned = await pool.query(`
     UPDATE borg_structural_passive_quotes
        SET status='ABANDONED_PROCESS_RESTART',closed_at=now(),updated_at=now(),
@@ -382,6 +390,7 @@ async function main() {
   // below retains every transition; keyed coalescing prevents one INSERT ...
   // ON CONFLICT batch from trying to update the same primary key twice.
   const passiveBuffer = new Map();
+  const attributionBuffer = [];
   const passiveStates = new Map();
   const lastStored = new Map();
   let successfulFlushes = 0;
@@ -390,6 +399,13 @@ async function main() {
   let lastPersistenceErrorAt = null;
   let stopping = false;
   const pendingEvaluations = new Set();
+  const recordAttribution = (event) => {
+    wal.append(JSON.stringify({ type: 'paper_execution_attribution', ...event }), {
+      channel: 'paper-execution-attribution', sourceMs: Date.parse(event.observedAt),
+    });
+    attributionBuffer.push(event);
+    if (attributionBuffer.length > 20_000) attributionBuffer.shift();
+  };
   const recordPassiveState = (state, latencyMs, transition, sourceMs = null) => {
     wal.append(JSON.stringify({
       type: 'structural_passive_quote',
@@ -401,6 +417,21 @@ async function main() {
       sourceMs,
     });
     passiveBuffer.set(state.quoteId, passiveQuoteRow(state, latencyMs));
+    const stage = passiveTransitionStage(transition, state);
+    if (stage) recordAttribution(attributionEvent({
+      experimentId: state.experimentId || structuralExperimentId(state.structureType),
+      opportunityId: state.quoteId,
+      instrumentGroupId: state.candidateId,
+      observedAt: Date.now(), stage, latencyMs, quantity: state.shares,
+      conservativePnlUsd: state.lockedPnl2xUsd ?? state.orphanUnwindPnl2xUsd
+        ?? state.orphanSafeProfitUsd,
+      dataQualityGrade: 'B', executionFidelityGrade: 'C',
+      detailIdentity: `${transition}:${state.status}:${state.observations || 0}`,
+      detail: {
+        transition, status: state.status, passiveFilledShares: state.passiveFilledShares ?? 0,
+        hedgedShares: state.hedgedShares ?? 0, paperPostOnly: true,
+      },
+    }));
   };
 
   const clob = new ClobMultiplex((token) => tokenMarket.get(String(token)) || null, {
@@ -451,6 +482,26 @@ async function main() {
               });
               buffer.push(durable);
               if (buffer.length > 20_000) buffer.shift();
+              recordAttribution(attributionEvent({
+                experimentId: durable.experimentId,
+                opportunityId: durable.dedupKey,
+                instrumentGroupId: candidate.candidateId,
+                observedAt: evaluatedAt,
+                stage: structuralEvaluationStage(evaluation), latencyMs,
+                quantity: evaluation.targetShares,
+                conservativePnlUsd: evaluation.orphanSafeProfit2xUsd,
+                dataQualityGrade: evaluation.passStale && evaluation.passQuotes ? 'A' : 'F',
+                executionFidelityGrade: 'B',
+                detailIdentity: durable.dedupKey,
+                detail: {
+                  passProof: evaluation.passProof,
+                  passRuleCertification: evaluation.passRuleCertification,
+                  passStale: evaluation.passStale, passFok: evaluation.passFok,
+                  passFees2x: evaluation.passFees2x,
+                  passOrphanRisk: evaluation.passOrphanRisk,
+                  qualified: evaluation.qualified, publicDisplayedDepthOnly: true,
+                },
+              }));
             }
 
             const passiveKey = `${candidate.candidateId}:${latencyMs}`;
@@ -518,6 +569,7 @@ async function main() {
     const graph = [
       ...buildConditionGraph(events),
       ...buildPhysicalSportsCandidates(events),
+      ...buildExpandedPhysicalCandidates(events),
     ];
     const panel = boundedPanel(graph);
     const catalog = boundedCatalog(graph, panel);
@@ -551,8 +603,9 @@ async function main() {
   };
 
   const flush = async () => {
-    if (!buffer.length && !passiveBuffer.size) return;
+    if (!buffer.length && !passiveBuffer.size && !attributionBuffer.length) return;
     const rows = buffer.splice(0, 2000);
+    const attribution = attributionBuffer.splice(0, 2000);
     const passiveEntries = [...passiveBuffer.entries()].slice(0, 2000);
     for (const [quoteId] of passiveEntries) passiveBuffer.delete(quoteId);
     const passiveRows = passiveEntries.map(([, row]) => row);
@@ -608,10 +661,16 @@ async function main() {
           observations=EXCLUDED.observations,detail=EXCLUDED.detail,
           updated_at=now()`);
       }
+      if (attribution.length) await insertRows('borg_execution_attribution', [
+        'attribution_id', 'experiment_id', 'opportunity_id', 'instrument_group_id',
+        'observed_at', 'stage', 'latency_ms', 'quantity', 'conservative_pnl_usd',
+        'data_quality_grade', 'execution_fidelity_grade', 'paper_only', 'detail',
+      ], attribution.map(attributionRow), 'ON CONFLICT (attribution_id) DO NOTHING');
       successfulFlushes += 1;
       lastPersistedAt = new Date().toISOString();
     } catch (error) {
       buffer.unshift(...rows);
+      attributionBuffer.unshift(...attribution);
       for (const [quoteId, row] of passiveEntries) {
         // A newer transition may have arrived while SQL was in flight. Never
         // replace it with the older failed materialization.
@@ -673,6 +732,7 @@ async function main() {
       candidates: candidates.size,
       catalogCandidates: catalogSize, tokens: byToken.size, queued: buffer.length,
       passiveQueued: passiveBuffer.size, passiveResting: passiveStates.size,
+      attributionQueued: attributionBuffer.length,
       successfulFlushes, persistenceErrors, lastPersistedAt, lastPersistenceErrorAt,
       paperOnly: true, walletLoaded: false, allMarket: true, sportsTagId: 1,
       sportsEventPages: SPORTS_EVENT_PAGES, universeVersion: STRUCTURAL_UNIVERSE_VERSION,
