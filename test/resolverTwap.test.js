@@ -2,7 +2,9 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { boundaryRecord, nearestTick } = require('../borg/resolver-twap/collector');
+const {
+  boundaryFinalizationDeadline, boundaryKey, boundaryRecord, nearestTick,
+} = require('../borg/resolver-twap/collector');
 const { e18Decimal, parseTwapFrame } = require('../borg/resolver-twap/rtds');
 const { SERIES, normalizeZecTwapMarket } = require('../borg/resolver-twap/universe');
 
@@ -54,4 +56,6 @@ test('boundary records use nearest exact-source tick and fail closed when stale'
   }, start + 7100);
   assert.equal(delayed.eligible, false);
   assert.equal(delayed.reason, 'SOURCE_OR_RECEIPT_STALE');
+  assert.equal(boundaryKey(market, 'OPEN'), 'c:OPEN');
+  assert.equal(boundaryFinalizationDeadline(market, 'OPEN'), start + 8000);
 });

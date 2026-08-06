@@ -116,6 +116,17 @@ function boundaryRecord(market, kind, tickMatch, observedAt = Date.now()) {
   };
 }
 
+function boundaryKey(market, kind) {
+  return `${market.conditionId}:${kind}`;
+}
+
+function boundaryFinalizationDeadline(market, kind) {
+  const targetMs = kind === 'OPEN' ? market.windowStart.getTime() : market.windowEnd.getTime();
+  // After this point, a newly arriving tick cannot both be inside the source-
+  // time tolerance and satisfy the maximum receipt-lag certification.
+  return targetMs + BOUNDARY_TOLERANCE_MS + BOUNDARY_RECEIPT_MAX_AGE_MS;
+}
+
 async function main() {
   await migrate(); await migrateEdgeExecution();
   const twapWal = new RawWal('zec-chainlink-twap', {
@@ -134,6 +145,8 @@ async function main() {
   let blocker = 'STARTING';
   let stopping = false;
   let clobStarted = false;
+  const finalizedBoundaries = new Set();
+  let boundaryCapturePromise = null;
 
   const twap = new TwapMultiplex({
     symbols: ['zec/usd'], windows: [30, 60], pathCount: 2,
@@ -188,45 +201,72 @@ async function main() {
     } catch (error) { tickBuffer.unshift(...rows); throw error; }
   };
 
-  const captureBoundaries = async () => {
+  const captureBoundariesOnce = async () => {
     const now = Date.now();
     for (const market of markets) {
       for (const kind of ['OPEN', 'CLOSE']) {
+        const key = boundaryKey(market, kind);
+        if (finalizedBoundaries.has(key)) continue;
         const targetMs = kind === 'OPEN' ? market.windowStart.getTime() : market.windowEnd.getTime();
         if (now < targetMs + BOUNDARY_TOLERANCE_MS) continue;
         const match = nearestTick(history, targetMs, market.twapWindowSeconds,
           BOUNDARY_TOLERANCE_MS);
         const record = boundaryRecord(market, kind, match, now);
-        const result = await pool.query(`INSERT INTO borg_twap_boundaries (
+        // A 250ms timer can otherwise overlap a slow PostgreSQL round-trip. Use
+        // constraint-agnostic DO NOTHING for the initial insert: the table has
+        // both a primary key and a condition/kind unique key, and naming only
+        // one arbiter allowed the other constraint to raise a duplicate error.
+        let result = await pool.query(`INSERT INTO borg_twap_boundaries (
           boundary_id,universe_id,market_id,condition_id,slug,boundary_kind,
           target_at,observed_at,source_ts,exact_value,distance_ms,eligible,reason,
           wal_event_id,detail
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)
-        ON CONFLICT (condition_id,boundary_kind) DO UPDATE SET
-          observed_at=EXCLUDED.observed_at,source_ts=EXCLUDED.source_ts,
-          exact_value=EXCLUDED.exact_value,distance_ms=EXCLUDED.distance_ms,
-          eligible=EXCLUDED.eligible,reason=EXCLUDED.reason,
-          wal_event_id=EXCLUDED.wal_event_id,detail=EXCLUDED.detail
-        WHERE borg_twap_boundaries.eligible=false AND EXCLUDED.eligible=true`, [
+        ON CONFLICT DO NOTHING`, [
           record.boundaryId, ZEC_TWAP_UNIVERSE, record.marketId, record.conditionId,
           record.slug, record.kind, record.targetAt, record.observedAt, record.sourceAt,
           record.exactValue, record.distanceMs, record.eligible, record.reason,
           record.walEventId, JSON.stringify(record.detail),
         ]);
-        if (!result.rowCount) continue;
-        boundaries += 1;
-        twapWal.append(JSON.stringify({ type: 'zec_twap_boundary', ...record }), {
-          channel: 'twap-boundary', sourceMs: record.sourceAt?.getTime?.() || null,
-        });
-        if (kind === 'OPEN' && record.eligible) {
+        // An initially absent boundary may be recorded as ineligible while the
+        // final admissible source tick is still in flight. Upgrade that row
+        // atomically when an eligible observation arrives; never downgrade it.
+        if (!result.rowCount && record.eligible) {
+          result = await pool.query(`UPDATE borg_twap_boundaries SET
+          observed_at=$3,source_ts=$4,exact_value=$5,distance_ms=$6,
+          eligible=true,reason=$7,wal_event_id=$8,detail=$9::jsonb
+          WHERE condition_id=$1 AND boundary_kind=$2 AND eligible=false`, [
+            record.conditionId, record.kind, record.observedAt, record.sourceAt,
+            record.exactValue, record.distanceMs, record.reason, record.walEventId,
+            JSON.stringify(record.detail),
+          ]);
+        }
+        if (record.eligible && kind === 'OPEN') {
+          // Run this even when the boundary row pre-existed: it repairs a crash
+          // between the durable boundary insert and the market-reference update.
           await pool.query(`UPDATE borg_markets SET chainlink_open=$1,
             chainlink_open_src=$2 WHERE id=$3`, [
             record.exactValue, `chainlink_twap_${market.twapWindowSeconds}s_nearest_3s`,
             market.id,
           ]);
         }
+        if (result.rowCount) {
+          boundaries += 1;
+          twapWal.append(JSON.stringify({ type: 'zec_twap_boundary', ...record }), {
+            channel: 'twap-boundary', sourceMs: record.sourceAt?.getTime?.() || null,
+          });
+        }
+        if (record.eligible || now >= boundaryFinalizationDeadline(market, kind)) {
+          finalizedBoundaries.add(key);
+        }
       }
     }
+  };
+
+  const captureBoundaries = () => {
+    if (boundaryCapturePromise) return boundaryCapturePromise;
+    boundaryCapturePromise = captureBoundariesOnce()
+      .finally(() => { boundaryCapturePromise = null; });
+    return boundaryCapturePromise;
   };
 
   const heartbeat = async () => {
@@ -241,6 +281,8 @@ async function main() {
       paperOnly: true, walletLoaded: false, liveOrderPath: false,
       captureOnly: true, noSpotSubstitution: true,
       markets: markets.length, ticks, boundaries, lastTickAt,
+      finalizedBoundaries: finalizedBoundaries.size,
+      boundaryCaptureInFlight: boundaryCapturePromise != null,
       blocker: statusBlocker, feed, clob: book,
     };
     await pool.query(`UPDATE borg_twap_runtime SET
@@ -269,7 +311,9 @@ async function main() {
   const shutdown = async (signal) => {
     if (stopping) return; stopping = true; timers.forEach(clearInterval);
     twap.close(); clob.close();
-    await Promise.allSettled([flushTicks(), clob.flushEvents(), heartbeat()]);
+    await Promise.allSettled([
+      boundaryCapturePromise || Promise.resolve(), flushTicks(), clob.flushEvents(), heartbeat(),
+    ]);
     await pool.query(`UPDATE borg_twap_runtime SET status='STOPPED',stopped_at=now(),updated_at=now()
       WHERE run_id=$1`, [RUN_ID]).catch(() => {});
     await Promise.allSettled([twapWal.close(), clobWal.close()]);
@@ -284,4 +328,6 @@ if (require.main === module) main().catch(async (error) => {
   console.error(error.stack || error.message); await pool.end().catch(() => {}); process.exit(1);
 });
 
-module.exports = { boundaryRecord, nearestTick, persistMarkets, tickRow };
+module.exports = {
+  boundaryFinalizationDeadline, boundaryKey, boundaryRecord, nearestTick, persistMarkets, tickRow,
+};
