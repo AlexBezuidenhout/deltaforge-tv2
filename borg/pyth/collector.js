@@ -93,6 +93,8 @@ class PythBoundaryObserver {
     this.lastUsableTickAt = 0;
     this.lastSignalAt = 0;
     this.deferredFeedSymbols = [];
+    this.eligibleWindowConnectionGaps = 0;
+    this.lastEligibleWindowConnectionGapAt = null;
     this.metrics = {
       ticks: 0, liveTicks: 0, historicalTicks: 0, carriedForward: 0,
       diagnosticRtdsTicks: 0,
@@ -112,9 +114,25 @@ class PythBoundaryObserver {
     this.hermes = new HermesPythStream({
       wal: this.hermesWal,
       onTick: (tick) => this.onTick(tick, true),
-      onStatus: (status, detail) => logEvent(
-        status === 'OPEN' ? 'INFO' : 'WARN', 'pyth', `Hermes ${status}`, detail,
-      ),
+      onStatus: (status, detail) => {
+        if (status === 'CLOSED') {
+          const now = Date.now();
+          const decisionWindowOpen = [...this.markets.values()].some((market) =>
+            market.active && market.pythFeedSymbol
+            && inResolverObservationWindow(market, now, OBSERVATION_WINDOW_SEC));
+          if (decisionWindowOpen) {
+            this.eligibleWindowConnectionGaps += 1;
+            this.lastEligibleWindowConnectionGapAt = new Date(now).toISOString();
+            this.decisionWal.append(JSON.stringify({
+              type: 'pyth_eligible_window_transport_gap',
+              observedAt: this.lastEligibleWindowConnectionGapAt,
+              detail,
+            }), { channel: 'control', receiveWallMs: now });
+          }
+        }
+        return logEvent(status === 'OPEN' ? 'INFO' : 'WARN',
+          'pyth', `Hermes ${status}`, detail);
+      },
     });
   }
 
@@ -657,6 +675,8 @@ class PythBoundaryObserver {
       symbols: this.hermes.feedById.size, polyTokens: this.targetByToken.size,
       lastTickAt: this.lastTickAt || null, lastUsableTickAt: this.lastUsableTickAt || null,
       signals: this.metrics.signals, refreshErrors: this.metrics.refreshErrors,
+      eligibleWindowConnectionGaps: this.eligibleWindowConnectionGaps,
+      lastEligibleWindowConnectionGapAt: this.lastEligibleWindowConnectionGapAt,
       feedState, marketsInWindow: inWindow.length,
       activeContractMarkets: active.length, observationWindowSec: OBSERVATION_WINDOW_SEC,
       deferredWindowMarkets: deferredInWindow.length,

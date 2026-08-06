@@ -7,6 +7,7 @@ const test = require('node:test');
 const {
   ageSeconds, assessParquetLake, findCounters, isAtOrAfter, isErrorCounter,
   isGapCounter, latestContinuousHealthySuffix, readReceipt, archiveReportFailure,
+  scopedEvidenceCounters,
 } = require('../borg/research/evidence-epoch');
 
 test('evidence health finds nested sequence and collector error counters', () => {
@@ -44,6 +45,19 @@ test('feed-specific coverage and sequence gaps fail closed', () => {
   assert.equal(isGapCounter('connectionGaps'), true);
   assert.equal(isGapCounter('reconfigurationGaps'), true);
   assert.equal(isGapCounter('globalBootstrapTruncations'), false);
+});
+
+test('Pyth all-day reconnects stay diagnostic while eligible-window gaps fail closed', () => {
+  const counters = scopedEvidenceCounters('pyth_boundary', {
+    marketsInWindow: 0,
+    eligibleWindowConnectionGaps: 1,
+    hermes: { metrics: { connectionGaps: 4, reconfigurationGaps: 0 } },
+  });
+  assert.equal(counters.hermes.metrics.connectionGaps, undefined);
+  assert.equal(counters.eligibleWindowConnectionGaps, 1);
+  assert.deepEqual(findCounters(counters, isGapCounter), [{
+    path: 'eligibleWindowConnectionGaps', value: 1,
+  }]);
 });
 
 test('evidence age uses explicit clock and never reports negative age', () => {

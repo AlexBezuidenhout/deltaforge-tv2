@@ -77,6 +77,23 @@ function isGapCounter(key) {
     .test(String(key));
 }
 
+function scopedEvidenceCounters(owner, counters) {
+  if (owner !== 'pyth_boundary' || !counters?.hermes?.metrics) return counters;
+  // The Pyth process keeps a broad exact-feed tape all day, but the frozen
+  // strategy can only emit evidence in its final 300-second resolver windows.
+  // Retain all transport reconnect telemetry while excluding the all-day
+  // diagnostic counter from the global no-gap gate. The collector exposes a
+  // separate eligibleWindowConnectionGaps counter, and live-window coverage
+  // is also checked explicitly above, so an economically relevant outage
+  // still fails closed.
+  const hermesMetrics = { ...counters.hermes.metrics };
+  delete hermesMetrics.connectionGaps;
+  return {
+    ...counters,
+    hermes: { ...counters.hermes, metrics: hermesMetrics },
+  };
+}
+
 function latestContinuousHealthySuffix(rows, options = {}) {
   const maxGapSec = finite(options.maxGapSec, FAST_COMPONENT_MAX_AGE_SEC);
   const ordered = [...(Array.isArray(rows) ? rows : [])]
@@ -552,6 +569,7 @@ async function assessEvidenceEpoch(pool, options = {}) {
       counters = broadCaptureCounters;
     }
     const owner = row.component || row.source || 'unknown';
+    counters = scopedEvidenceCounters(owner, counters);
     sequenceCounters.push(...findCounters(counters, isGapCounter)
       .map((entry) => ({ ...entry, owner })));
     errorCounters.push(...findCounters(counters, isErrorCounter)
@@ -844,6 +862,7 @@ module.exports = {
   findCounters,
   isAtOrAfter,
   isErrorCounter,
+  scopedEvidenceCounters,
   isGapCounter,
   latestContinuousHealthySuffix,
   readReceipt,

@@ -741,8 +741,26 @@ INSERT INTO asset_config (asset, slug_prefix, binance_symbol, price_source, hl_c
 ON CONFLICT (asset) DO NOTHING;
 `;
 
+async function runSchemaMigration(lockName, sql) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [lockName]);
+    await client.query(sql);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function migrate() {
-  await pool.query(SCHEMA);
+  // The primary and exact-TWAP collectors start together and both need the
+  // core market schema. PostgreSQL's idempotent DDL can still deadlock when
+  // two sessions create/alter the same implicit types concurrently.
+  await runSchemaMigration('deltaforge:core-schema:v1', SCHEMA);
 }
 
 // The legacy all-in-one migration also contains historical ALTER/DO blocks
@@ -1512,18 +1530,7 @@ async function migrateEdgeExecution() {
   // pg_type_typname_nsp_index violation. Serialize this additive migration on
   // one transaction-scoped advisory lock; the lock is released on commit or
   // rollback and never enters a strategy/order path.
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('deltaforge:edge-execution-schema:v1'))");
-    await client.query(EDGE_EXECUTION_SCHEMA);
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
-  } finally {
-    client.release();
-  }
+  await runSchemaMigration('deltaforge:edge-execution-schema:v1', EDGE_EXECUTION_SCHEMA);
 }
 
 // All-market pre-trade L2 and passive-maker laboratory. This schema is
