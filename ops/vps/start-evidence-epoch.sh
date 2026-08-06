@@ -110,7 +110,9 @@ systemctl stop \
   borg-allmarket.service \
   borg-crossvenue.service \
   borg-options-surface.service \
+  borg-equity-options.service \
   borg-pyth-boundary.service \
+  borg-zec-twap.service \
   borg-public-info.service \
   borg-structural-scanner.service \
   polymarket-flow.service \
@@ -153,7 +155,9 @@ systemctl enable \
   borg-allmarket.service \
   borg-crossvenue.service \
   borg-options-surface.service \
+  borg-equity-options.service \
   borg-pyth-boundary.service \
+  borg-zec-twap.service \
   borg-public-info.service \
   borg-structural-scanner.service \
   polymarket-flow.service
@@ -164,7 +168,9 @@ systemctl start \
   borg-allmarket.service \
   borg-crossvenue.service \
   borg-options-surface.service \
+  borg-equity-options.service \
   borg-pyth-boundary.service \
+  borg-zec-twap.service \
   borg-public-info.service \
   borg-structural-scanner.service \
   polymarket-flow.service

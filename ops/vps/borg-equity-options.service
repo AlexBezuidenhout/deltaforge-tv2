@@ -1,0 +1,39 @@
+[Unit]
+Description=BORG exact-expiry equity options research lane (read-only, paper only)
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
+Environment=NODE_ENV=production
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_WAL_MIN_FREE_GB=20
+Environment=EQOPT_SYMBOLS=SPY,EWY
+Environment=EQOPT_QUOTE_POLL_MS=1000
+Environment=EQOPT_DB_TOUCH_SAMPLE_MS=5000
+Environment=EQOPT_MAX_AGE_MS=2000
+Environment=EQOPT_OPTION_FEE_PER_CONTRACT=0.65
+Environment=EQOPT_OPTION_TICK_USD=0.01
+Environment=EQOPT_ASSIGNMENT_RESERVE_USD=5
+Environment=EQOPT_CORPORATE_ACTION_CLEAR=false
+ExecStart=/usr/local/bin/node borg/equity-options/collector.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=45
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

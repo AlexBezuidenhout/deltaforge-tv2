@@ -1,0 +1,34 @@
+[Unit]
+Description=BORG exact Chainlink ZEC TWAP capture lane (paper only)
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=deltaforge
+Group=deltaforge
+WorkingDirectory=/opt/deltaforge/tv2/current
+EnvironmentFile=/etc/deltaforge/tv2.env
+EnvironmentFile=-/etc/deltaforge/evidence-epoch.env
+Environment=NODE_ENV=production
+Environment=BORG_WAL_DIR=/var/lib/deltaforge/wal/borg
+Environment=BORG_WAL_MIN_FREE_GB=20
+Environment=TWAP_MARKET_REFRESH_MS=60000
+Environment=TWAP_SOURCE_MAX_AGE_MS=5000
+Environment=TWAP_BOUNDARY_TOLERANCE_MS=3000
+ExecStart=/usr/local/bin/node borg/resolver-twap/collector.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=45
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

@@ -84,6 +84,8 @@
     "structural:collect": "node borg/structural/scanner.js",
     "options:collect": "node borg/options/collector.js",
     "pyth:collect": "node borg/pyth/collector.js",
+    "equity-options:collect": "node borg/equity-options/collector.js",
+    "zec-twap:collect": "node borg/resolver-twap/collector.js",
     "publicinfo:collect": "node borg/publicinfo/collector.js",
     "access:create-viewer": "node scripts/create-collaborator-viewer.js",
     "access:verify-viewer": "node scripts/verify-collaborator-viewer.js"
