@@ -23,6 +23,7 @@
     "benchmark:infra": "node scripts/infra-benchmark.js",
     "replay:latency": "node scripts/borg-latency-replay.js",
     "replay:wal-execution": "node scripts/wal-execution-replay.js",
+    "replay:h43-full-depth": "node scripts/h43-full-depth-replay.js",
     "replay:latency-sweep": "node scripts/latency-sweep.js",
     "archive:parquet": "node scripts/parquet-mirror.js",
     "archive:parquet-lake": "node scripts/parquet-lake.js compact",
