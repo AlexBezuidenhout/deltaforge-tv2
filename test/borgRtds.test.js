@@ -4,6 +4,22 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const RtdsRecon = require('../borg/recon/rtds');
 const RtdsMultiplex = require('../borg/recon/rtds-multiplex');
+const WebSocket = require('ws');
+
+test('RTDS uses the official lowercase application heartbeat and accepts either pong case', () => {
+  const sent = [];
+  const feed = new RtdsRecon(() => {}, { assets: ['btc'] });
+  const socket = { readyState: WebSocket.OPEN, send: (message) => sent.push(message) };
+  feed.ws = socket;
+  assert.equal(feed._sendHeartbeat(socket), true);
+  assert.deepEqual(sent, ['ping']);
+
+  feed._onMessage(Buffer.from('pong'));
+  feed._onMessage(Buffer.from('PONG'));
+  assert.equal(feed.lastMsgAt, 0, 'transport keepalives cannot refresh economic state');
+  assert.equal(feed.drainRows().length, 0);
+  feed.close();
+});
 
 test('RTDS Chainlink parser records source/receive clocks and divergence', () => {
   const order = [];

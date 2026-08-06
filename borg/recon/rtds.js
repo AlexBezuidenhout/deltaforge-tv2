@@ -129,7 +129,7 @@ class RtdsRecon {
           ],
         }));
         this._pingTimer = setInterval(() => {
-          if (this.ws === ws && ws.readyState === WebSocket.OPEN) ws.send('PING');
+          this._sendHeartbeat(ws);
         }, 5000);
         resolve(true);
       });
@@ -161,6 +161,16 @@ class RtdsRecon {
       this._reconnectTimer = null;
       this.connect().then((ok) => { if (!ok) this._scheduleReconnect(); }).catch(() => this._scheduleReconnect());
     }, delay);
+  }
+
+  _sendHeartbeat(socket) {
+    if (this.ws !== socket || socket?.readyState !== WebSocket.OPEN) return false;
+    // RTDS is a different protocol from the CLOB market channel. Polymarket's
+    // current official real-time-data-client sends the lowercase text frame
+    // `ping` every five seconds; uppercase CLOB-style PINGs caused long-lived
+    // RTDS sockets to stop receiving economic updates before closing 1006.
+    socket.send('ping');
+    return true;
   }
 
   _recordConnectionGap(detail = {}) {
@@ -245,7 +255,7 @@ class RtdsRecon {
       connection_epoch: this.connectionEpoch,
     };
     this.lastFrameAt = receiveWallMs;
-    if (raw.toString() === 'PONG') return;
+    if (raw.toString().trim().toLowerCase() === 'pong') return;
     let message;
     try { message = JSON.parse(raw); } catch (_) { return; }
     if (!['crypto_prices_chainlink', 'crypto_prices'].includes(message.topic)) return;
