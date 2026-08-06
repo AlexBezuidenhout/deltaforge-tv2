@@ -1,0 +1,39 @@
+{
+  "experiment_id": "zec-chainlink-twap-capture-v1",
+  "manifest_format": "borg-experiment-v1",
+  "registered_at": "2026-08-06T10:20:00.000Z",
+  "frozen_at": "2026-08-06T10:20:00.000Z",
+  "evidence_started_at": null,
+  "phase": "capture",
+  "status": "frozen",
+  "paper_only": true,
+  "live_order_path": "disabled",
+  "family": "resolver_boundary_transfer",
+  "strategy_version": "zec-chainlink-twap-capture-v1",
+  "starting_bankroll_usd": 500,
+  "historical_rows_reused": false,
+  "mechanism": "Capture the exact Chainlink 30-second and 60-second ZEC TWAP resolver streams, source timestamps, boundary values, and synchronized CLOB books before any residual strategy is specified.",
+  "frozen_predicates": [
+    "zec/usd exact symbol",
+    "crypto_prices_twap_thirty for five-minute contracts",
+    "crypto_prices_twap_sixty for fifteen-minute contracts",
+    "full_accuracy_value E18 payload",
+    "source timestamp within three seconds of the certified market boundary",
+    "no spot-price substitution"
+  ],
+  "promotion": {
+    "minimum_fresh_independent_markets": 300,
+    "minimum_calendar_days": 14,
+    "strategy_required_before_trading": true,
+    "paper_only_until_authenticated_fill_pilot": true
+  },
+  "strategy_bindings": [{
+    "strategy": "zec_twap_boundary_capture_v1",
+    "family": "resolver_boundary_transfer",
+    "arm": "capture_only",
+    "phase": "capture",
+    "min_independent_markets": 300,
+    "min_days": 14,
+    "primary_metric": "exact_resolver_boundary_coverage"
+  }]
+}
