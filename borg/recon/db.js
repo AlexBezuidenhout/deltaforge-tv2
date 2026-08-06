@@ -1240,6 +1240,275 @@ async function migratePyth() {
   await pool.query(PYTH_SCHEMA);
 }
 
+// Shared paper-execution attribution plus the exact-expiry equity/options
+// research lane. These tables deliberately contain no account, wallet, order
+// submission, or authenticated execution fields. Full-rate licensed/source
+// frames are WAL-authoritative; SQL remains a bounded research projection.
+const EDGE_EXECUTION_SCHEMA = `
+CREATE TABLE IF NOT EXISTS borg_execution_attribution (
+  attribution_id TEXT PRIMARY KEY,
+  experiment_id TEXT NOT NULL,
+  opportunity_id TEXT NOT NULL,
+  instrument_group_id TEXT,
+  observed_at TIMESTAMPTZ NOT NULL,
+  stage TEXT NOT NULL CHECK (stage IN (
+    'DETECTED','SIMULTANEOUS_EXECUTABLE','COST_QUALIFIED','ORPHAN_SAFE','QUALIFIED',
+    'PAPER_SUBMITTED','PARTIALLY_FILLED','FULLY_FILLED','CANCELLED','ORPHANED'
+  )),
+  latency_ms INT,
+  quantity NUMERIC,
+  conservative_pnl_usd NUMERIC,
+  data_quality_grade TEXT,
+  execution_fidelity_grade TEXT,
+  paper_only BOOLEAN NOT NULL DEFAULT true,
+  detail JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS borg_execution_attribution_experiment_time
+  ON borg_execution_attribution (experiment_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS borg_execution_attribution_opportunity_time
+  ON borg_execution_attribution (opportunity_id, observed_at);
+
+CREATE TABLE IF NOT EXISTS borg_eqopt_targets (
+  condition_id TEXT PRIMARY KEY,
+  experiment_id TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  gamma_id TEXT NOT NULL,
+  slug TEXT,
+  question TEXT,
+  symbol TEXT NOT NULL,
+  pyth_feed_symbol TEXT NOT NULL,
+  strike NUMERIC NOT NULL,
+  expiry_at TIMESTAMPTZ NOT NULL,
+  yes_token_id TEXT NOT NULL,
+  no_token_id TEXT NOT NULL,
+  minimum_order_size NUMERIC NOT NULL,
+  fees_enabled BOOLEAN NOT NULL,
+  fee_rate NUMERIC NOT NULL,
+  fee_exponent NUMERIC NOT NULL,
+  rule_hash TEXT NOT NULL,
+  rule_document JSONB NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT true,
+  refreshed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS borg_eqopt_targets_expiry
+  ON borg_eqopt_targets (symbol, expiry_at, strike) WHERE active;
+
+CREATE TABLE IF NOT EXISTS borg_eqopt_contracts (
+  conid BIGINT PRIMARY KEY,
+  instrument_id TEXT UNIQUE NOT NULL,
+  underlying TEXT NOT NULL,
+  underlying_conid BIGINT NOT NULL,
+  option_type TEXT NOT NULL CHECK (option_type IN ('call','put')),
+  strike NUMERIC NOT NULL,
+  expiry_at TIMESTAMPTZ NOT NULL,
+  multiplier NUMERIC NOT NULL,
+  trading_class TEXT,
+  exchange TEXT,
+  exercise_style TEXT,
+  settlement_style TEXT,
+  adjusted BOOLEAN NOT NULL,
+  metadata_grade TEXT NOT NULL,
+  raw JSONB NOT NULL,
+  refreshed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS borg_eqopt_contracts_surface
+  ON borg_eqopt_contracts (underlying, expiry_at, strike, option_type);
+
+CREATE TABLE IF NOT EXISTS borg_eqopt_option_touches (
+  id BIGSERIAL PRIMARY KEY,
+  observed_at TIMESTAMPTZ NOT NULL,
+  source_ts TIMESTAMPTZ NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL,
+  receive_monotonic_ns NUMERIC(30,0),
+  conid BIGINT NOT NULL,
+  instrument_id TEXT NOT NULL,
+  underlying TEXT NOT NULL,
+  option_type TEXT NOT NULL,
+  strike NUMERIC NOT NULL,
+  expiry_at TIMESTAMPTZ NOT NULL,
+  bid NUMERIC,
+  ask NUMERIC,
+  bid_size NUMERIC,
+  ask_size NUMERIC,
+  last_price NUMERIC,
+  market_data_availability TEXT,
+  live_entitled BOOLEAN NOT NULL,
+  connection_epoch INT,
+  event_sequence BIGINT,
+  wal_event_id TEXT,
+  data_quality_grade TEXT NOT NULL,
+  UNIQUE (conid, observed_at)
+);
+CREATE INDEX IF NOT EXISTS borg_eqopt_option_touches_surface_time
+  ON borg_eqopt_option_touches (underlying, expiry_at, strike, observed_at DESC);
+
+CREATE TABLE IF NOT EXISTS borg_eqopt_underlying_touches (
+  id BIGSERIAL PRIMARY KEY,
+  observed_at TIMESTAMPTZ NOT NULL,
+  source_ts TIMESTAMPTZ NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL,
+  receive_monotonic_ns NUMERIC(30,0),
+  conid BIGINT NOT NULL,
+  symbol TEXT NOT NULL,
+  bid NUMERIC,
+  ask NUMERIC,
+  bid_size NUMERIC,
+  ask_size NUMERIC,
+  last_price NUMERIC,
+  market_data_availability TEXT,
+  live_entitled BOOLEAN NOT NULL,
+  data_quality_grade TEXT NOT NULL,
+  UNIQUE (conid, observed_at)
+);
+CREATE INDEX IF NOT EXISTS borg_eqopt_underlying_touches_symbol_time
+  ON borg_eqopt_underlying_touches (symbol, source_ts DESC);
+
+CREATE TABLE IF NOT EXISTS borg_eqopt_basis_samples (
+  sample_id TEXT PRIMARY KEY,
+  experiment_id TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  trade_date DATE NOT NULL,
+  target_close_at TIMESTAMPTZ NOT NULL,
+  pyth_feed_symbol TEXT NOT NULL,
+  pyth_source_ts TIMESTAMPTZ,
+  pyth_close NUMERIC,
+  pyth_source_kind TEXT NOT NULL,
+  underlying_source TEXT NOT NULL,
+  underlying_source_ts TIMESTAMPTZ,
+  underlying_close NUMERIC,
+  basis_usd NUMERIC,
+  basis_bps NUMERIC,
+  source_grade TEXT NOT NULL,
+  qualifying BOOLEAN NOT NULL DEFAULT false,
+  rule_hash TEXT,
+  detail JSONB NOT NULL,
+  observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (experiment_id, symbol, trade_date, pyth_source_kind, underlying_source)
+);
+CREATE INDEX IF NOT EXISTS borg_eqopt_basis_samples_symbol_date
+  ON borg_eqopt_basis_samples (symbol, trade_date DESC);
+
+CREATE TABLE IF NOT EXISTS borg_eqopt_evaluations (
+  evaluation_id TEXT PRIMARY KEY,
+  experiment_id TEXT NOT NULL,
+  observed_at TIMESTAMPTZ NOT NULL,
+  condition_id TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  strike NUMERIC NOT NULL,
+  expiry_at TIMESTAMPTZ NOT NULL,
+  side TEXT,
+  contracts INT,
+  token_shares NUMERIC,
+  synchronized BOOLEAN NOT NULL DEFAULT false,
+  live_entitled BOOLEAN NOT NULL DEFAULT false,
+  basis_ready BOOLEAN NOT NULL DEFAULT false,
+  costs_known BOOLEAN NOT NULL DEFAULT false,
+  displayed_depth_supported BOOLEAN NOT NULL DEFAULT false,
+  orphan_safe BOOLEAN NOT NULL DEFAULT false,
+  qualified BOOLEAN NOT NULL DEFAULT false,
+  stressed_profit_usd NUMERIC,
+  orphan_safe_profit_usd NUMERIC,
+  capital_required_usd NUMERIC,
+  barrier TEXT,
+  data_quality_grade TEXT NOT NULL,
+  execution_fidelity_grade TEXT NOT NULL,
+  detail JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS borg_eqopt_evaluations_condition_time
+  ON borg_eqopt_evaluations (condition_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS borg_eqopt_evaluations_positive
+  ON borg_eqopt_evaluations (observed_at DESC) WHERE qualified;
+
+CREATE TABLE IF NOT EXISTS borg_eqopt_runtime (
+  run_id TEXT PRIMARY KEY,
+  experiment_id TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  stopped_at TIMESTAMPTZ,
+  host TEXT NOT NULL,
+  pid INT NOT NULL,
+  paper_only BOOLEAN NOT NULL DEFAULT true,
+  wallet_loaded BOOLEAN NOT NULL DEFAULT false,
+  live_order_path BOOLEAN NOT NULL DEFAULT false,
+  status TEXT NOT NULL,
+  targets INT NOT NULL DEFAULT 0,
+  contracts INT NOT NULL DEFAULT 0,
+  live_entitled_contracts INT NOT NULL DEFAULT 0,
+  option_touches BIGINT NOT NULL DEFAULT 0,
+  basis_samples INT NOT NULL DEFAULT 0,
+  evaluations BIGINT NOT NULL DEFAULT 0,
+  last_option_at TIMESTAMPTZ,
+  last_basis_at TIMESTAMPTZ,
+  blocker TEXT,
+  metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS borg_twap_ticks (
+  id BIGSERIAL PRIMARY KEY,
+  universe_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  asset TEXT NOT NULL,
+  window_seconds INT NOT NULL CHECK (window_seconds IN (30,60)),
+  exact_value NUMERIC NOT NULL,
+  source_ts TIMESTAMPTZ NOT NULL,
+  publisher_ts TIMESTAMPTZ,
+  received_at TIMESTAMPTZ NOT NULL,
+  receive_monotonic_ns NUMERIC(30,0),
+  transport_path INT NOT NULL,
+  connection_epoch INT NOT NULL,
+  event_sequence BIGINT,
+  wal_event_id TEXT,
+  raw JSONB NOT NULL,
+  UNIQUE (source, symbol, window_seconds, source_ts, exact_value)
+);
+CREATE INDEX IF NOT EXISTS borg_twap_ticks_symbol_window_time
+  ON borg_twap_ticks (symbol, window_seconds, source_ts DESC);
+
+CREATE TABLE IF NOT EXISTS borg_twap_boundaries (
+  boundary_id TEXT PRIMARY KEY,
+  universe_id TEXT NOT NULL,
+  market_id INT,
+  condition_id TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  boundary_kind TEXT NOT NULL CHECK (boundary_kind IN ('OPEN','CLOSE')),
+  target_at TIMESTAMPTZ NOT NULL,
+  observed_at TIMESTAMPTZ NOT NULL,
+  source_ts TIMESTAMPTZ,
+  exact_value NUMERIC,
+  distance_ms NUMERIC,
+  eligible BOOLEAN NOT NULL,
+  reason TEXT NOT NULL,
+  wal_event_id TEXT,
+  detail JSONB NOT NULL,
+  UNIQUE (condition_id, boundary_kind)
+);
+
+CREATE TABLE IF NOT EXISTS borg_twap_runtime (
+  run_id TEXT PRIMARY KEY,
+  universe_id TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  stopped_at TIMESTAMPTZ,
+  host TEXT NOT NULL,
+  pid INT NOT NULL,
+  paper_only BOOLEAN NOT NULL DEFAULT true,
+  wallet_loaded BOOLEAN NOT NULL DEFAULT false,
+  live_order_path BOOLEAN NOT NULL DEFAULT false,
+  status TEXT NOT NULL,
+  markets INT NOT NULL DEFAULT 0,
+  ticks BIGINT NOT NULL DEFAULT 0,
+  boundaries INT NOT NULL DEFAULT 0,
+  last_tick_at TIMESTAMPTZ,
+  blocker TEXT,
+  metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+`;
+
+async function migrateEdgeExecution() {
+  await pool.query(EDGE_EXECUTION_SCHEMA);
+}
+
 // All-market pre-trade L2 and passive-maker laboratory. This schema is
 // deliberately namespaced and additive so the service can migrate without
 // reacquiring the legacy collector's broad ALTER locks. There are no wallet,
@@ -2487,7 +2756,7 @@ async function upsertStrategyRuntime(epochId, runId, rows) {
 module.exports = {
   pool, migrate, migrateFlow, migrateStructural, migrateOptions,
   migratePyth, migrateAllMarket, migratePairedMaker, migrateCrossVenue,
-  migratePublicInfo,
+  migratePublicInfo, migrateEdgeExecution,
   insertRows, logEvent, parameterSafeChunks,
   registerCollectionEpoch, startCollectorRun, finishCollectorRun, upsertStrategyRuntime,
 };
